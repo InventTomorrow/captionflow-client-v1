@@ -31,8 +31,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && original && !original._retry) {
+    const original = error.config as typeof error.config & { _retry?: boolean };
+    const url = String(original?.url || '');
+    const isAuthRoute =
+      url.includes('/auth/login') ||
+      url.includes('/auth/register') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/auth/logout');
+
+    if (error.response?.status === 401 && original && !original._retry && !isAuthRoute) {
       original._retry = true;
       if (!refreshing) {
         refreshing = api

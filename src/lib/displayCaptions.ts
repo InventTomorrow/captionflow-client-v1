@@ -53,6 +53,10 @@ export interface DisplayCaption extends Caption {
   sourceId?: string;
   /** Index of this display caption's first word within the source caption. */
   wordOffset?: number;
+  /** Every distinct canonical caption id contributing a word to this display
+   *  caption — used by whole-chunk resize to write sizeScale to all of them,
+   *  even when a display caption spans more than one canonical caption. */
+  sourceIds?: string[];
 }
 
 interface FlatWord {
@@ -61,6 +65,9 @@ interface FlatWord {
   end: number;
   role: WordRole;
   style?: WordStyle;
+  sizeScale?: number | null;
+  offsetX?: number | null;
+  offsetY?: number | null;
   sourceId?: string;
   sourceIndex: number;
 }
@@ -121,6 +128,9 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
         end: times[i].end,
         role: c.emphasis?.[i] ?? 'auto',
         style: c.wordStyles?.[i],
+        sizeScale: c.sizeScale,
+        offsetX: c.offsetX,
+        offsetY: c.offsetY,
         sourceId: c._id,
         sourceIndex: i,
       });
@@ -142,8 +152,12 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
     words: words.map((w) => ({ word: w.text, start: w.start, end: w.end })),
     emphasis: words.map((w) => w.role),
     wordStyles: words.map((w) => w.style ?? {}),
+    sizeScale: first.sizeScale ?? null,
+    offsetX: first.offsetX ?? null,
+    offsetY: first.offsetY ?? null,
     sourceId: singleSource ? first.sourceId : undefined,
     wordOffset: singleSource ? first.sourceIndex : undefined,
+    sourceIds: Array.from(new Set(words.map((w) => w.sourceId).filter((id): id is string => !!id))),
   };
 }
 

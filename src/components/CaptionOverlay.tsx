@@ -19,7 +19,26 @@ export type CaptionTemplate =
   | 'stack'
   | 'bigpop'
   | 'highlight'
-  | 'heroWord';
+  | 'heroWord'
+  | 'mixed'
+  | 'mixed2'
+  // Ported from CaptionTemplates.jsx — preview-only kinetic looks (see
+  // CAPTION_TEMPLATE.md: no ASS/export counterpart yet, so these do not
+  // appear in the burned-in export, only the live preview).
+  | 'editorMasala'
+  | 'aura'
+  | 'swiss'
+  | 'theBigRed'
+  | 'scribble'
+  | 'archives';
+
+/**
+ * Both Mixed Styles sets rotate through this many curated sub-styles, keyed
+ * by `caption.sequence % MIXED_STYLE_COUNT` — same rule server-side in
+ * export.service.ts (MIXED_STYLE_SPECS / MIXED_STYLE_SPECS_2), so preview and
+ * burned-in export always pick the same look for the same caption.
+ */
+export const MIXED_STYLE_COUNT = 8;
 
 export interface OverlayStyle {
   template: CaptionTemplate;
@@ -101,6 +120,37 @@ function resolveHeroSupportIdx(
   }
   if (supportIdx === heroIdx) supportIdx = heroIdx === 0 ? 1 : 0;
   return { heroIdx, supportIdx };
+}
+
+/**
+ * Word indices to emphasize for the imported kinetic templates (Editor
+ * Masala / Aura / Swiss / The Big Red / Scribble / Archives) — manual
+ * 'hero' roles win, otherwise fall back to the single longest word, same
+ * rule as `emphasisHeroIndex`.
+ */
+function emphasisSet(words: string[], roles: Array<string | undefined> = []): Set<number> {
+  const manual: number[] = [];
+  roles.forEach((r, i) => {
+    if (r === 'hero') manual.push(i);
+  });
+  if (manual.length) return new Set(manual);
+  const idx = emphasisHeroIndex(words);
+  return idx >= 0 ? new Set([idx]) : new Set();
+}
+
+/**
+ * Shrink factor for a hero/keyword string so long words (or a manual
+ * multi-word hero selection) don't overflow a narrow 9:16 frame the way a
+ * short single demo word never would in the template picker's preview card.
+ */
+function heroFitScale(text: string): number {
+  const len = coreLen(text.replace(/\s+/g, ''));
+  if (len <= 5) return 1;
+  if (len <= 7) return 0.72;
+  if (len <= 9) return 0.55;
+  if (len <= 11) return 0.42;
+  if (len <= 15) return 0.32;
+  return 0.24;
 }
 
 /** Inline CSS for one word's manual overrides (size scale % and color). */
@@ -292,7 +342,17 @@ function CaptionWords({
   // Stacked templates own their look — never flatten to plain karaoke words
   // (export burns these as phrase with hero/support sizing).
   const stackedTemplate =
-    template === 'heroWord' || template === 'hero' || template === 'stack';
+    template === 'heroWord' ||
+    template === 'hero' ||
+    template === 'stack' ||
+    template === 'mixed' ||
+    template === 'mixed2' ||
+    template === 'editorMasala' ||
+    template === 'aura' ||
+    template === 'swiss' ||
+    template === 'theBigRed' ||
+    template === 'scribble' ||
+    template === 'archives';
 
   // Karaoke already highlights the spoken word — skip template emphasis
   // only for non-stacked templates.
@@ -378,6 +438,127 @@ function CaptionWords({
     );
   }
 
+  // Mixed Styles — a different curated look per caption, cycling through
+  // MIXED_STYLE_COUNT sub-styles keyed by sequence so two consecutive
+  // captions are never the same (fonts/colors/animation live in index.css
+  // as `.cap-mixed-0` … `.cap-mixed-7`). Checked before the generic emphasis
+  // branch below: hero/support roles are computed for every project
+  // regardless of template, and would otherwise hijack Mixed Styles into the
+  // Poetic-Stack layout. The longest word gets the keyword accent instead.
+  if (template === 'mixed' || template === 'mixed2') {
+    const styleIdx =
+      ((((caption.sequence ?? 1) - 1) % MIXED_STYLE_COUNT) + MIXED_STYLE_COUNT) %
+      MIXED_STYLE_COUNT;
+    let keyIdx = -1;
+    if (words.length >= 2) {
+      keyIdx = 0;
+      words.forEach((w, i) => {
+        if (coreLen(w) > coreLen(words[keyIdx])) keyIdx = i;
+      });
+    }
+    const prefix = template === 'mixed2' ? 'cap-mixed2' : 'cap-mixed';
+    return (
+      <span className={`${prefix} ${prefix}-${styleIdx}`}>
+        {words.map((w, i) => (
+          <span key={i}>
+            {renderWord(w, i, i === keyIdx ? `${prefix}-key` : undefined)}
+            {i < words.length - 1 ? ' ' : ''}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  // Editor Masala / Aura / Swiss — ported from CaptionTemplates.jsx. Exactly
+  // two stacked lines (the rest of the phrase + the single hero/keyword),
+  // matching the picker preview's "tiny lead-in + giant shout word" layout
+  // regardless of how many words a real transcribed phrase actually has —
+  // stacking one line per word (the old behaviour) turned any phrase longer
+  // than the preview's two-word demo into a tower of lines that overflowed
+  // the frame. Preview-only: no ASS/export counterpart, see CAPTION_TEMPLATE.md.
+  if (template === 'editorMasala' || template === 'aura' || template === 'swiss') {
+    const emSet = emphasisSet(words, emphasis || []);
+    const gap = template === 'swiss' ? 0.1 : template === 'aura' ? 0.14 : 0.13;
+    // Base em size of the `-em` (hero/keyword) line, mirrored from the CSS
+    // rule of the same name — heroFitScale multiplies it down for long words.
+    const heroBaseEm = template === 'editorMasala' ? 1.55 : template === 'aura' ? 1.3 : 1.3;
+    const heroLine = words.filter((_, i) => emSet.has(i)).join(' ');
+    const restLine = words.filter((_, i) => !emSet.has(i)).join(' ');
+    type LineSpec = { key: string; cls: 'em' | 'normal'; text: string; fontSize?: string };
+    const heroSpec: LineSpec | null = heroLine
+      ? { key: 'hero', cls: 'em', text: heroLine, fontSize: `${heroBaseEm * heroFitScale(heroLine)}em` }
+      : null;
+    const restSpec: LineSpec | null = restLine ? { key: 'rest', cls: 'normal', text: restLine } : null;
+    // Aura's demo leads with the coloured keyword; Editor Masala / Swiss lead
+    // with the small line — same order the imported design uses for each.
+    const lines = (template === 'aura' ? [heroSpec, restSpec] : [restSpec, heroSpec]).filter(
+      (l): l is LineSpec => l != null,
+    );
+    return (
+      <span className={`cap-tpl cap-tpl-${template}`}>
+        {lines.map((l, i) => (
+          <div
+            key={l.key}
+            className={`cap-tpl-line cap-tpl-${template}-${l.cls}`}
+            style={{ animationDelay: `${i * gap}s`, ...(l.fontSize ? { fontSize: l.fontSize } : null) }}
+          >
+            {l.text}
+          </div>
+        ))}
+      </span>
+    );
+  }
+
+  // The Big Red — one monumental hero word with the rest of the phrase
+  // crossing it as a small caption line. Ported from CaptionTemplates.jsx.
+  // The picker preview only ever demos a short single word, so the base
+  // 1.9em size overflowed a narrow 9:16 frame for real (longer) transcribed
+  // words — heroFitScale shrinks it to fit instead.
+  if (template === 'theBigRed') {
+    const emSet = emphasisSet(words, emphasis || []);
+    const bigIdx = emSet.size ? Math.min(...emSet) : emphasisHeroIndex(words);
+    const big = bigIdx >= 0 ? words[bigIdx] : words[0];
+    const line = words.filter((_, i) => i !== bigIdx).join(' ');
+    return (
+      <span className="cap-tpl cap-tpl-theBigRed">
+        <span className="cap-tpl-bigred-word" style={{ fontSize: `${1.9 * heroFitScale(big)}em` }}>
+          {big}
+        </span>
+        {line && <span className="cap-tpl-bigred-line">{line}</span>}
+      </span>
+    );
+  }
+
+  // Scribble / Archives — inline flowing words with a highlighter mark
+  // (Scribble) or hand underline (Archives) behind the emphasized word(s).
+  // Ported from CaptionTemplates.jsx.
+  if (template === 'scribble' || template === 'archives') {
+    const emSet = emphasisSet(words, emphasis || []);
+    const gap = template === 'scribble' ? 0.12 : 0.13;
+    return (
+      <span className={`cap-tpl cap-tpl-${template}`}>
+        {words.map((w, i) => {
+          const em = emSet.has(i);
+          return (
+            <span
+              key={i}
+              className={`cap-tpl-${template}-word ${em ? `cap-tpl-${template}-em` : ''}`.trim()}
+              style={{ animationDelay: `${i * gap}s` }}
+            >
+              {em && (
+                <span
+                  className={`cap-tpl-${template}-mark`}
+                  style={{ animationDelay: `${i * gap + 0.15}s` }}
+                />
+              )}
+              {w}
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
+
   // Manual per-word roles override automatic template emphasis.
   // Each word is its own line so a Hero never shares a row with neighbours
   // (matches CapCut / Poetic Stack style from the reference editor).
@@ -448,12 +629,14 @@ interface CaptionOverlayProps {
   selectedWordIdx: number | null;
   /** Click a word on the video to select it in the Phrases panel. */
   onWordSelect: (caption: DisplayCaption, index: number) => void;
-  /** Merge a partial style change (drag position / resize font size). */
-  onStyleChange: (patch: Partial<OverlayStyle>) => void;
-  /** Persist the current style after a drag/resize gesture ends. */
-  onStylePersist: () => void;
   /** Save edited caption text (double-click inline editing). */
   onSaveText: (caption: DisplayCaption, text: string) => void;
+  /** Commit a whole-chunk resize and/or reposition: just this caption, or every caption. */
+  onChunkStyleCommit: (
+    caption: DisplayCaption,
+    patch: { sizeScale?: number; offsetX?: number; offsetY?: number },
+    scope: 'chunk' | 'all',
+  ) => void;
 }
 
 /**
@@ -474,9 +657,8 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   selectedCaptionId,
   selectedWordIdx,
   onWordSelect,
-  onStyleChange,
-  onStylePersist,
   onSaveText,
+  onChunkStyleCommit,
 }: CaptionOverlayProps) {
   const [activeIdx, setActiveIdx] = useState(-1);
   const [visibleCount, setVisibleCount] = useState(0);
@@ -501,10 +683,33 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   const [editing, setEditing] = useState(false);
   /** Grab offset from the caption center, so dragging never snaps/jumps. */
   const dragging = useRef<{ dx: number; dy: number } | null>(null);
-  /** Active caption resize gesture: start pointer, font size and corner. */
-  const resizing = useRef<{ x: number; y: number; size: number; sx: number; sy: number } | null>(
+  /** Active caption resize gesture: start pointer, starting chunk scale and corner. */
+  const resizing = useRef<{ x: number; y: number; startScale: number; sx: number; sy: number } | null>(
     null,
   );
+  /**
+   * Whole-chunk resize in progress/just-finished: the candidate `sizeScale`
+   * for the active caption, applied optimistically to the live preview only.
+   * Non-null after a drag ends is what shows the Current Preset / Apply To
+   * All toolbar; it is cleared on commit or on any other interaction.
+   */
+  const [pendingScale, setPendingScale] = useState<number | null>(null);
+  /**
+   * Whole-chunk reposition in progress/just-finished — same pending/confirm
+   * pattern as pendingScale, just for offsetX/offsetY instead of sizeScale.
+   */
+  const [pendingPosition, setPendingPosition] = useState<{ offsetX: number; offsetY: number } | null>(
+    null,
+  );
+  /** Removes the in-flight resize's/drag's window listeners; cleared once run. */
+  const resizeCleanup = useRef<(() => void) | null>(null);
+  const dragCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      resizeCleanup.current?.();
+      dragCleanup.current?.();
+    };
+  }, []);
 
   // Live mirrors for the rAF loop (avoids re-subscribing every render).
   const styleLatest = useRef(style);
@@ -569,13 +774,27 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   }, [videoRef]);
 
   const active = activeIdx >= 0 && activeIdx < captions.length ? captions[activeIdx] : undefined;
+  // A pending (unconfirmed) resize only ever applies to the caption it was
+  // started on — discard it the moment a different caption becomes active.
+  const activeIdForPending = active?._id;
+  useEffect(() => {
+    setPendingScale(null);
+    setPendingPosition(null);
+  }, [activeIdForPending]);
   /** Previous caption, shown dimmed above the current one in Rolling mode. */
   const rollingPrev =
     displayMode === 'rolling' && activeIdx > 0 ? captions[activeIdx - 1] : undefined;
   const wordVariants = useMemo(() => makeWordVariants(style.animation), [style.animation]);
   const blockVariants = useMemo(() => makeBlockVariants(style.animation), [style.animation]);
-  // Single coordinate system for preview + export: caption CENTER as % of canvas.
-  const anchor = resolveCaptionAnchor(style);
+  // Single coordinate system for preview + export: caption CENTER as % of
+  // canvas. A pending drag wins over this chunk's saved override, which
+  // wins over the project's shared style position — same fallback chain as
+  // sizeScale/pendingScale above.
+  const anchor = resolveCaptionAnchor({
+    position: style.position,
+    offsetX: pendingPosition?.offsetX ?? active?.offsetX ?? style.offsetX,
+    offsetY: pendingPosition?.offsetY ?? active?.offsetY ?? style.offsetY,
+  });
   const behavior = wordBehavior(displayMode);
 
   // Selection arrives as (canonical caption id, canonical word index); derived
@@ -610,34 +829,49 @@ export const CaptionOverlay = memo(function CaptionOverlay({
             // follows the cursor from that point instead of snapping its
             // center under the pointer.
             const box = e.currentTarget.getBoundingClientRect();
-            dragging.current = {
-              dx: box.left + box.width / 2 - e.clientX,
-              dy: box.top + box.height / 2 - e.clientY,
+            const dx = box.left + box.width / 2 - e.clientX;
+            const dy = box.top + box.height / 2 - e.clientY;
+            dragging.current = { dx, dy };
+            // Window-level listeners (same reasoning as the resize handles
+            // above) — setPointerCapture on this element was unreliable in
+            // this tree, silently dropping move/up.
+            const onMove = (ev: PointerEvent) => {
+              if (!dragging.current) return;
+              const wrap = wrapRef.current;
+              if (!wrap) return;
+              const rect = wrap.getBoundingClientRect();
+              const clamp = (pct: number) => Math.min(95, Math.max(5, Math.round(pct * 10) / 10));
+              const offsetY = clamp(((ev.clientY + dy - rect.top) / rect.height) * 100);
+              const offsetX = clamp(((ev.clientX + dx - rect.left) / rect.width) * 100);
+              setPendingPosition({ offsetX, offsetY });
             };
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            const d = dragging.current;
-            if (!d) return;
-            const wrap = wrapRef.current;
-            if (!wrap) return;
-            const rect = wrap.getBoundingClientRect();
-            const clamp = (pct: number) => Math.min(95, Math.max(5, Math.round(pct * 10) / 10));
-            const offsetY = clamp(((e.clientY + d.dy - rect.top) / rect.height) * 100);
-            const offsetX = clamp(((e.clientX + d.dx - rect.left) / rect.width) * 100);
-            onStyleChange({ offsetY, offsetX, position: 'center' });
-          }}
-          onPointerUp={(e) => {
-            if (!dragging.current) return;
-            dragging.current = null;
-            e.currentTarget.releasePointerCapture(e.pointerId);
-            onStylePersist();
+            const onUp = () => {
+              dragging.current = null;
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+              dragCleanup.current = null;
+              // Leave pendingPosition set — its presence (along with
+              // pendingScale) is what shows the Current Preset / Apply To
+              // All toolbar below. Nothing is persisted until the user
+              // picks a scope.
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+            dragCleanup.current = onUp;
           }}
           style={{
             fontFamily: style.fontFamily,
             // Same rule as the export: fontSize is 1080-reference, scaled to
-            // the actual frame height (here, the preview canvas height).
-            fontSize: `${Math.max(9, (style.fontSize * (wrapH || 480)) / 1080)}px`,
+            // the actual frame height (here, the preview canvas height), then
+            // multiplied by this chunk's own size override (100 = normal) —
+            // a pending drag-resize wins over the saved value until committed.
+            fontSize: `${Math.max(
+              9,
+              (style.fontSize *
+                ((pendingScale ?? active.sizeScale ?? 100) / 100) *
+                (wrapH || 480)) /
+                1080,
+            )}px`,
             fontWeight: style.fontWeight,
             color: style.color,
             textTransform: style.textTransform && style.textTransform !== 'none'
@@ -765,34 +999,102 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  resizing.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    size: styleLatest.current.fontSize,
-                    sx,
-                    sy,
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const startScale = pendingScale ?? active.sizeScale ?? 100;
+                  resizing.current = { x: startX, y: startY, startScale, sx, sy };
+                  // Window-level listeners instead of setPointerCapture on this
+                  // 14px span — capture-based dragging was silently failing to
+                  // fire move/up (likely Framer Motion's own pointer handling
+                  // on the ancestor motion.div intercepting it), so the drag
+                  // would end with nothing recorded and no toolbar. Global
+                  // listeners fire regardless of what element the pointer is
+                  // over, which is the standard robust pattern for this.
+                  const onMove = (ev: PointerEvent) => {
+                    const r = resizing.current;
+                    if (!r) return;
+                    // Same delta→px projection as before, but applied against
+                    // this chunk's own effective size, then converted back to
+                    // a sizeScale percentage relative to the base
+                    // style.fontSize — this chunk resizes, not the whole
+                    // project.
+                    const delta = ((ev.clientX - r.x) * r.sx + (ev.clientY - r.y) * r.sy) / 2;
+                    const scaled = (delta * 1080) / Math.max(240, wrapH || 480);
+                    const startPx = (styleLatest.current.fontSize * r.startScale) / 100;
+                    const newPx = Math.min(160, Math.max(16, startPx + scaled));
+                    const scale = Math.min(
+                      400,
+                      Math.max(25, Math.round((newPx / styleLatest.current.fontSize) * 100)),
+                    );
+                    setPendingScale(scale);
                   };
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                }}
-                onPointerMove={(e) => {
-                  const r = resizing.current;
-                  if (!r) return;
-                  // Project the drag onto the corner's outward direction, and
-                  // convert screen px to 1080-reference units so the caption
-                  // edge tracks the cursor 1:1 at any preview size.
-                  const delta = ((e.clientX - r.x) * r.sx + (e.clientY - r.y) * r.sy) / 2;
-                  const scaled = (delta * 1080) / Math.max(240, wrapH || 480);
-                  const fontSize = Math.min(160, Math.max(16, Math.round(r.size + scaled)));
-                  onStyleChange({ fontSize });
-                }}
-                onPointerUp={(e) => {
-                  if (!resizing.current) return;
-                  resizing.current = null;
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                  onStylePersist();
+                  const onUp = () => {
+                    resizing.current = null;
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    resizeCleanup.current = null;
+                    // Leave pendingScale set — its presence is what shows the
+                    // Current Preset / Apply To All toolbar below. Nothing is
+                    // persisted until the user picks a scope.
+                  };
+                  window.addEventListener('pointermove', onMove);
+                  window.addEventListener('pointerup', onUp);
+                  resizeCleanup.current = onUp;
                 }}
               />
             ))}
+          {(pendingScale != null || pendingPosition != null) && (
+            <div className="caption-resize-confirm" onPointerDown={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="caption-resize-confirm-btn active"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChunkStyleCommit(
+                    active,
+                    {
+                      ...(pendingScale != null ? { sizeScale: pendingScale } : {}),
+                      ...(pendingPosition ?? {}),
+                    },
+                    'chunk',
+                  );
+                  setPendingScale(null);
+                  setPendingPosition(null);
+                }}
+              >
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                  <path
+                    d="M3 8.5l3 3 7-7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Current Preset
+              </button>
+              <button
+                type="button"
+                className="caption-resize-confirm-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChunkStyleCommit(
+                    active,
+                    {
+                      ...(pendingScale != null ? { sizeScale: pendingScale } : {}),
+                      ...(pendingPosition ?? {}),
+                    },
+                    'all',
+                  );
+                  setPendingScale(null);
+                  setPendingPosition(null);
+                }}
+              >
+                Apply To All
+              </button>
+            </div>
+          )}
         </div>
       )}
     </AnimatePresence>

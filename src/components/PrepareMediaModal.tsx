@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { api, API_URL, getAccessToken } from '../lib/api';
+import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../lib/planErrors';
+import { UpgradeBanner } from './UpgradeBanner';
 
 /**
  * "Prepare Your Media" popup shown on the editor right after upload.
- * Replaces the old full-page transcription settings screen — only the
- * language options are exposed; everything else uses server defaults.
+ * Language options only — caption mode / Whisper settings use server defaults.
  */
 export function PrepareMediaModal({
   projectId,
@@ -13,60 +14,95 @@ export function PrepareMediaModal({
 }: {
   projectId: string;
   onClose: () => void;
-  /** Transcription kicked off — the editor shows its inline processing state. */
   onStarted: () => void;
 }) {
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [outputLanguage, setOutputLanguage] = useState('keep_original');
   const [error, setError] = useState('');
+  const [planError, setPlanError] = useState<PlanErrorInfo | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onContinue() {
     setBusy(true);
     setError('');
+    setPlanError(null);
     try {
       await api.post(`/projects/${projectId}/transcribe`, {
         sourceLanguage,
         outputLanguage,
-        // captionMode / batchSize / whisperOptions use server defaults for now
       });
-      // Stay on the editor: processing progress is shown right on the stage.
       onStarted();
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Failed to start transcription',
-      );
+      const data = (err as { response?: { data?: ApiErrorPayload } })?.response?.data;
+      const planErr = resolvePlanError(data);
+      if (planErr) setPlanError(planErr);
+      else setError(data?.message || 'Failed to start transcription');
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-card prepare-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
+    <div className="modal-backdrop prepare-backdrop" onClick={onClose}>
+      <section
+        className="prepare-modal"
+        role="dialog"
+        aria-labelledby="prepare-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="prepare-header">
           <div>
-            <h3>Prepare Your Media</h3>
-            <p className="muted tiny">Select a language to transcribe your media.</p>
+            <div className="prepare-chip">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+              </svg>
+              Step 1 of 2
+            </div>
+            <h1 id="prepare-title">Prepare your media</h1>
+            <p className="prepare-sub">Select a language to transcribe your media.</p>
           </div>
-          <button type="button" className="modal-close" onClick={onClose} title="Close">
-            ×
+          <button type="button" className="prepare-icon-btn" onClick={onClose} aria-label="Close">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
+        </header>
+
+        <div className="prepare-media">
+          {error && <div className="error-banner">{error}</div>}
+          {planError && <UpgradeBanner info={planError} />}
+          <div className="prepare-player">
+            <video
+              className="prepare-video"
+              controls
+              preload="metadata"
+              src={`${API_URL}/api/projects/${projectId}/video?token=${encodeURIComponent(getAccessToken() || '')}`}
+            />
+          </div>
         </div>
 
-        <div className="modal-body">
-          {error && <div className="error-banner">{error}</div>}
-
-          <video
-            className="prepare-video"
-            controls
-            preload="metadata"
-            src={`${API_URL}/api/projects/${projectId}/video?token=${encodeURIComponent(getAccessToken() || '')}`}
-          />
-
-          <div className="prepare-fields">
-            <label className="props-field">
-              What language is spoken?
+        <div className="prepare-fields">
+          <label>
+            <span>What language is spoken?</span>
+            <div className="prepare-select-wrap">
               <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)}>
                 <option value="auto">Auto-detect</option>
                 <option value="ur">Urdu / Hindi (Hinglish)</option>
@@ -78,12 +114,15 @@ export function PrepareMediaModal({
                 <option value="fr">French</option>
                 <option value="tr">Turkish</option>
               </select>
-            </label>
-            <label className="props-field">
-              Script style
+              <ChevronIcon />
+            </div>
+          </label>
+          <label>
+            <span>Script style</span>
+            <div className="prepare-select-wrap">
               <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
                 <option value="keep_original">Original</option>
-                <option value="roman_urdu">Roman (Urdu/Hindi in English letters)</option>
+                <option value="roman_urdu">Urdish (Urdu/Hindi in English letters)</option>
                 <option value="english">English (translate)</option>
                 <option value="urdu">Urdu — اردو (translate)</option>
                 <option value="hindi">Hindi (translate)</option>
@@ -93,72 +132,43 @@ export function PrepareMediaModal({
                 <option value="french">French (translate)</option>
                 <option value="turkish">Turkish (translate)</option>
               </select>
-            </label>
-          </div>
-
-          {/* ---- Options removed from the popup for now (kept for later) ----
-          <p className="muted">
-            Estimated ~{estimate.minutes} min audio → ~{estimate.calls} API calls · ~${estimate.cost}
-          </p>
-
-          <fieldset>
-            <legend>Caption style</legend>
-            <label className="radio">
-              <input type="radio" checked={captionMode === 'word'} onChange={() => setCaptionMode('word')} />
-              Word by word
-            </label>
-            <label className="radio">
-              <input type="radio" checked={captionMode === 'batch'} onChange={() => setCaptionMode('batch')} />
-              Batch (N words)
-            </label>
-            <label className="radio">
-              <input type="radio" checked={captionMode === 'sentence'} onChange={() => setCaptionMode('sentence')} />
-              Full sentence
-            </label>
-          </fieldset>
-
-          {captionMode === 'batch' && (
-            <div className="batch-sizes">
-              {[3, 5, 7].map((n) => (
-                <button key={n} type="button" className={`btn ${batchSize === n ? 'primary' : 'ghost'}`}
-                  onClick={() => setBatchSize(n as 3 | 5 | 7)}>
-                  {n}
-                </button>
-              ))}
+              <ChevronIcon />
             </div>
-          )}
-
-          Advanced Whisper options:
-          <label>
-            Model
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="whisper-1">whisper-1 (word timestamps — required for word mode)</option>
-              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe (cheaper, no word ts)</option>
-              <option value="gpt-4o-transcribe">gpt-4o-transcribe (accurate, no word ts)</option>
-              <option value="gpt-4o-transcribe-diarize">gpt-4o-transcribe-diarize (speakers, no word ts)</option>
-            </select>
           </label>
-          <label>
-            Prompt (style / vocabulary hint)
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
-          </label>
-          <label>
-            Temperature ({temperature})
-            <input type="range" min={0} max={1} step={0.1} value={temperature}
-              onChange={(e) => setTemperature(Number(e.target.value))} />
-          </label>
-          ------------------------------------------------------------------ */}
         </div>
 
-        <div className="modal-foot">
-          <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+        <footer className="prepare-footer">
+          <button type="button" className="prepare-btn prepare-btn-ghost" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="btn primary" onClick={() => void onContinue()} disabled={busy}>
+          <button
+            type="button"
+            className="prepare-btn prepare-btn-primary"
+            onClick={() => void onContinue()}
+            disabled={busy || !!planError?.showUpgrade}
+          >
             {busy ? 'Starting…' : 'Continue'}
           </button>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }

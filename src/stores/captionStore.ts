@@ -21,6 +21,13 @@ export interface Caption {
   emphasis?: WordRole[];
   /** Per-word size/color overrides aligned with text.split(whitespace). */
   wordStyles?: WordStyle[];
+  /** Whole-chunk font-size multiplier (100 = normal), on top of style.fontSize. */
+  sizeScale?: number | null;
+  /** Whole-chunk position override (% of canvas, center anchor) — composes
+   *  with the global style position the same way sizeScale composes with
+   *  style.fontSize. Null/undefined = use the project's style position. */
+  offsetX?: number | null;
+  offsetY?: number | null;
 }
 
 interface StageState {

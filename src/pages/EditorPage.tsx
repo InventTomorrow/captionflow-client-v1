@@ -7,12 +7,15 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
 import { api, API_URL, getAccessToken } from '../lib/api';
 import { useCaptionStore, type Caption, type WordRole, type WordStyle } from '../stores/captionStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
+import { useFlagsStore } from '../stores/flagsStore';
+import { useAuthStore } from '../stores/authStore';
+import { PlanBadge } from '../components/AppShell';
 import { joinProjectRoom, connectSocket, getSocket } from '../lib/socket';
 import { PrepareMediaModal } from '../components/PrepareMediaModal';
 import { CaptionOverlay, findActiveCaption, type CaptionTemplate } from '../components/CaptionOverlay';
@@ -29,6 +32,8 @@ import {
   type CaptionPosition,
 } from '../lib/captionPosition';
 import { ANTIGRAVITY_UNIFIED_TEMPLATES } from '../lib/captionTemplates';
+import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
+import { captionsToSrt } from '../lib/srt';
 
 interface StyleState {
   template: CaptionTemplate;
@@ -107,7 +112,13 @@ const PHRASE_BASED: DisplayMode[] = ['karaoke', 'phrase', 'popOn', 'rolling', 'p
  */
 function stackedDisplayMode(template?: string): DisplayMode | null {
   if (template === 'heroWord') return 'paintOn';
-  if (template === 'hero' || template === 'stack') return 'phrase';
+  if (
+    template === 'hero' ||
+    template === 'stack' ||
+    template === 'mixed' ||
+    template === 'mixed2'
+  )
+    return 'phrase';
   return null;
 }
 
@@ -344,6 +355,7 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
   // Hero Word pinned first — it's the flagship template.
   HERO_WORD_CARD,
   // Industrial Display pinned second.
+  // Mixed Styles / Mixed Styles 2 are hidden from the picker (kept in codebase for restore).
   INDUSTRIAL_CARD,
   {
     key: 'beat-karaoke',
@@ -466,24 +478,6 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
     },
   },
   {
-    key: 'clean-phrase',
-    name: 'Clean Phrase',
-    tag: 'Clean',
-    purpose: 'Podcasts · explainers · clarity',
-    desc: 'Short groups, no effects — maximum readability.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'classic',
-      fontFamily: 'Inter',
-      fontWeight: 600,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#B6BBC7',
-      animation: 'fade',
-      displayWords: 5,
-    },
-  },
-  {
     key: 'full-sentence',
     name: 'Full Sentence',
     purpose: 'Quotes · subtitles · accessibility',
@@ -497,23 +491,6 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
       backgroundColor: 'rgba(0,0,0,0)',
       highlightColor: '#FFFFFF',
       animation: 'fade',
-    },
-  },
-  {
-    key: 'live-feed',
-    name: 'Live Feed',
-    tag: 'Live',
-    purpose: 'Streams · commentary · fast talk',
-    desc: 'New lines push the previous line up — live-chat energy.',
-    preset: {
-      displayMode: 'rolling',
-      template: 'classic',
-      fontFamily: 'Barlow',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#7C6DFF',
-      animation: 'slideUp',
     },
   },
   {
@@ -549,12 +526,21 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
     },
   },
   // Antigravity / TikTok-style presets — appended; previous cards unchanged.
-  // Hero Word and Industrial Display are already pinned above, so excluded here.
-  ...ANTIGRAVITY_UNIFIED_TEMPLATES.filter((t) => t.key !== 'hero-word' && t.key !== 'industrial'),
+  // Hero Word and Industrial are pinned above. Hidden from picker (kept for restore):
+  // Mixed Styles, Mixed Styles 2, Clean White, Editor Masala.
+  ...ANTIGRAVITY_UNIFIED_TEMPLATES.filter(
+    (t) =>
+      t.key !== 'hero-word' &&
+      t.key !== 'industrial' &&
+      t.key !== 'mixed-styles' &&
+      t.key !== 'mixed-styles-2' &&
+      t.key !== 'clean-white' &&
+      t.key !== 'editor-masala',
+  ),
 ];
 
 /** Swatches for the caption highlight color (Text panel). */
-const HIGHLIGHT_SWATCHES = ['#FFC43D', '#8FE649', '#FFFFFF', '#5ED2FF', '#FF5FA2', '#7C6DFF'];
+const HIGHLIGHT_SWATCHES = ['#FFC43D', '#8FE649', '#FFFFFF', '#5ED2FF', '#FF5FA2', '#89E900'];
 
 /** Per-template card preview — unique look so purpose is obvious at a glance. */
 function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
@@ -728,6 +714,119 @@ function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
           <span className="uprev-hw-s">fox</span>
         </span>
       );
+    case 'mixed-styles':
+      return (
+        <span className="uprev uprev-mixed">
+          <span className="uprev-mx-0">BOLD</span>
+          <span className="uprev-mx-1">Elegant</span>
+          <span className="uprev-mx-2">NEON</span>
+        </span>
+      );
+    case 'mixed-styles-2':
+      return (
+        <span className="uprev uprev-mixed">
+          <span className="uprev-mx2-0">Modern</span>
+          <span className="uprev-mx2-1">Quiet</span>
+          <span className="uprev-mx2-2">GOLD</span>
+        </span>
+      );
+    case 'creator-yellow-box':
+      return (
+        <span
+          className="uprev-box"
+          style={{
+            background: t.preset.backgroundColor,
+            color: t.preset.color,
+            fontFamily: t.preset.fontFamily,
+            fontWeight: 800,
+            textTransform: 'uppercase',
+          }}
+        >
+          the quick brown fox
+        </span>
+      );
+    case 'cinematic-subtitle':
+      return (
+        <span
+          className="uprev-box"
+          style={{
+            background: t.preset.backgroundColor,
+            color: t.preset.color,
+            fontFamily: t.preset.fontFamily,
+            fontWeight: 500,
+          }}
+        >
+          the quick brown fox
+        </span>
+      );
+    case 'bubble-candy':
+      return (
+        <span
+          className="uprev-box"
+          style={{
+            background: t.preset.backgroundColor,
+            color: t.preset.color,
+            fontFamily: t.preset.fontFamily,
+          }}
+        >
+          the quick brown fox
+        </span>
+      );
+    case 'editor-masala':
+      return (
+        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 0.95 }}>
+          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, fontSize: '0.55em' }}>
+            trust the
+          </span>
+          <span
+            style={{ fontFamily: 'Anton, sans-serif', fontSize: '1.4em', color: hl, textTransform: 'uppercase' }}
+          >
+            process
+          </span>
+        </span>
+      );
+    case 'aura':
+      return (
+        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 1 }}>
+          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', color: hl, textTransform: 'uppercase' }}>
+            forget
+          </span>
+          <span style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 900, fontSize: '1.1em' }}>
+            status
+          </span>
+        </span>
+      );
+    case 'swiss':
+      return (
+        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 0.9 }}>
+          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', textTransform: 'uppercase' }}>
+            focus
+          </span>
+          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', color: hl, textTransform: 'uppercase' }}>
+            deeply
+          </span>
+        </span>
+      );
+    case 'the-big-red':
+      return (
+        <span className="uprev-box" style={{ background: 'transparent', position: 'relative', padding: '0.4em 0' }}>
+          <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: '1.5em', color: hl, textTransform: 'uppercase' }}>
+            second
+          </span>
+        </span>
+      );
+    case 'scribble':
+      return (
+        <span className="uprev" style={{ fontFamily: 'Caveat, cursive', fontWeight: 700, fontSize: '1.3em' }}>
+          the <mark style={{ background: hl, color: '#0b0b0d' }}>little</mark> things
+        </span>
+      );
+    case 'archives':
+      return (
+        <span className="uprev" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: '1.2em' }}>
+          Your <span style={{ fontStyle: 'italic', textDecoration: 'underline' }}>Style</span> is it
+        </span>
+      );
     default:
       return <span className="uprev">The Quick BROWN fox</span>;
   }
@@ -798,6 +897,25 @@ function formatClock(seconds: number) {
 
 export function EditorPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [accountMenuPos, setAccountMenuPos] = useState<{ left: number; bottom: number } | null>(null);
+  const accountBtnRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const rect = accountBtnRef.current?.getBoundingClientRect();
+    if (rect) setAccountMenuPos({ left: rect.right + 8, bottom: window.innerHeight - rect.bottom });
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (accountMenuRef.current?.contains(target) || accountBtnRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [accountMenuOpen]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -876,7 +994,15 @@ export function EditorPage() {
   const captionLayerRef = useRef<HTMLDivElement>(null);
   const [showPrepare, setShowPrepare] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const flags = useFlagsStore((s) => s.flags);
+  const loadFlags = useFlagsStore((s) => s.load);
+  useEffect(() => {
+    void loadFlags();
+  }, [loadFlags]);
   const [exportQuality, setExportQuality] = useState<'720p' | '1080p' | '2K' | '4K'>('1080p');
+  useEffect(() => {
+    if (exportQuality === '4K' && !flags.export4kEnabled) setExportQuality('2K');
+  }, [flags.export4kEnabled, exportQuality]);
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
   const [exportStatus, setExportStatus] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle');
   const [exportPercent, setExportPercent] = useState(0);
@@ -944,18 +1070,22 @@ export function EditorPage() {
     didSeekToCaption.current = false;
   }, [id]);
 
-  /** Pull final captions from the API (source of truth after merge/translate). */
+  /** Pull final captions — status/duration/stage still come from the server,
+   *  but captions themselves are local now (no Mongo Caption collection).
+   *  `opts.captions`, when given, is the payload the caller already has
+   *  fresh from a `captions:complete` socket event — use it directly instead
+   *  of re-reading IndexedDB right after writing it. */
   const reloadFinalCaptions = useCallback(
-    async (opts?: { fromComplete?: boolean }) => {
+    async (opts?: { fromComplete?: boolean; captions?: Caption[] }) => {
       if (!id) return;
       const r = await api.get(`/projects/${id}`);
       const status = r.data.project?.status as string | undefined;
-      const caps = r.data.captions || [];
       if (r.data.project?.video?.duration) setDuration(r.data.project.video.duration);
       if (r.data.project?.stage) setPipelineStage(r.data.project.stage);
 
       const done = ['ready', 'done', 'partial_error', 'error'].includes(status || '');
       if (done || opts?.fromComplete) {
+        const caps = opts?.captions ?? (await getAllForProject(id));
         setCaptions(caps);
         setComplete(caps.length, caps.length === 0);
         setBusy('');
@@ -963,6 +1093,12 @@ export function EditorPage() {
         setProcessing(false);
         if (status === 'partial_error' && r.data.project?.errorMessage) {
           setError(r.data.project.errorMessage);
+        } else if (done && caps.length === 0 && status !== 'error') {
+          // Terminal server status but nothing found locally — either this
+          // browser never received the generated captions (missed socket
+          // event) or this is a different device than the one that
+          // generated them. There's no server copy to fall back to.
+          setError('No captions found on this device — click Regenerate to create them again.');
         }
         const first = caps[0]?.start;
         if (typeof first === 'number' && videoRef.current) {
@@ -985,12 +1121,29 @@ export function EditorPage() {
       setBusy('rebuild');
       if (typeof data.percent === 'number') setRebuildPercent(data.percent);
     };
-    const onComplete = () => {
-      void reloadFinalCaptions({ fromComplete: true }).catch(() => {
+    const onComplete = (data: { captions?: Caption[] }) => {
+      // The full caption set now arrives IN the socket event itself (no more
+      // Mongo Caption collection to re-fetch via REST) — persist it locally
+      // first, then reload from that. Still retry the status/duration GET
+      // inside reloadFinalCaptions against a transient network/dev-server blip.
+      void (async () => {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            if (data.captions) await replaceAllForProject(id, data.captions);
+            await reloadFinalCaptions({ fromComplete: true, captions: data.captions });
+            return;
+          } catch (err) {
+            console.error('reloadFinalCaptions failed after captions:complete', {
+              attempt,
+              err,
+            });
+            if (attempt < 3) await new Promise((r) => setTimeout(r, 800 * attempt));
+          }
+        }
         setError('Captions finished but failed to load — refresh the page');
         setBusy('');
         setProcessing(false);
-      });
+      })();
     };
     const onProjError = (data: { message?: string }) => {
       setError(data.message || 'Caption generation failed');
@@ -1053,7 +1206,7 @@ export function EditorPage() {
     if (!id) return;
     connectSocket();
     joinProjectRoom(id);
-    void api.get(`/projects/${id}`).then((r) => {
+    void api.get(`/projects/${id}`).then(async (r) => {
       setProjectName(r.data.project.name || 'Project');
       if (r.data.project.video?.duration) setDuration(r.data.project.video.duration);
       // Display size from upload probe (rotation-aware) — sizes the canvas
@@ -1123,7 +1276,7 @@ export function EditorPage() {
       // Freshly uploaded project, never transcribed — show the Prepare Your
       // Media popup so the user can pick languages and start transcription.
       const status = r.data.project.status as string;
-      const caps = r.data.captions || [];
+      const caps = await getAllForProject(id);
       if (['uploaded', 'uploading'].includes(status)) {
         setShowPrepare(true);
         setCaptions(caps);
@@ -1477,11 +1630,12 @@ export function EditorPage() {
   // CaptionOverlay / TimelineBlocks don't re-render on every page render.
   const saveCaption = useCallback(
     async (caption: Caption, text: string) => {
-      if (!caption._id) return;
-      await api.patch(`/projects/${id}/captions/${caption._id}`, { text });
+      if (!caption._id || !id) return;
+      const updated = { ...caption, text };
       setCaptions(
-        captionsLive.current.map((c) => (c._id === caption._id ? { ...c, text } : c)),
+        captionsLive.current.map((c) => (c._id === caption._id ? updated : c)),
       );
+      await upsertOne(id, updated);
     },
     [id, setCaptions],
   );
@@ -1512,15 +1666,6 @@ export function EditorPage() {
     setSelectedId(caption.sourceId ?? caption._id ?? null);
     setSelectedWordIdx(i + (caption.wordOffset ?? 0));
   }, []);
-
-  const overlayStyleChange = useCallback(
-    (patch: Partial<StyleState>) => setStyle((s) => ({ ...s, ...patch })),
-    [],
-  );
-
-  const overlayStylePersist = useCallback(() => {
-    void api.patch(`/projects/${id}/style`, styleRef.current);
-  }, [id]);
 
   /**
    * Apply a display change (template / words per caption) instantly and
@@ -1579,7 +1724,7 @@ export function EditorPage() {
   }
 
   async function setWordRole(caption: Caption, index: number, role: WordRole) {
-    if (!caption._id) return;
+    if (!caption._id || !id) return;
     const wordCount = caption.text.split(/\s+/).filter(Boolean).length;
     const roles: WordRole[] = Array.from(
       { length: wordCount },
@@ -1592,57 +1737,61 @@ export function EditorPage() {
       }
     }
     roles[index] = role;
-    setCaptions(captions.map((c) => (c._id === caption._id ? { ...c, emphasis: roles } : c)));
-    try {
-      await api.patch(`/projects/${id}/captions/${caption._id}`, { emphasis: roles });
-    } catch {
-      // keep optimistic state; next save will retry
-    }
+    const updated = { ...caption, emphasis: roles };
+    setCaptions(captions.map((c) => (c._id === caption._id ? updated : c)));
+    await upsertOne(id, updated);
   }
 
   function setWordStyle(caption: Caption, index: number, patch: WordStyle) {
-    if (!caption._id) return;
+    if (!caption._id || !id) return;
     const wordCount = caption.text.split(/\s+/).filter(Boolean).length;
     const wordStyles: WordStyle[] = Array.from({ length: wordCount }, (_, i) => ({
       scale: caption.wordStyles?.[i]?.scale ?? null,
       color: caption.wordStyles?.[i]?.color ?? null,
     }));
     wordStyles[index] = { ...wordStyles[index], ...patch };
-    setCaptions(captions.map((c) => (c._id === caption._id ? { ...c, wordStyles } : c)));
+    const updated = { ...caption, wordStyles };
+    setCaptions(captions.map((c) => (c._id === caption._id ? updated : c)));
     // Sliders/color pickers fire rapidly while dragging — debounce the save.
     if (wordStyleSaveTimer.current) window.clearTimeout(wordStyleSaveTimer.current);
-    const captionId = caption._id;
+    const projectId = id;
     wordStyleSaveTimer.current = window.setTimeout(() => {
-      void api
-        .patch(`/projects/${id}/captions/${captionId}`, { wordStyles })
-        .catch(() => undefined);
+      void upsertOne(projectId, updated);
     }, 450);
   }
 
   async function resetWordRoles(caption: Caption) {
-    if (!caption._id) return;
-    setCaptions(
-      captions.map((c) => (c._id === caption._id ? { ...c, emphasis: [], wordStyles: [] } : c)),
-    );
-    try {
-      await api.patch(`/projects/${id}/captions/${caption._id}`, { emphasis: [], wordStyles: [] });
-    } catch {
-      // ignore
-    }
+    if (!caption._id || !id) return;
+    const updated = { ...caption, emphasis: [], wordStyles: [] };
+    setCaptions(captions.map((c) => (c._id === caption._id ? updated : c)));
+    await upsertOne(id, updated);
   }
 
-  const downloadAuth = useCallback(async (path: string, filename: string, json = false) => {
-    const { data } = await api.get(path, { responseType: json ? 'json' : 'blob' });
-    const blob = json
-      ? new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      : (data as Blob);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
+  /**
+   * Commit a whole-chunk drag-resize and/or reposition from the video
+   * overlay: either just the caption(s) behind the resized/moved display
+   * block ("Current Preset"), or every caption in the project ("Apply To All").
+   */
+  async function handleChunkStyleCommit(
+    caption: DisplayCaption,
+    patch: { sizeScale?: number; offsetX?: number; offsetY?: number },
+    scope: 'chunk' | 'all',
+  ) {
+    if (!id) return;
+    const targetIds =
+      scope === 'chunk'
+        ? caption.sourceIds?.length
+          ? caption.sourceIds
+          : [caption.sourceId ?? caption._id].filter((v): v is string => !!v)
+        : captions.map((c) => c._id).filter((v): v is string => !!v);
+    if (!targetIds.length) return;
+    const idSet = new Set(targetIds);
+    const updatedCaptions = captions.map((c) => (c._id && idSet.has(c._id) ? { ...c, ...patch } : c));
+    setCaptions(updatedCaptions);
+    await Promise.all(
+      updatedCaptions.filter((c) => c._id && idSet.has(c._id)).map((c) => upsertOne(id, c)),
+    );
+  }
 
   const openExportModal = useCallback(() => setShowExport(true), []);
   const closeExportModal = useCallback(() => {
@@ -1659,18 +1808,24 @@ export function EditorPage() {
   }, [exportStatus, id]);
   const downloadSrt = useCallback(() => {
     if (!id) return;
-    void downloadAuth(`/projects/${id}/download/srt`, `captions-${id}.srt`);
-  }, [downloadAuth, id]);
+    const srt = captionsToSrt(captionsLive.current);
+    const blob = new Blob([srt], { type: 'application/x-subrip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `captions-${id}.srt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [id]);
 
   useEffect(() => {
     useEditorChromeStore.getState().setChrome({
       active: true,
-      projectName,
       onExport: openExportModal,
       onDownloadSrt: downloadSrt,
     });
     return () => useEditorChromeStore.getState().clearChrome();
-  }, [projectName, openExportModal, downloadSrt]);
+  }, [openExportModal, downloadSrt]);
 
   async function startExport() {
     setExportError('');
@@ -1712,14 +1867,24 @@ export function EditorPage() {
         styleSnap.fontWeight = styleSnap.fontWeight || 900;
         styleSnap.fontFamily = 'Montserrat';
       }
-      // Send live hero/support roles with the export job (don't rely on patch races).
-      const captionsSnap = captions.map((c) => ({
-        _id: c._id,
-        sequence: c.sequence,
-        text: c.text,
-        emphasis: c.emphasis,
-        wordStyles: c.wordStyles,
-      }));
+      // Captions no longer live in Mongo — this is the export's SOLE caption
+      // source (not an override of a DB read), so it must be the full shape.
+      const captionsSnap = captions
+        .filter((c) => c._id)
+        .map((c) => ({
+          _id: c._id as string,
+          sequence: c.sequence,
+          start: c.start,
+          end: c.end,
+          text: c.text,
+          originalText: c.originalText,
+          words: c.words,
+          emphasis: c.emphasis,
+          wordStyles: c.wordStyles,
+          sizeScale: c.sizeScale,
+          offsetX: c.offsetX,
+          offsetY: c.offsetY,
+        }));
       // Always persist + send concrete aspect (9:16 / 16:9) — never "original".
       setStyle((s) => ({ ...s, aspectRatio: aspectForBurn }));
       await api.patch(`/projects/${id}/style`, styleSnap);
@@ -1807,6 +1972,50 @@ export function EditorPage() {
             </svg>
             <span>{drawerOpen ? 'Hide' : 'Show'}</span>
           </button>
+
+          <div className="rail-account">
+            <button
+              type="button"
+              ref={accountBtnRef}
+              className={`rail-account-trigger ${accountMenuOpen ? 'is-open' : ''}`}
+              title={user?.name}
+              onClick={() => setAccountMenuOpen((v) => !v)}
+            >
+              <span className="rail-account-avatar">{(user?.name || '?')[0]?.toUpperCase()}</span>
+              <span className="rail-account-name">{user?.name}</span>
+            </button>
+            {accountMenuOpen && accountMenuPos && (
+              <div
+                className="rail-account-menu"
+                ref={accountMenuRef}
+                style={{ left: accountMenuPos.left, bottom: accountMenuPos.bottom }}
+              >
+                <PlanBadge userId={user?.id} plan={user?.plan} planName={user?.planName} />
+                <button
+                  type="button"
+                  className="rail-account-menu-logout"
+                  onClick={async () => {
+                    await logout();
+                    navigate('/login');
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                  </svg>
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
 
         {drawerOpen && (
@@ -1823,7 +2032,7 @@ export function EditorPage() {
                   Language
                   <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
                     <option value="keep_original">Keep original</option>
-                    <option value="roman_urdu">Roman Urdu</option>
+                    <option value="roman_urdu">Urdish</option>
                     <option value="english">English</option>
                     <option value="urdu">Urdu (اردو)</option>
                     <option value="hindi">Hindi</option>
@@ -1842,9 +2051,7 @@ export function EditorPage() {
                     : 'Regenerate Captions'}
                 </button>
                 <p className="muted tiny">
-                  Runs a full Whisper re-transcription of the video, then converts to your
-                  language and picks one hero + one support word per phrase. Use after changing language or if captions
-                  are missing parts of the video.
+                  Use after changing language or if captions are missing parts of the video.
                 </p>
               </div>
               </div>
@@ -2035,7 +2242,7 @@ export function EditorPage() {
                                 <circle cx="12" cy="12" r="11" fill="currentColor" />
                                 <path
                                   d="M7.5 12.5 10.5 15.5 16.5 9"
-                                  stroke="#0D0D10"
+                                  stroke="#222222"
                                   strokeWidth="2.2"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -2130,6 +2337,11 @@ export function EditorPage() {
                 : null),
             }}
           >
+            <div className="video-filename-pill">
+              <span className="video-filename-dot" />
+              <span className="video-filename-name">{projectName}</span>
+              <span className="video-filename-saved">· Saved</span>
+            </div>
             <video
               ref={videoRef}
               onPlay={() => setPlaying(true)}
@@ -2190,9 +2402,8 @@ export function EditorPage() {
                 selectedCaptionId={panel === 'captions' ? selectedId : null}
                 selectedWordIdx={selectedWordIdx}
                 onWordSelect={overlayWordSelect}
-                onStyleChange={overlayStyleChange}
-                onStylePersist={overlayStylePersist}
                 onSaveText={saveDerivedText}
+                onChunkStyleCommit={handleChunkStyleCommit}
               />
             </div>
           </div>
@@ -2636,7 +2847,8 @@ export function EditorPage() {
                   <option value="720p">720p — HD</option>
                   <option value="1080p">1080p — Full HD</option>
                   <option value="2K">2K — 1440p</option>
-                  <option value="4K">4K — 2160p</option>
+                  {/* Admin toggles this via System > Flags > 4K export enabled */}
+                  {flags.export4kEnabled && <option value="4K">4K — 2160p</option>}
                 </select>
               </label>
               <label className="props-field">

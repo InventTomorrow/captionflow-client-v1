@@ -30,14 +30,7 @@ dist-ssr
 /.cursor
 /.vscode
 
+# Env files (keep .env.example commitable)
 .env
-.env.local
-.env.development
-.env.production
-.env.test
-.env.test.local
-.env.test.local.backup
-.env.test.local.backup.2
-.env.test.local.backup.3
-.env.test.local.backup.4
-.env.test.local.backup.5
+.env.*
+!.env.example

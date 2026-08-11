@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { deleteAllForProject, listAllProjectIds } from '../lib/captionDb';
 
 interface ProjectRow {
   _id: string;
@@ -17,13 +18,25 @@ export function DashboardPage() {
   useEffect(() => {
     void api
       .get('/projects')
-      .then((r) => setProjects(r.data.projects))
+      .then(async (r) => {
+        const rows: ProjectRow[] = r.data.projects;
+        setProjects(rows);
+        // Prune IndexedDB captions for projects that no longer exist server-side
+        // (e.g. deleted from another device) — captions are the only thing
+        // stored locally, this just prevents them piling up forever.
+        const liveIds = new Set(rows.map((p) => p._id));
+        const localIds = await listAllProjectIds();
+        await Promise.all(
+          localIds.filter((pid) => !liveIds.has(pid)).map((pid) => deleteAllForProject(pid)),
+        );
+      })
       .catch(() => setError('Failed to load projects'));
   }, []);
 
   async function remove(id: string) {
     if (!confirm('Delete this project and its files?')) return;
     await api.delete(`/projects/${id}`);
+    await deleteAllForProject(id);
     setProjects((p) => p.filter((x) => x._id !== id));
   }
 
@@ -32,9 +45,9 @@ export function DashboardPage() {
       <div className="page-header">
         <div>
           <h1>Projects</h1>
-          <p className="muted">Upload up to 5GB and generate timed captions</p>
+          <p className="muted">Upload up to 1GB and generate timed captions</p>
         </div>
-        <Link className="btn primary" to="/upload">
+        <Link className="btn primary" to="/projects/upload">
           New upload
         </Link>
       </div>

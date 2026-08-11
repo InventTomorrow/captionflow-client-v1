@@ -1,7 +1,7 @@
 /**
  * captionTemplates — Antigravity / TikTok-style caption presets.
  *
- * Adapted for CaptionFlow's StyleState. Existing UNIFIED_TEMPLATES are untouched;
+ * Adapted for Asaan Caption's StyleState. Existing UNIFIED_TEMPLATES are untouched;
  * import ANTIGRAVITY_UNIFIED_TEMPLATES and append them in the picker.
  *
  * Source inspiration:
@@ -66,7 +66,7 @@ export interface AntigravityCaptionTemplate {
   renderHints?: Record<string, unknown> | null;
   previewStatic?: string;
   previewVideo?: string;
-  /** CaptionFlow style snapshot applied when the card is selected. */
+  /** Asaan Caption style snapshot applied when the card is selected. */
   preset: {
     displayMode: DisplayMode;
     template: CaptionTemplate;
@@ -455,8 +455,482 @@ export const HERO_WORD_TEMPLATE: AntigravityCaptionTemplate = {
   },
 };
 
+/**
+ * Mixed Styles — every sentence gets a different premium look.
+ *
+ * Unlike every other template (one consistent style for the whole video),
+ * Mixed Styles cycles through 8 curated sub-styles — Bold Minimal, Elegant
+ * Serif, Neon Glow, Glassmorphism, Editorial Magazine, Handwritten Script,
+ * Luxury Typography, Comic Sticker Pop — keyed by `caption.sequence % 8`, so
+ * consecutive captions never repeat the same look (see MIXED_STYLE_COUNT in
+ * CaptionOverlay.tsx and MIXED_STYLES in server/src/services/export.service.ts,
+ * which must stay in sync with each other).
+ *
+ * `style`/`colors`/`preset.*` below are fallbacks only — the per-caption CSS
+ * class (`.cap-mixed-N`) fully overrides font, color, shadow and animation.
+ */
+export const MIXED_STYLES: AntigravityCaptionTemplate = {
+  id: 'mixed-styles',
+  name: 'Mixed Styles',
+  type: 'lines',
+  tag: 'New',
+  purpose: 'Maximum scroll-stop · every sentence a new look',
+  desc: 'Eight rotating premium looks — bold, serif, neon, glass, editorial, script, luxury, comic — never the same one twice in a row.',
+  style: {
+    fontFamily: 'Anton',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#FFC43D',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'mixed',
+    fontFamily: 'Anton',
+    fontSize: 64,
+    fontWeight: 800,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#FFC43D',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+/**
+ * Mixed Styles 2 — a calmer, more "content worthy" successor to Mixed Styles.
+ *
+ * Same per-sentence rotation mechanic, but every sub-style was picked to feel
+ * premium and editorial rather than playful: no comic/cartoon faces, no
+ * bounce/overshoot animation, a restrained graphite/ivory/gold/teal/terracotta
+ * palette instead of candy colours — Modern Grotesk, Quiet Serif, Studio
+ * Technical, Frosted Card, Editorial Pairing, Warm Minimal, Museum Gold,
+ * Broadcast Line (see MIXED_STYLE_COUNT in CaptionOverlay.tsx and
+ * MIXED_STYLE_SPECS_2 in server/src/services/export.service.ts, which must
+ * stay in sync with each other).
+ *
+ * `style`/`colors`/`preset.*` below are fallbacks only — the per-caption CSS
+ * class (`.cap-mixed2-N`) fully overrides font, color, shadow and animation.
+ */
+export const MIXED_STYLES_2: AntigravityCaptionTemplate = {
+  id: 'mixed-styles-2',
+  name: 'Mixed Styles 2',
+  type: 'lines',
+  tag: 'Premium',
+  purpose: 'Every sentence feels special · still content-worthy, never cartoonish',
+  desc: 'Eight refined rotating looks — grotesk, serif, technical, frosted, editorial, minimal, museum gold, broadcast — premium, not playful.',
+  style: {
+    fontFamily: 'Archivo Black',
+    fontSize: 60,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#E8B44A',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'mixed2',
+    fontFamily: 'Archivo Black',
+    fontSize: 60,
+    fontWeight: 700,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#E8B44A',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+/** Template — Creator Yellow Box (Hormozi / MrBeast-style bold box captions) */
+export const CREATOR_YELLOW_BOX: AntigravityCaptionTemplate = {
+  id: 'creator-yellow-box',
+  name: 'Creator Yellow Box',
+  type: 'lines',
+  tag: 'Trending',
+  purpose: 'YouTube Shorts · high-retention talking-head',
+  desc: 'Bold black-on-yellow box captions — the most-copied high-view creator caption style.',
+  style: {
+    fontFamily: 'Poppins',
+    fontUrl: 'https://fonts.gstatic.com/s/poppins/v15/pxiByp8kv8JHgFVrLCz7V1tvFP-KUEg.ttf',
+    fontSize: 60,
+    color: '#111111',
+    align: 'center',
+    textTransform: 'uppercase',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#111111',
+    active: '#111111',
+    activeFill: 'transparent',
+    background: '#FFE100',
+    keyword: '#7A3E00',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'classic',
+    fontFamily: 'Poppins',
+    fontSize: 60,
+    fontWeight: 800,
+    color: '#111111',
+    backgroundColor: '#FFE100',
+    highlightColor: '#7A3E00',
+    activeFill: 'transparent',
+    textTransform: 'uppercase',
+    animation: 'fade',
+    displayWords: 5,
+  },
+};
+
+/** Template — Cinematic Subtitle (Netflix-style translucent bar, serif) */
+export const CINEMATIC_SUBTITLE: AntigravityCaptionTemplate = {
+  id: 'cinematic-subtitle',
+  name: 'Cinematic Subtitle',
+  type: 'lines',
+  tag: 'Premium',
+  purpose: 'Documentary · film · premium brand voiceover',
+  desc: 'Understated serif captions on a soft translucent bar — a premium, cinematic subtitle look.',
+  style: {
+    fontFamily: 'Lora',
+    fontSize: 44,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'rgba(0,0,0,0.55)',
+    keyword: '#F2C879',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'classic',
+    fontFamily: 'Lora',
+    fontSize: 44,
+    fontWeight: 700,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    highlightColor: '#F2C879',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+/** Template — Bubble Candy (playful rounded box, comic-style face) */
+export const BUBBLE_CANDY: AntigravityCaptionTemplate = {
+  id: 'bubble-candy',
+  name: 'Bubble Candy',
+  type: 'lines',
+  tag: 'Playful',
+  purpose: 'Lifestyle · comedy · beauty · vlogs',
+  desc: 'Bouncy bubble-font captions on a hot-pink box — playful and unmissable.',
+  style: {
+    fontFamily: 'Luckiest Guy',
+    fontSize: 52,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: '#FF3E9A',
+    keyword: '#FFF04D',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'classic',
+    fontFamily: 'Luckiest Guy',
+    fontSize: 52,
+    fontWeight: 400,
+    color: '#FFFFFF',
+    backgroundColor: '#FF3E9A',
+    highlightColor: '#FFF04D',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'pop',
+    displayWords: 5,
+  },
+};
+
+/**
+ * Six kinetic templates ported from CaptionTemplates.jsx (self-contained word-
+ * by-word animated components). Preview-only for now: CaptionOverlay.tsx
+ * renders the equivalent markup/CSS, but there is no ASS/export counterpart
+ * in server/src/services/export.service.ts yet, so these do not appear in
+ * the burned-in downloaded video (see CAPTION_TEMPLATE.md).
+ */
+export const EDITOR_MASALA: AntigravityCaptionTemplate = {
+  id: 'editor-masala',
+  name: 'Editor Masala',
+  type: 'lines',
+  tag: 'Smart',
+  purpose: 'Bold kinetic hooks · talking-head',
+  desc: 'Tiny lowercase lead-in pops into a giant yellow shout word.',
+  style: {
+    fontFamily: 'Anton',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#FFD60A',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'editorMasala',
+    fontFamily: 'Anton',
+    fontSize: 64,
+    fontWeight: 700,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#FFD60A',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+export const AURA: AntigravityCaptionTemplate = {
+  id: 'aura',
+  name: 'Aura',
+  type: 'lines',
+  tag: 'Editorial',
+  purpose: 'Editorial · lifestyle · brand voiceover',
+  desc: 'Serif italic paired with an electric-blue uppercase accent.',
+  style: {
+    fontFamily: 'Playfair Display',
+    fontSize: 60,
+    color: '#4A4A52',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#4A4A52',
+    active: '#4A4A52',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#2F6BFF',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'aura',
+    fontFamily: 'Playfair Display',
+    fontSize: 60,
+    fontWeight: 900,
+    color: '#4A4A52',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#2F6BFF',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+export const SWISS: AntigravityCaptionTemplate = {
+  id: 'swiss',
+  name: 'Swiss',
+  type: 'lines',
+  tag: 'Editorial',
+  purpose: 'Editorial · minimal grotesk · statements',
+  desc: 'Heavy grotesk stack with a yellow punch on the key word.',
+  style: {
+    fontFamily: 'Archivo',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'uppercase',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#FFD60A',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'swiss',
+    fontFamily: 'Archivo',
+    fontSize: 64,
+    fontWeight: 900,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#FFD60A',
+    activeFill: 'transparent',
+    textTransform: 'uppercase',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+export const THE_BIG_RED: AntigravityCaptionTemplate = {
+  id: 'the-big-red',
+  name: 'The Big Red',
+  type: 'lines',
+  tag: 'New',
+  purpose: 'Monumental hero word · posters · punchlines',
+  desc: 'One monumental red serif word with a thin caption crossing it.',
+  style: {
+    fontFamily: 'Playfair Display',
+    fontSize: 72,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#D11A24',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'theBigRed',
+    fontFamily: 'Playfair Display',
+    fontSize: 72,
+    fontWeight: 900,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#D11A24',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+export const SCRIBBLE: AntigravityCaptionTemplate = {
+  id: 'scribble',
+  name: 'Scribble',
+  type: 'lines',
+  tag: 'New',
+  purpose: 'Handwritten · vlogs · casual notes',
+  desc: 'Handwritten script with a green highlighter mark behind one word.',
+  style: {
+    fontFamily: 'Caveat',
+    fontSize: 56,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#37D66B',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'scribble',
+    fontFamily: 'Caveat',
+    fontSize: 56,
+    fontWeight: 700,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#37D66B',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+export const ARCHIVES: AntigravityCaptionTemplate = {
+  id: 'archives',
+  name: 'Archives',
+  type: 'lines',
+  tag: 'New',
+  purpose: 'Elegant script · storytelling · quotes',
+  desc: 'Elegant script with one word underlined by hand.',
+  style: {
+    fontFamily: 'Dancing Script',
+    fontSize: 52,
+    color: '#F3F1EA',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#F3F1EA',
+    active: '#F3F1EA',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#F3F1EA',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'archives',
+    fontFamily: 'Dancing Script',
+    fontSize: 52,
+    fontWeight: 700,
+    color: '#F3F1EA',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#F3F1EA',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
 export const CAPTION_TEMPLATES: AntigravityCaptionTemplate[] = [
   HERO_WORD_TEMPLATE,
+  MIXED_STYLES,
+  MIXED_STYLES_2,
+  CREATOR_YELLOW_BOX,
+  CINEMATIC_SUBTITLE,
+  BUBBLE_CANDY,
   INDUSTRIAL,
   TIKTOK_CLASSIC,
   VIRAL_ORANGE,
@@ -464,7 +938,12 @@ export const CAPTION_TEMPLATES: AntigravityCaptionTemplate[] = [
   TIKTOK_PILL,
   CLEAN_WHITE,
   POPPINS_BOLD,
-  
+  EDITOR_MASALA,
+  AURA,
+  SWISS,
+  THE_BIG_RED,
+  SCRIBBLE,
+  ARCHIVES,
 ];
 
 /** Picker cards — same shape as EditorPage UNIFIED_TEMPLATES entries. */
