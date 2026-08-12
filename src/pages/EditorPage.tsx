@@ -10,7 +10,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
-import { api, API_URL, getAccessToken } from '../lib/api';
+import { api, API_URL } from '../lib/api';
 import { useCaptionStore, type Caption, type WordRole, type WordStyle } from '../stores/captionStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
@@ -3007,7 +3007,7 @@ function AuthenticatedVideo({
 }) {
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.src = `${API_URL}/api/projects/${id}/video?token=${encodeURIComponent(getAccessToken() || '')}`;
+      videoRef.current.src = `${API_URL}/api/projects/${id}/video`;
     }
   }, [id, videoRef]);
   return null;

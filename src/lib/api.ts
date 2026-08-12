@@ -8,25 +8,10 @@ export const api = axios.create({
   timeout: 60_000,
 });
 
-let accessToken: string | null = localStorage.getItem('cf_access');
-let refreshing: Promise<string | null> | null = null;
-
-export function setAccessToken(token: string | null) {
-  accessToken = token;
-  if (token) localStorage.setItem('cf_access', token);
-  else localStorage.removeItem('cf_access');
-}
-
-export function getAccessToken() {
-  return accessToken;
-}
-
-api.interceptors.request.use((config) => {
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  return config;
-});
+// Access/refresh tokens live only in httpOnly cookies set by the server —
+// never in JS-reachable storage, so there's nothing to attach here. The
+// browser sends them automatically on every request (withCredentials above).
+let refreshing: Promise<boolean> | null = null;
 
 api.interceptors.response.use(
   (res) => res,
@@ -44,23 +29,14 @@ api.interceptors.response.use(
       if (!refreshing) {
         refreshing = api
           .post('/auth/refresh')
-          .then((r) => {
-            setAccessToken(r.data.accessToken);
-            return r.data.accessToken as string;
-          })
-          .catch(() => {
-            setAccessToken(null);
-            return null;
-          })
+          .then(() => true)
+          .catch(() => false)
           .finally(() => {
             refreshing = null;
           });
       }
-      const token = await refreshing;
-      if (token) {
-        original.headers.Authorization = `Bearer ${token}`;
-        return api(original);
-      }
+      const ok = await refreshing;
+      if (ok) return api(original);
     }
     return Promise.reject(error);
   },
