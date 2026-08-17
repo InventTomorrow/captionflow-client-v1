@@ -357,10 +357,19 @@ export function LandingPage() {
           </a>
           <ul className="lp-nav-links">
             <li>
+              <a href="#templates">Templates</a>
+            </li>
+            <li>
+              <a href="#difference">Features</a>
+            </li>
+            <li>
               <a href="#how-it-works">How It Works</a>
             </li>
             <li>
               <a href="#pricing">Pricing</a>
+            </li>
+            <li>
+              <a href="#day-pass">Day Pass</a>
             </li>
           </ul>
           <div className="lp-nav-actions">
@@ -387,11 +396,20 @@ export function LandingPage() {
         </nav>
         <div className={`lp-mobile-panel ${mobileOpen ? 'is-open' : ''}`}>
           <div className="lp-mobile-inner">
+            <a href="#templates" onClick={() => setMobileOpen(false)}>
+              Templates
+            </a>
+            <a href="#difference" onClick={() => setMobileOpen(false)}>
+              Features
+            </a>
             <a href="#how-it-works" onClick={() => setMobileOpen(false)}>
               How It Works
             </a>
             <a href="#pricing" onClick={() => setMobileOpen(false)}>
               Pricing
+            </a>
+            <a href="#day-pass" onClick={() => setMobileOpen(false)}>
+              Day Pass
             </a>
             <button type="button" className="lp-btn lp-btn-primary lp-mobile-cta" onClick={getStarted}>
               Get Started

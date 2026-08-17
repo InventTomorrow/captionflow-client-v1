@@ -4644,6 +4644,17 @@ legend {
   color: var(--cf-text);
   font-family: 'Outfit', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* overflow-x: hidden used to live on .lp-body itself, but ANY ancestor with
+   a non-visible overflow breaks position:sticky for descendants (it becomes
+   the "nearest scrolling ancestor" sticky positions against, even though it
+   never actually scrolls) — that's what made .lp-nav scroll away instead of
+   staying pinned. Scoped to main/footer instead, which is where the
+   decorative full-bleed elements that need horizontal containment actually
+   live, leaving .lp-nav's ancestor chain sticky-safe. */
+.lp-body > main,
+.lp-body > footer {
   overflow-x: hidden;
 }
 
@@ -4956,6 +4967,15 @@ legend {
   gap: 16px;
 }
 
+/* More see-through than the default .lp-glass — the nav stays pinned
+   (.lp-nav is position:sticky) while scrolling, so content should visibly
+   ghost through it rather than sit behind a near-opaque bar. Scoped to the
+   nav only; .lp-glass itself is reused elsewhere (payment panel, carousel
+   controls) and shouldn't change. */
+.lp-nav-shell.lp-glass {
+  background: color-mix(in srgb, var(--cf-surface) 42%, transparent);
+}
+
 .lp-brand {
   font-size: 22px;
   font-weight: 700;
@@ -4977,16 +4997,45 @@ legend {
 
 .lp-nav-links {
   display: none;
-  gap: 28px;
+  gap: 22px;
   font-size: 14px;
+  font-weight: 600;
   color: var(--cf-text-muted);
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
+.lp-nav-links a {
+  position: relative;
+  display: inline-block;
+  padding: 4px 1px;
+  transition: color var(--lp-smooth);
+}
+
+/* Animated underline that grows in from the left on hover, using the same
+   accent gradient as the primary CTA so the nav links feel tied to the
+   rest of the page's accent instead of sitting there as flat gray text. */
+.lp-nav-links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--lp-gradient-btn);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--lp-smooth);
+}
+
 .lp-nav-links a:hover {
   color: var(--cf-text);
+}
+
+.lp-nav-links a:hover::after {
+  transform: scaleX(1);
 }
 
 .lp-nav-actions {
@@ -5013,7 +5062,7 @@ legend {
   padding: 6px;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 980px) {
   .lp-nav-links {
     display: flex;
   }
@@ -5053,7 +5102,7 @@ legend {
   margin-top: 4px;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 980px) {
   .lp-mobile-panel {
     display: none !important;
   }
