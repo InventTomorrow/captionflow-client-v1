@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, setAccessToken } from '../lib/api';
+import { api } from '../lib/api';
 import { connectSocket, disconnectSocket } from '../lib/socket';
 
 export interface PlanLimits {
@@ -52,13 +52,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: true,
   async login(email, password) {
     const { data } = await api.post('/auth/login', { email, password });
-    setAccessToken(data.accessToken);
     set({ user: mapUser(data.user) });
     connectSocket();
   },
   async register(name, email, password) {
     const { data } = await api.post('/auth/register', { name, email, password });
-    setAccessToken(data.accessToken);
     set({ user: mapUser(data.user) });
     connectSocket();
   },
@@ -66,19 +64,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await api.post('/auth/logout');
     } finally {
-      setAccessToken(null);
       disconnectSocket();
       set({ user: null });
     }
   },
   async bootstrap() {
+    // No token in JS to check — the access/refresh cookies are httpOnly, so
+    // the only way to know if a session exists is to ask the server.
     try {
-      const token = localStorage.getItem('cf_access');
-      if (!token) {
-        set({ loading: false, user: null });
-        return;
-      }
-      setAccessToken(token);
       const { data } = await api.get('/auth/me');
       set({
         user: mapUser(data.user),
@@ -86,7 +79,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
       connectSocket();
     } catch {
-      setAccessToken(null);
       set({ user: null, loading: false });
     }
   },

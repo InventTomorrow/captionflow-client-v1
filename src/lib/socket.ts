@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { API_URL, getAccessToken } from './api';
+import { API_URL } from './api';
 
 let socket: Socket | null = null;
 
@@ -15,8 +15,9 @@ export function getSocket() {
   if (!socket) {
     socket = io(API_URL, {
       autoConnect: false,
+      // Auth cookie rides along automatically (withCredentials) — the
+      // server reads it from the handshake's Cookie header.
       withCredentials: true,
-      auth: { token: getAccessToken() },
       reconnection: true,
       reconnectionAttempts: 20,
       reconnectionDelay: 1000,
@@ -32,7 +33,6 @@ export function getSocket() {
 
 export function connectSocket() {
   const s = getSocket();
-  s.auth = { token: getAccessToken() };
   if (!s.connected) s.connect();
   return s;
 }

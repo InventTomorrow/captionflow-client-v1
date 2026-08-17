@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, API_URL, getAccessToken } from '../lib/api';
+import { api, API_URL } from '../lib/api';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../lib/planErrors';
 import { UpgradeBanner } from './UpgradeBanner';
 
@@ -94,7 +94,7 @@ export function PrepareMediaModal({
               className="prepare-video"
               controls
               preload="metadata"
-              src={`${API_URL}/api/projects/${projectId}/video?token=${encodeURIComponent(getAccessToken() || '')}`}
+              src={`${API_URL}/api/projects/${projectId}/video`}
             />
           </div>
         </div>
