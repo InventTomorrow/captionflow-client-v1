@@ -50,6 +50,20 @@ api.interceptors.response.use(
           })
           .catch(() => {
             setAccessToken(null);
+            // Clearing the token alone left useAuthStore's `user` truthy,
+            // so <Private> kept rendering the protected page — every
+            // subsequent request then went out with no Authorization
+            // header, 401'd again, and silently retried this same doomed
+            // refresh forever with no "session expired" message and no way
+            // out except a manual reload. Force both the app state and a
+            // real navigation to /login so an expired session actually ends
+            // the session, in whichever tab notices first.
+            void import('../stores/authStore').then(({ useAuthStore }) => {
+              useAuthStore.setState({ user: null, loading: false });
+            });
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+              window.location.href = '/login';
+            }
             return null;
           })
           .finally(() => {

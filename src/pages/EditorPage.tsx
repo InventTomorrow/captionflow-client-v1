@@ -256,8 +256,8 @@ type PanelId =
 const RAIL_ITEMS: Array<{ id: PanelId; label: string }> = [
   //{ id: 'media', label: 'Media' },
   { id: 'text', label: 'Text' },
-  { id: 'captions', label: 'Captions' },
   { id: 'templates', label: 'Templates' },
+  { id: 'captions', label: 'Captions' },
   //{ id: 'audio', label: 'Audio' },
  // { id: 'transitions', label: 'Transitions' },
  // { id: 'filters', label: 'Filters' },
@@ -964,7 +964,7 @@ export function EditorPage() {
   const [error, setError] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const [showHlPicker, setShowHlPicker] = useState(false);
-  const [panel, setPanel] = useState<PanelId>('captions');
+  const [panel, setPanel] = useState<PanelId>('templates');
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Word index currently being edited in the selected caption, or null. */
@@ -1078,35 +1078,62 @@ export function EditorPage() {
   const reloadFinalCaptions = useCallback(
     async (opts?: { fromComplete?: boolean; captions?: Caption[] }) => {
       if (!id) return;
-      const r = await api.get(`/projects/${id}`);
-      const status = r.data.project?.status as string | undefined;
-      if (r.data.project?.video?.duration) setDuration(r.data.project.video.duration);
-      if (r.data.project?.stage) setPipelineStage(r.data.project.stage);
+      try {
+        const r = await api.get(`/projects/${id}`);
+        const status = r.data.project?.status as string | undefined;
+        if (r.data.project?.video?.duration) setDuration(r.data.project.video.duration);
+        if (r.data.project?.stage) setPipelineStage(r.data.project.stage);
 
-      const done = ['ready', 'done', 'partial_error', 'error'].includes(status || '');
-      if (done || opts?.fromComplete) {
-        const caps = opts?.captions ?? (await getAllForProject(id));
-        setCaptions(caps);
-        setComplete(caps.length, caps.length === 0);
+        const done = ['ready', 'done', 'partial_error', 'error'].includes(status || '');
+        if (done || opts?.fromComplete) {
+          let caps = opts?.captions ?? (await getAllForProject(id));
+          if (done && !opts?.fromComplete && caps.length === 0 && status !== 'error') {
+            // Terminal server status but nothing found locally — this browser
+            // missed the one-shot captions:complete socket event (or this is a
+            // different device than the one that generated them). Try the
+            // temporary server-side fallback copy before giving up — it's
+            // cleared once the project is exported, so this only helps in the
+            // window between generation and export.
+            try {
+              const fallback = await api.get(`/projects/${id}/captions-cache`);
+              const fallbackCaps = (fallback.data?.captions || []) as Caption[];
+              if (fallbackCaps.length) {
+                await replaceAllForProject(id, fallbackCaps);
+                caps = fallbackCaps;
+              }
+            } catch {
+              /* fall through to the "no captions" error below */
+            }
+          }
+          setCaptions(caps);
+          setComplete(caps.length, caps.length === 0);
+          setBusy('');
+          setRebuildPercent(0);
+          setProcessing(false);
+          if (status === 'partial_error' && r.data.project?.errorMessage) {
+            setError(r.data.project.errorMessage);
+          } else if (done && caps.length === 0 && status !== 'error') {
+            setError('No captions found on this device — click Regenerate to create them again.');
+          }
+          const first = caps[0]?.start;
+          if (typeof first === 'number' && videoRef.current) {
+            videoRef.current.currentTime = Math.max(0, first + 0.05);
+            didSeekToCaption.current = true;
+          }
+        } else if (['processing', 'transcribing', 'translating', 'uploaded'].includes(status || '')) {
+          setProcessing(status !== 'uploaded');
+        }
+      } catch (err) {
+        // Previously unguarded — a throw here (IndexedDB unavailable/quota
+        // error, a 404 for a stale/foreign project id, a network blip) left
+        // the editor silently stuck on blank/default state or, when called
+        // from the polling safety-net below, left ProcessingOverlay spinning
+        // forever with only a console-level unhandled rejection as any trace.
+        console.error('reloadFinalCaptions failed', err);
+        setError('Failed to load captions — try refreshing the page.');
         setBusy('');
         setRebuildPercent(0);
         setProcessing(false);
-        if (status === 'partial_error' && r.data.project?.errorMessage) {
-          setError(r.data.project.errorMessage);
-        } else if (done && caps.length === 0 && status !== 'error') {
-          // Terminal server status but nothing found locally — either this
-          // browser never received the generated captions (missed socket
-          // event) or this is a different device than the one that
-          // generated them. There's no server copy to fall back to.
-          setError('No captions found on this device — click Regenerate to create them again.');
-        }
-        const first = caps[0]?.start;
-        if (typeof first === 'number' && videoRef.current) {
-          videoRef.current.currentTime = Math.max(0, first + 0.05);
-          didSeekToCaption.current = true;
-        }
-      } else if (['processing', 'transcribing', 'translating', 'uploaded'].includes(status || '')) {
-        setProcessing(status !== 'uploaded');
       }
     },
     [id, setCaptions, setComplete, setPipelineStage],
@@ -1289,6 +1316,14 @@ export function EditorPage() {
       } else {
         setCaptions(caps);
       }
+    }).catch((err) => {
+      // Previously unguarded — a throw here (deleted/foreign project id,
+      // IndexedDB unavailable, a network blip) left the editor permanently
+      // on default/blank state with no error banner and nothing distinct
+      // from "still loading," discoverable only via an unhandled rejection
+      // in the console.
+      console.error('Failed to load project', err);
+      setError('Failed to load this project — it may have been deleted, or try refreshing.');
     });
   }, [id, setCaptions, setPipelineStage, beginGeneration]);
 
@@ -1756,7 +1791,15 @@ export function EditorPage() {
     if (wordStyleSaveTimer.current) window.clearTimeout(wordStyleSaveTimer.current);
     const projectId = id;
     wordStyleSaveTimer.current = window.setTimeout(() => {
-      void upsertOne(projectId, updated);
+      // Previously fire-and-forget with no .catch() — a failure (IndexedDB
+      // quota/unavailable) left the edit showing as applied in the UI
+      // (setCaptions above already ran) while never actually persisting,
+      // silently reverting on next load with zero indication anything went
+      // wrong.
+      void upsertOne(projectId, updated).catch((err) => {
+        console.error('Failed to save word style', err);
+        setError('Failed to save style change — it may not persist after reload.');
+      });
     }, 450);
   }
 
@@ -2033,6 +2076,7 @@ export function EditorPage() {
                   <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
                     <option value="keep_original">Keep original</option>
                     <option value="roman_urdu">Urdish</option>
+                    <option value="roman_punjabi">Roman Punjabi</option>
                     <option value="english">English</option>
                     <option value="urdu">Urdu (اردو)</option>
                     <option value="hindi">Hindi</option>

@@ -21,7 +21,20 @@ interface ApiPlan {
   priceYearlyPkr: number;
   features: string[];
   sortOrder: number;
+  isOneTime?: boolean;
+  durationDays?: number;
+  discountPercent?: number;
+  discountActive?: boolean;
 }
+
+/** Admin-set per-plan discount — returns the discounted price, or null when no discount applies. */
+function discountedPrice(base: number, plan: ApiPlan): number | null {
+  if (!plan.discountActive || !plan.discountPercent) return null;
+  return Math.round(base * (1 - plan.discountPercent / 100));
+}
+
+/** Yearly billing toggle hidden for now — flip back on when yearly pricing is ready to promote. */
+const SHOW_YEARLY_TOGGLE = false;
 
 /** Small per-tier glyph for the pricing cards — play (try it), bolt (speed/creation), star (top tier). */
 function PlanIcon({ slug }: { slug: string }) {
@@ -63,10 +76,12 @@ function Reveal({
   children,
   delayMs = 0,
   className = '',
+  id,
 }: {
   children: ReactNode;
   delayMs?: number;
   className?: string;
+  id?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -90,6 +105,7 @@ function Reveal({
   return (
     <div
       ref={ref}
+      id={id}
       className={`lp-reveal ${visible ? 'is-visible' : ''} ${className}`.trim()}
       style={{ transitionDelay: `${delayMs}ms` }}
     >
@@ -136,12 +152,12 @@ const WHY_US = [
 
 const STEPS = ['Upload', 'Transcribe', 'Generate Captions', 'Style', 'Export'];
 
-const TEMPLATES: Array<{ name: string; video: string }> = [
-  { name: 'Word Pop', video: '/landing/templates/tpl-1.mp4' },
-  { name: 'Karaoke Fill', video: '/landing/templates/tpl-2.mp4' },
-  { name: 'Bold Impact', video: '/landing/templates/tpl-3.mp4' },
-  { name: 'Clean Single Line', video: '/landing/templates/tpl-4.mp4' },
-  { name: 'Minimal Sub', video: '/landing/templates/tpl-5.mp4' },
+const TEMPLATES: Array<{ name: string; video: string; poster: string }> = [
+  { name: 'Word Pop', video: '/landing/templates/tpl-1.mp4', poster: '/landing/templates/tpl-1.jpg' },
+  { name: 'Karaoke Fill', video: '/landing/templates/tpl-2.mp4', poster: '/landing/templates/tpl-2.jpg' },
+  { name: 'Bold Impact', video: '/landing/templates/tpl-3.mp4', poster: '/landing/templates/tpl-3.jpg' },
+  { name: 'Clean Single Line', video: '/landing/templates/tpl-4.mp4', poster: '/landing/templates/tpl-4.jpg' },
+  { name: 'Minimal Sub', video: '/landing/templates/tpl-5.mp4', poster: '/landing/templates/tpl-5.jpg' },
 ];
 
 const TESTIMONIALS = [
@@ -173,7 +189,12 @@ export function LandingPage() {
   const [tplIdx, setTplIdx] = useState(1);
   const tplSliderRef = useRef<InstanceType<typeof Slider> | null>(null);
   const flags = useFlagsStore((s) => s.flags);
+  const launchOffer = useFlagsStore((s) => s.launchOffer);
+  const bankTransfer = useFlagsStore((s) => s.bankTransfer);
   const loadFlags = useFlagsStore((s) => s.load);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [selectedPassSlug, setSelectedPassSlug] = useState('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     void loadFlags();
@@ -182,6 +203,35 @@ export function LandingPage() {
       .then((r) => setPlans(r.data.plans))
       .catch(() => setPlans([]));
   }, [loadFlags]);
+
+  // Dismissal is only in-memory (not persisted to storage) — closing the
+  // banner hides it for this page view, but it comes back on refresh so a
+  // live launch offer keeps getting seen rather than being hidden forever
+  // after one click.
+  function dismissBanner() {
+    setBannerDismissed(true);
+  }
+
+  async function copyToClipboard(value: string, field: string) {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField((f) => (f === field ? null : f)), 1500);
+    } catch {
+      // Clipboard API unavailable/denied — user can still select+copy manually.
+    }
+  }
+
+  const subscriptionPlans = plans?.filter((p) => !p.isOneTime) ?? null;
+  const dayPassPlans = plans?.filter((p) => p.isOneTime) ?? [];
+  const selectedPass = dayPassPlans.find((p) => p.slug === selectedPassSlug) ?? dayPassPlans[0];
+  const whatsappHref =
+    bankTransfer.whatsappNumber && selectedPass
+      ? `https://wa.me/${bankTransfer.whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+          `Hi, I've paid for the ${selectedPass.name} — here's my payment proof.`,
+        )}`
+      : undefined;
 
   /** Get Started always resolves against the current session — no session → /login, signed in → /projects/upload. */
   const getStarted = () => {
@@ -267,12 +317,33 @@ export function LandingPage() {
   // "Most Popular" badge lands on the creator plan when present, else the
   // middle-priced plan, so a newly added plan never breaks the layout.
   const featuredSlug =
-    plans && plans.length > 0
-      ? (plans.find((p) => p.slug === 'creator') ?? plans[Math.floor((plans.length - 1) / 2)])?.slug
+    subscriptionPlans && subscriptionPlans.length > 0
+      ? (subscriptionPlans.find((p) => p.slug === 'creator') ??
+          subscriptionPlans[Math.floor((subscriptionPlans.length - 1) / 2)])?.slug
       : undefined;
 
   return (
     <div className="lp-body">
+      {launchOffer.enabled && launchOffer.text && !bannerDismissed && (
+        <div className="lp-launch-banner">
+          <span className="lp-launch-banner-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M13 2 5 13h5.5L10 22l8-11h-5.5z" />
+            </svg>
+          </span>
+          <span className="lp-launch-banner-text">{launchOffer.text}</span>
+          <button
+            type="button"
+            className="lp-launch-banner-close"
+            aria-label="Dismiss offer"
+            onClick={dismissBanner}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
       <header className="lp-nav">
         {flags.maintenanceMode && (
           <div className="maintenance-banner">
@@ -384,10 +455,11 @@ export function LandingPage() {
                         <video
                           className="lp-tpl-figure-video"
                           src={t.video}
+                          poster={t.poster}
                           muted
                           loop
                           playsInline
-                          preload="auto"
+                          preload="metadata"
                         />
                       </figure>
                     </div>
@@ -585,36 +657,45 @@ export function LandingPage() {
                 No unused suites. Just what a Pakistani creator needs.
               </p>
             </Reveal>
-            <div className="lp-price-toggle-wrap">
-              <div className="lp-price-toggle">
-                <button
-                  type="button"
-                  className={yearly ? '' : 'is-active'}
-                  onClick={() => setYearly(false)}
-                >
-                  Monthly
-                </button>
-                <button type="button" className={yearly ? 'is-active' : ''} onClick={() => setYearly(true)}>
-                  Yearly · Save 20%
-                </button>
+            {SHOW_YEARLY_TOGGLE && (
+              <div className="lp-price-toggle-wrap">
+                <div className="lp-price-toggle">
+                  <button
+                    type="button"
+                    className={yearly ? '' : 'is-active'}
+                    onClick={() => setYearly(false)}
+                  >
+                    Monthly
+                  </button>
+                  <button type="button" className={yearly ? 'is-active' : ''} onClick={() => setYearly(true)}>
+                    Yearly · Save 20%
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             <div className="lp-grid-3 lp-pricing-grid">
-              {plans === null && <p className="muted">Loading plans…</p>}
-              {plans?.length === 0 && (
+              {subscriptionPlans === null && <p className="muted">Loading plans…</p>}
+              {subscriptionPlans?.length === 0 && (
                 <p className="muted">Pricing isn&apos;t configured yet — check back soon.</p>
               )}
-              {plans?.map((p, i) => {
+              {subscriptionPlans?.map((p, i) => {
                 const featured = p.slug === featuredSlug;
                 const monthlyFree = p.priceMonthlyPkr <= 0;
                 const shown = yearly ? p.priceYearlyPkr : p.priceMonthlyPkr;
-                // Yearly billing shows the discounted rate — cross out the
-                // monthly rate alongside it so the saving actually reads as
-                // a saving, not just a different number.
-                const showWasPrice = yearly && !monthlyFree && p.priceYearlyPkr < p.priceMonthlyPkr;
+                const discounted = discountedPrice(shown, p);
+                // An admin discount takes priority over the yearly-savings
+                // comparison — showing two different "was" prices at once
+                // would be confusing, so pick one: the discount when active,
+                // otherwise the existing monthly-vs-yearly comparison.
+                const showWasPrice = discounted != null || (yearly && !monthlyFree && p.priceYearlyPkr < p.priceMonthlyPkr);
+                const wasPriceValue = discounted != null ? shown : p.priceMonthlyPkr;
+                const figureValue = discounted ?? shown;
                 return (
                   <Reveal key={p._id} delayMs={i * 100}>
                     <article className={`lp-card lp-price-card ${featured ? 'lp-price-featured' : ''}`}>
+                      {discounted != null && (
+                        <span className="lp-price-discount-ribbon">{p.discountPercent}% OFF</span>
+                      )}
                       {featured && <div className="lp-price-glow" aria-hidden="true" />}
                       {featured && (
                         <span className="lp-price-badge">
@@ -637,11 +718,11 @@ export function LandingPage() {
                           <div className="lp-price-figure-row">
                             {showWasPrice && (
                               <span className="lp-price-was">
-                                PKR {p.priceMonthlyPkr.toLocaleString()}
+                                PKR {wasPriceValue.toLocaleString()}
                               </span>
                             )}
                             <span className="lp-price-currency">PKR</span>
-                            <span className="lp-price-figure">{shown.toLocaleString()}</span>
+                            <span className="lp-price-figure">{figureValue.toLocaleString()}</span>
                             <span className="lp-price-suffix">/mo</span>
                           </div>
                         )}
@@ -698,6 +779,180 @@ export function LandingPage() {
             </ul>
           </div>
         </section>
+
+        {dayPassPlans.length > 0 && (
+          <section id="day-pass" className="lp-section lp-daypass-section">
+            <div className="lp-container">
+              <Reveal className="lp-section-head lp-daypass-head">
+                <p className="lp-eyebrow">No subscription needed</p>
+                <h2 className="lp-h2">
+                  Short on time? <span className="lp-accent-text">Grab a Pass</span>
+                </h2>
+                <p className="lp-body-text lp-narrow-text">
+                  One-time access, no auto-renewal — perfect for a single shoot or a quick campaign.
+                </p>
+              </Reveal>
+              <div className="lp-daypass-layout">
+                <div className="lp-daypass-grid">
+                  {dayPassPlans.map((p, i) => {
+                    const discounted = discountedPrice(p.priceMonthlyPkr, p);
+                    return (
+                      <Reveal key={p._id} delayMs={i * 100}>
+                        <article className="lp-card lp-price-card lp-daypass-card">
+                          {discounted != null && (
+                            <span className="lp-price-discount-ribbon">{p.discountPercent}% OFF</span>
+                          )}
+                          <h3 className="lp-price-name">{p.name}</h3>
+                          {p.description && <p className="lp-price-desc">{p.description}</p>}
+                          <div className="lp-price-amount">
+                            <div className="lp-price-figure-row">
+                              {discounted != null && (
+                                <span className="lp-price-was">PKR {p.priceMonthlyPkr.toLocaleString()}</span>
+                              )}
+                              <span className="lp-price-currency">PKR</span>
+                              <span className="lp-price-figure">
+                                {(discounted ?? p.priceMonthlyPkr).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                          <ul className="lp-price-features">
+                            {p.features.map((f) => (
+                              <li key={f}>
+                                <span className="lp-price-check" aria-hidden="true">
+                                  <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
+                                    <path
+                                      d="M3 8.5l3 3 7-7"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.4"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                </span>
+                                <span>{f}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            className="lp-btn lp-btn-primary lp-price-cta"
+                            onClick={() => {
+                              setSelectedPassSlug(p.slug);
+                              document.getElementById('daypass-payment')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }}
+                          >
+                            Get {p.name}
+                            <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                              <path
+                                d="M3 8h9M8 3l5 5-5 5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        </article>
+                      </Reveal>
+                    );
+                  })}
+                </div>
+
+                <Reveal id="daypass-payment" className="lp-glass lp-payment-panel">
+                  <div className="lp-payment-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 10 12 4l9 6M4 10v9M20 10v9M8 10v9M16 10v9M2 22h20" />
+                    </svg>
+                  </div>
+                  <h3 className="lp-payment-title">Manual Payment (Bank Transfer)</h3>
+                  <p className="lp-payment-sub">
+                    Prefer bank transfer over card? Pay the amount for your chosen pass below.
+                  </p>
+                  {dayPassPlans.length > 1 && (
+                    <label className="lp-payment-select">
+                      Plan
+                      <select
+                        value={selectedPass?.slug || ''}
+                        onChange={(e) => setSelectedPassSlug(e.target.value)}
+                      >
+                        {dayPassPlans.map((p) => {
+                          const discounted = discountedPrice(p.priceMonthlyPkr, p);
+                          return (
+                            <option key={p.slug} value={p.slug}>
+                              {p.name} — PKR {(discounted ?? p.priceMonthlyPkr).toLocaleString()}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                  )}
+                  <p className="lp-payment-fields-label">Bank details &amp; how it works</p>
+                  <div className="lp-payment-fields">
+                    {(
+                      [
+                        ['Account title', bankTransfer.accountTitle, 'accountTitle'],
+                        ['Bank', bankTransfer.bankName, 'bankName'],
+                        ['Account #', bankTransfer.accountNumber, 'accountNumber'],
+                      ] as const
+                    ).map(([label, value, key]) => (
+                      <div className="lp-payment-field" key={key}>
+                        <div className="lp-payment-field-text">
+                          <span className="lp-payment-field-label">{label}</span>
+                          <span className="lp-payment-field-value">{value || '—'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="lp-payment-copy"
+                          aria-label={`Copy ${label}`}
+                          onClick={() => void copyToClipboard(value, key)}
+                        >
+                          {copiedField === key ? (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M3 8.5l3 3 7-7" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <rect x="8" y="8" width="12" height="12" rx="2" />
+                              <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {bankTransfer.instructions.length > 0 && (
+                    <ol className="lp-payment-steps">
+                      {bankTransfer.instructions.map((step, i) => (
+                        <li key={i}>
+                          <span className="lp-payment-step-num">{i + 1}</span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <a
+                    className="lp-btn lp-whatsapp-btn"
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-disabled={!whatsappHref}
+                    onClick={(e) => {
+                      if (!whatsappHref) e.preventDefault();
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M17.5 14.4c-.3-.1-1.6-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.2.2-.3.2-.5.1-.3-.1-1.2-.4-2.2-1.3-.8-.7-1.4-1.6-1.5-1.9-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5-.1-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.5 1.1 2.7c.1.2 1.9 2.9 4.6 4 .6.3 1.1.4 1.5.6.6.2 1.2.2 1.6.1.5-.1 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.5-.3z" />
+                      <path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 20.2 12 8.2 8.2 0 0 1 12 20.2z" />
+                    </svg>
+                    Send proof on WhatsApp
+                  </a>
+                </Reveal>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="lp-section lp-section-surface">
           <div className="lp-container">

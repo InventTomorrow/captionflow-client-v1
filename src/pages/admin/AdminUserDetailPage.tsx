@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 
-type Plan = { _id: string; name: string; slug: string; priceMonthlyPkr: number };
+type Plan = {
+  _id: string;
+  name: string;
+  slug: string;
+  priceMonthlyPkr: number;
+  isOneTime?: boolean;
+  durationDays?: number;
+};
 
 export function AdminUserDetailPage() {
   const { id } = useParams();
@@ -115,7 +122,8 @@ export function AdminUserDetailPage() {
           <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
             {plans.map((p) => (
               <option key={p._id} value={p._id}>
-                {p.name} — PKR {p.priceMonthlyPkr}/mo
+                {p.name} — PKR {p.priceMonthlyPkr}
+                {p.isOneTime ? ` (one-time, ${p.durationDays || '?'}d access)` : '/mo'}
               </option>
             ))}
           </select>

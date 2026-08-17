@@ -12,6 +12,10 @@ type Plan = {
   isActive: boolean;
   sortOrder: number;
   features: string[];
+  isOneTime?: boolean;
+  durationDays?: number;
+  discountPercent?: number;
+  discountActive?: boolean;
   limits: {
     minutesPerMonth: number;
     maxExportQuality: string;
@@ -64,6 +68,10 @@ export function AdminPlansPage() {
           isActive: editing.isActive,
           features: editing.features,
           limits: editing.limits,
+          isOneTime: Boolean(editing.isOneTime),
+          durationDays: editing.isOneTime ? Number(editing.durationDays || 0) || undefined : undefined,
+          discountPercent: Number(editing.discountPercent || 0) || undefined,
+          discountActive: Boolean(editing.discountActive),
         });
       } else {
         await api.post('/admin/plans', {
@@ -75,6 +83,10 @@ export function AdminPlansPage() {
           sortOrder: Number(editing.sortOrder || 0),
           features: editing.features || [],
           limits: editing.limits || emptyLimits,
+          isOneTime: Boolean(editing.isOneTime),
+          durationDays: editing.isOneTime ? Number(editing.durationDays || 0) || undefined : undefined,
+          discountPercent: Number(editing.discountPercent || 0) || undefined,
+          discountActive: Boolean(editing.discountActive),
         });
       }
       setMsg('Saved');
@@ -127,9 +139,11 @@ export function AdminPlansPage() {
             <tr>
               <th>Name</th>
               <th>Slug</th>
-              <th>Monthly</th>
+              <th>Type</th>
+              <th>Price</th>
               <th>Minutes</th>
               <th>Quality</th>
+              <th>Discount</th>
               <th>Active</th>
               <th />
             </tr>
@@ -139,9 +153,11 @@ export function AdminPlansPage() {
               <tr key={p._id}>
                 <td>{p.name}</td>
                 <td>{p.slug}</td>
+                <td>{p.isOneTime ? `Day Pass (${p.durationDays || '?'}d)` : 'Subscription'}</td>
                 <td>PKR {p.priceMonthlyPkr}</td>
                 <td>{p.limits.minutesPerMonth}</td>
                 <td>{p.limits.maxExportQuality}</td>
+                <td>{p.discountActive && p.discountPercent ? `${p.discountPercent}% off` : '—'}</td>
                 <td>{p.isActive ? 'Yes' : 'No'}</td>
                 <td className="admin-actions">
                   {isAdmin && (
@@ -236,6 +252,58 @@ export function AdminPlansPage() {
                 <option value="4K">4K</option>
               </select>
             </label>
+          </div>
+          <label>
+            Features (one per line — shown as checklist bullets)
+            <textarea
+              rows={4}
+              value={(editing.features || []).join('\n')}
+              onChange={(e) =>
+                setEditing({ ...editing, features: e.target.value.split('\n').map((f) => f.trim()).filter(Boolean) })
+              }
+            />
+          </label>
+          <div className="admin-inline">
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                checked={Boolean(editing.isOneTime)}
+                onChange={(e) => setEditing({ ...editing, isOneTime: e.target.checked })}
+              />
+              One-time pass (not a recurring subscription)
+            </label>
+            {editing.isOneTime && (
+              <label>
+                Duration (days)
+                <input
+                  type="number"
+                  value={editing.durationDays ?? 3}
+                  onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })}
+                />
+              </label>
+            )}
+          </div>
+          <div className="admin-inline">
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                checked={Boolean(editing.discountActive)}
+                onChange={(e) => setEditing({ ...editing, discountActive: e.target.checked })}
+              />
+              Discount active
+            </label>
+            {editing.discountActive && (
+              <label>
+                Discount %
+                <input
+                  type="number"
+                  min={0}
+                  max={95}
+                  value={editing.discountPercent ?? 0}
+                  onChange={(e) => setEditing({ ...editing, discountPercent: Number(e.target.value) })}
+                />
+              </label>
+            )}
           </div>
           <div className="admin-actions">
             <button type="button" className="btn primary" onClick={() => void save()}>

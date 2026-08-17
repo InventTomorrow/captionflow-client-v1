@@ -797,6 +797,24 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   });
   const behavior = wordBehavior(displayMode);
 
+  // Templates with a solid background (TikTok Pill, Creator Yellow Box,
+  // Cinematic Subtitle, Bubble Candy) paint a pill/box behind the text. That
+  // box has to live on its own inner element (.cap-box below), not on the
+  // outer .caption-overlay — the outer's `width: max-content` is load-bearing
+  // for safe dragging (see its CSS comment) and, once a caption's text is
+  // long enough to wrap, max-content clamped by max-width locks the outer to
+  // a fixed 90%-of-frame width regardless of how short the wrapped lines
+  // actually are. Painting the box directly on that outer stretched it into
+  // a full-width rectangle for any multi-line caption — a "justified
+  // paragraph" look that only ever matched the picker preview's short,
+  // single-line demo text. .cap-box is a normal-flow (non-positioned) child
+  // instead, so its own auto width can do a real shrink-to-fit around the
+  // actual wrapped lines.
+  const hasBox =
+    !!style.backgroundColor &&
+    style.backgroundColor !== 'transparent' &&
+    !/rgba?\([^)]*,\s*0\s*\)/i.test(style.backgroundColor);
+
   // Selection arrives as (canonical caption id, canonical word index); derived
   // display captions map back through sourceId/wordOffset.
   const activeSourceId = active ? (active.sourceId ?? active._id) : null;
@@ -883,25 +901,13 @@ export const CaptionOverlay = memo(function CaptionOverlay({
               style.activeFill && style.activeFill !== 'transparent'
                 ? style.activeFill
                 : 'transparent',
-            // TikTok Pill / boxed captions — only paint when truly opaque.
-            background:
-              style.backgroundColor &&
-              !/rgba?\([^)]*,\s*0\s*\)/i.test(style.backgroundColor) &&
-              style.backgroundColor !== 'transparent'
-                ? style.backgroundColor
-                : undefined,
-            borderRadius:
-              style.backgroundColor &&
-              !/rgba?\([^)]*,\s*0\s*\)/i.test(style.backgroundColor) &&
-              style.backgroundColor !== 'transparent'
-                ? 16
-                : undefined,
-            padding:
-              style.backgroundColor &&
-              !/rgba?\([^)]*,\s*0\s*\)/i.test(style.backgroundColor) &&
-              style.backgroundColor !== 'transparent'
-                ? '0.45em 0.85em'
-                : undefined,
+            // The .caption-overlay CSS rule's own default padding/radius are
+            // for the non-boxed case (drag hover outline hugs plain text).
+            // When .cap-box paints a real pill/box below, its own padding IS
+            // the box's padding — cancel the outer's here so the drag hover
+            // outline still hugs that box exactly, not a padded shell around it.
+            padding: hasBox ? 0 : undefined,
+            borderRadius: hasBox ? 16 : undefined,
             top: `${anchor.offsetY}%`,
             left: `${anchor.offsetX}%`,
             bottom: 'auto',
@@ -909,6 +915,25 @@ export const CaptionOverlay = memo(function CaptionOverlay({
             transform: 'translate(-50%, -50%)',
           }}
         >
+          {/* The visible box (when this template paints one) plus the resize
+              handles/confirm toolbar that anchor to it. display: contents
+              when there's no background so it never affects layout — the
+              resize handles then anchor to .caption-overlay exactly as
+              before, unaffected by this wrapper's presence. */}
+          <div
+            className="cap-box"
+            style={
+              hasBox
+                ? {
+                    display: 'inline-table',
+                    position: 'relative',
+                    background: style.backgroundColor,
+                    borderRadius: 16,
+                    padding: '0.45em 0.85em',
+                  }
+                : { display: 'contents' }
+            }
+          >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1095,6 +1120,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
               </button>
             </div>
           )}
+          </div>
         </div>
       )}
     </AnimatePresence>

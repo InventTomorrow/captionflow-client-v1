@@ -5699,7 +5699,11 @@ legend {
 .lp-price-toggle-wrap {
   display: flex;
   justify-content: center;
-  margin: 0 0 8px;
+  /* Extra breathing room below the toggle — the featured card scales up and
+     translates upward on desktop (.lp-price-featured), and its discount
+     ribbon sits right in the top-left corner, so a tight gap here made the
+     ribbon look cramped against the toggle above it. */
+  margin: 0 0 36px;
 }
 
 .lp-price-toggle {
@@ -5978,6 +5982,304 @@ legend {
 
 .lp-price-notes {
   margin-top: 28px;
+}
+
+/* Diagonal corner ribbon for an admin-set per-plan discount — reused on both
+   the regular subscription cards and the day-pass cards below. Anchored to
+   the top-LEFT corner (rotated -45deg) so it never collides with the
+   existing top-right "Popular" ribbon on a featured + discounted plan. Card
+   needs overflow:hidden for the corners to clip cleanly — .lp-price-card
+   already sets that. */
+.lp-price-discount-ribbon {
+  position: absolute;
+  z-index: 2;
+  top: 22px;
+  left: -38px;
+  width: 140px;
+  padding: 5px 0;
+  transform: rotate(-45deg);
+  transform-origin: center;
+  background: linear-gradient(135deg, var(--cf-danger) 0%, color-mix(in srgb, var(--cf-danger) 55%, #ff8a3d) 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* =====================================================================
+   Launch offer banner — admin-controlled dismissible bar above the nav.
+   ===================================================================== */
+
+.lp-launch-banner {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 44px 10px 16px;
+  background-image: var(--lp-gradient, linear-gradient(92deg, var(--cf-accent), var(--cf-accent)));
+  color: var(--cf-on-accent, #111);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.lp-launch-banner-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.lp-launch-banner-text {
+  line-height: 1.4;
+}
+
+.lp-launch-banner-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.lp-launch-banner-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, black 12%, transparent);
+}
+
+/* =====================================================================
+   Day Pass section — one-time purchases + manual bank-transfer panel.
+   ===================================================================== */
+
+.lp-daypass-section {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+.lp-daypass-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .lp-daypass-layout {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+
+.lp-daypass-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .lp-daypass-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.lp-daypass-card {
+  align-items: center;
+}
+
+.lp-payment-panel {
+  border-radius: 20px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lp-body main .lp-payment-panel h3,
+.lp-body main .lp-payment-panel p {
+  text-align: left;
+}
+
+.lp-payment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--cf-accent) 16%, transparent);
+  color: var(--cf-accent);
+}
+
+.lp-payment-title {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--cf-text);
+}
+
+.lp-payment-sub {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--cf-text-muted);
+}
+
+.lp-payment-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.lp-payment-select select {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cf-text);
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.lp-payment-fields-label {
+  margin: 4px 0 10px !important;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.lp-payment-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.lp-payment-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cf-surface) 70%, transparent);
+  border: 1px solid var(--cf-border);
+}
+
+.lp-payment-field-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lp-payment-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.lp-payment-field-value {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--cf-text);
+  overflow-wrap: anywhere;
+}
+
+.lp-payment-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border);
+  background: transparent;
+  color: var(--cf-text-secondary);
+  cursor: pointer;
+  transition: background var(--lp-smooth), color var(--lp-smooth), border-color var(--lp-smooth);
+}
+
+.lp-payment-copy:hover {
+  color: var(--cf-accent);
+  border-color: color-mix(in srgb, var(--cf-accent) 50%, var(--cf-border));
+  background: color-mix(in srgb, var(--cf-accent) 8%, transparent);
+}
+
+.lp-payment-steps {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-payment-steps li {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--cf-text-secondary);
+}
+
+.lp-payment-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-top: 1px;
+  background: color-mix(in srgb, var(--cf-accent) 18%, transparent);
+  color: var(--cf-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lp-whatsapp-btn {
+  width: 100%;
+  background: #25d366;
+  color: #06210f;
+  box-shadow: 0 10px 26px -12px color-mix(in srgb, #25d366 65%, transparent);
+}
+
+.lp-whatsapp-btn:hover {
+  transform: translateY(-2px);
+  background: #2ee374;
+}
+
+.lp-whatsapp-btn[aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .lp-testimonial-card {

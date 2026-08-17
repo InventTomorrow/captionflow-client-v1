@@ -108,6 +108,7 @@ export function PrepareMediaModal({
                 <option value="ur">Urdu / Hindi (Hinglish)</option>
                 <option value="en">English</option>
                 <option value="hi">Hindi</option>
+                <option value="pa">Punjabi</option>
                 <option value="ar">Arabic</option>
                 <option value="de">German</option>
                 <option value="es">Spanish</option>
@@ -123,6 +124,7 @@ export function PrepareMediaModal({
               <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
                 <option value="keep_original">Original</option>
                 <option value="roman_urdu">Urdish (Urdu/Hindi in English letters)</option>
+                <option value="roman_punjabi">Roman Punjabi (Punjabi in English letters)</option>
                 <option value="english">English (translate)</option>
                 <option value="urdu">Urdu — اردو (translate)</option>
                 <option value="hindi">Hindi (translate)</option>

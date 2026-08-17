@@ -18,6 +18,14 @@ export function AdminSystemPage() {
     gptOutputUsdPer1k: 0.0006,
     usdToPkr: 280,
   });
+  const [launchOffer, setLaunchOffer] = useState({ enabled: false, text: '' });
+  const [bankTransfer, setBankTransfer] = useState({
+    accountTitle: '',
+    bankName: '',
+    accountNumber: '',
+    whatsappNumber: '',
+    instructions: [] as string[],
+  });
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
@@ -27,13 +35,15 @@ export function AdminSystemPage() {
         if (f.data.flags) setFlags({ ...flags, ...f.data.flags });
         if (f.data.defaultPlanSlug) setDefaultPlanSlug(f.data.defaultPlanSlug);
         if (f.data.apiPricing) setApiPricing({ ...apiPricing, ...f.data.apiPricing });
+        if (f.data.launchOffer) setLaunchOffer({ ...launchOffer, ...f.data.launchOffer });
+        if (f.data.bankTransfer) setBankTransfer({ ...bankTransfer, ...f.data.bankTransfer });
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
-    await api.patch('/admin/system/flags', { flags, defaultPlanSlug, apiPricing });
+    await api.patch('/admin/system/flags', { flags, defaultPlanSlug, apiPricing, launchOffer, bankTransfer });
     setMsg('Saved');
   }
 
@@ -141,6 +151,89 @@ export function AdminSystemPage() {
               </label>
               <button type="button" className="btn primary" onClick={() => void save()}>
                 Save pricing
+              </button>
+            </>
+          )}
+        </section>
+        <section className="admin-card">
+          <h2>Launch offer banner</h2>
+          <p className="muted">Dismissible bar shown above the nav on the landing page.</p>
+          {!isAdmin ? (
+            <p className="muted">Support can view; only admins edit.</p>
+          ) : (
+            <>
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={launchOffer.enabled}
+                  onChange={(e) => setLaunchOffer({ ...launchOffer, enabled: e.target.checked })}
+                />
+                Banner enabled
+              </label>
+              <label>
+                Banner text
+                <input
+                  value={launchOffer.text}
+                  onChange={(e) => setLaunchOffer({ ...launchOffer, text: e.target.value })}
+                  placeholder="Launch offer — get the Starter plan at 50% off. Offer ends today."
+                />
+              </label>
+              <button type="button" className="btn primary" onClick={() => void save()}>
+                Save banner
+              </button>
+            </>
+          )}
+        </section>
+        <section className="admin-card">
+          <h2>Manual payment (bank transfer)</h2>
+          <p className="muted">Shown on the landing page Day Pass section so buyers can pay and send proof.</p>
+          {!isAdmin ? (
+            <p className="muted">Support can view; only admins edit.</p>
+          ) : (
+            <>
+              <label>
+                Account title
+                <input
+                  value={bankTransfer.accountTitle}
+                  onChange={(e) => setBankTransfer({ ...bankTransfer, accountTitle: e.target.value })}
+                />
+              </label>
+              <label>
+                Bank name
+                <input
+                  value={bankTransfer.bankName}
+                  onChange={(e) => setBankTransfer({ ...bankTransfer, bankName: e.target.value })}
+                />
+              </label>
+              <label>
+                Account number
+                <input
+                  value={bankTransfer.accountNumber}
+                  onChange={(e) => setBankTransfer({ ...bankTransfer, accountNumber: e.target.value })}
+                />
+              </label>
+              <label>
+                WhatsApp number (digits only, with country code, e.g. 923001234567)
+                <input
+                  value={bankTransfer.whatsappNumber}
+                  onChange={(e) => setBankTransfer({ ...bankTransfer, whatsappNumber: e.target.value })}
+                />
+              </label>
+              <label>
+                Instructions (one step per line)
+                <textarea
+                  rows={4}
+                  value={bankTransfer.instructions.join('\n')}
+                  onChange={(e) =>
+                    setBankTransfer({
+                      ...bankTransfer,
+                      instructions: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                />
+              </label>
+              <button type="button" className="btn primary" onClick={() => void save()}>
+                Save payment details
               </button>
             </>
           )}
