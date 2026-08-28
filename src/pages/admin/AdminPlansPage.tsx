@@ -24,6 +24,7 @@ type Plan = {
     bulkUpload: boolean;
     priorityProcessing: boolean;
     brandKits: boolean;
+    exportEnabled: boolean;
   };
 };
 
@@ -35,6 +36,7 @@ const emptyLimits = {
   bulkUpload: false,
   priorityProcessing: false,
   brandKits: false,
+  exportEnabled: true,
 };
 
 export function AdminPlansPage() {
@@ -143,6 +145,7 @@ export function AdminPlansPage() {
               <th>Price</th>
               <th>Minutes</th>
               <th>Quality</th>
+              <th>Export</th>
               <th>Discount</th>
               <th>Active</th>
               <th />
@@ -157,6 +160,7 @@ export function AdminPlansPage() {
                 <td>PKR {p.priceMonthlyPkr}</td>
                 <td>{p.limits.minutesPerMonth}</td>
                 <td>{p.limits.maxExportQuality}</td>
+                <td>{p.limits.exportEnabled === false ? 'Disabled' : 'Yes'}</td>
                 <td>{p.discountActive && p.discountPercent ? `${p.discountPercent}% off` : '—'}</td>
                 <td>{p.isActive ? 'Yes' : 'No'}</td>
                 <td className="admin-actions">
@@ -253,6 +257,19 @@ export function AdminPlansPage() {
               </select>
             </label>
           </div>
+          <label className="admin-check">
+            <input
+              type="checkbox"
+              checked={editing.limits?.exportEnabled ?? true}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  limits: { ...emptyLimits, ...editing.limits!, exportEnabled: e.target.checked },
+                })
+              }
+            />
+            Export enabled on this plan
+          </label>
           <label>
             Features (one per line — shown as checklist bullets)
             <textarea

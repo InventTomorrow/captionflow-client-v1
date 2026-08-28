@@ -1,75 +1,36 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ReactSlick from 'react-slick';
 import type { Settings } from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
+import {
+  MessageSquare,
+  SquarePen,
+  CloudUpload,
+  AudioLines,
+  ALargeSmall,
+  Download,
+  Users,
+  Target,
+  Zap,
+  FileVideo,
+  History,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { useFlagsStore } from '../stores/flagsStore';
+import { PricingCards, discountedPrice, type ApiPlan } from '../components/PricingCards';
+import { ManualPaymentModal } from '../components/ManualPaymentModal';
 
 /** Vite/CJS interop: default export can be nested as `{ default: Component }`. */
 const Slider = ((ReactSlick as unknown as { default?: typeof ReactSlick }).default ??
   ReactSlick) as typeof ReactSlick;
 
-interface ApiPlan {
-  _id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  priceMonthlyPkr: number;
-  priceYearlyPkr: number;
-  features: string[];
-  sortOrder: number;
-  isOneTime?: boolean;
-  durationDays?: number;
-  discountPercent?: number;
-  discountActive?: boolean;
-}
-
-/** Admin-set per-plan discount — returns the discounted price, or null when no discount applies. */
-function discountedPrice(base: number, plan: ApiPlan): number | null {
-  if (!plan.discountActive || !plan.discountPercent) return null;
-  return Math.round(base * (1 - plan.discountPercent / 100));
-}
-
 /** Yearly billing toggle hidden for now — flip back on when yearly pricing is ready to promote. */
 const SHOW_YEARLY_TOGGLE = false;
-
-/** Small per-tier glyph for the pricing cards — play (try it), bolt (speed/creation), star (top tier). */
-function PlanIcon({ slug }: { slug: string }) {
-  const common = {
-    width: 18,
-    height: 18,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  };
-  if (slug === 'studio') {
-    return (
-      <svg {...common}>
-        <path d="M12 3.5l2.6 5.3 5.9.8-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" />
-      </svg>
-    );
-  }
-  if (slug === 'creator') {
-    return (
-      <svg {...common}>
-        <path d="M13 2 5 13h5.5L10 22l8-11h-5.5z" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <circle cx="12" cy="12" r="8.3" />
-      <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 /** Fades a section in once it scrolls into view (mirrors the original mockup's .cf-reveal). */
 function Reveal({
@@ -114,43 +75,55 @@ function Reveal({
   );
 }
 
-const DIFFERENTIATORS = [
+const DIFFERENTIATORS: Array<{ icon: LucideIcon | null; badge?: string; title: string; body: string }> = [
   {
-    icon: '🎯',
-    title: 'Trained on how Pakistan speaks',
-    body: 'Built on Pakistani speech — not an English model with an Urdu patch.',
+    icon: MessageSquare,
+    title: 'Trained on Real Pakistani Speech',
+    body: 'Fine-tuned specifically on local accents, slang, and seamless code-switching—not an English AI guessing Urdu phonetics.',
   },
   {
-    icon: '✏️',
-    title: 'Edit every single word',
-    body: 'Fix wording and timing before export. Nothing goes out until you say so.',
+    icon: SquarePen,
+    title: 'Full Control Before You Post',
+    body: 'Easily fix spelling, change line lengths, and adjust word timing with zero hassle.',
   },
   {
-    icon: '🎬',
-    title: 'Export up to 4K',
-    body: 'Burned-in video or SRT — sharp and ready to post.',
-  },
-];
-
-const WHY_US = [
-  {
-    icon: '🇵🇰',
-    title: 'Not adapted. Built.',
-    body: 'Trained on Pakistani speech from the ground up.',
-  },
-  {
-    icon: '🎯',
-    title: 'Accuracy where it counts',
-    body: 'Model does the heavy lift. You keep final say.',
-  },
-  {
-    icon: '💸',
-    title: 'Pay for what you use',
-    body: 'No translation suites. No enterprise fluff. Just captions.',
+    icon: null,
+    badge: '4K',
+    title: 'High-Quality & Ready to Upload',
+    body: 'Download crisp 4K videos with ready-to-use caption styles, or get simple subtitle files for your video editor.',
   },
 ];
 
-const STEPS = ['Upload', 'Transcribe', 'Generate Captions', 'Style', 'Export'];
+const WHY_WE_BUILT: Array<{ icon: LucideIcon; title: string; body: string }> = [
+  {
+    icon: Users,
+    title: 'Built for Pakistan',
+    body: 'Trained on how Pakistan actually speaks — not just textbook English.',
+  },
+  {
+    icon: Target,
+    title: 'More Accurate',
+    body: 'Understands Urdu, English, Roman Urdu, and code-switching like a native.',
+  },
+  {
+    icon: Zap,
+    title: 'Saves You Time',
+    body: 'From hours to minutes. Focus on creating, not editing captions.',
+  },
+  {
+    icon: FileVideo,
+    title: 'Ready for Anything',
+    body: 'Export in multiple formats, including 4K — ready for any platform.',
+  },
+];
+
+const STEPS: Array<{ icon: LucideIcon; title: string; body: string }> = [
+  { icon: CloudUpload, title: 'Upload', body: 'Upload your video or audio file.' },
+  { icon: AudioLines, title: 'Transcribe', body: 'We transcribe your content.' },
+  { icon: MessageSquare, title: 'Generate Captions', body: 'AI generates accurate captions instantly.' },
+  { icon: ALargeSmall, title: 'Style', body: 'Choose a style that fits your content.' },
+  { icon: Download, title: 'Export', body: 'Export and share your content.' },
+];
 
 const TEMPLATES: Array<{ name: string; video: string; poster: string }> = [
   { name: 'Word Pop', video: '/landing/templates/tpl-1.mp4', poster: '/landing/templates/tpl-1.jpg' },
@@ -160,26 +133,9 @@ const TEMPLATES: Array<{ name: string; video: string; poster: string }> = [
   { name: 'Minimal Sub', video: '/landing/templates/tpl-5.mp4', poster: '/landing/templates/tpl-5.jpg' },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: 'Pehli baar koi tool meri Urdish samajhta hai.',
-    author: '@zaravlogs · Karachi',
-    tags: ['Reels Creator', '85K Followers'],
-  },
-  {
-    quote: 'Shoot, upload, export — under two minutes.',
-    author: '@haris.makes · Lahore',
-    tags: ['Freelance Editor', 'Video Agency'],
-  },
-  {
-    quote: 'Roman Urdu captions that finally look clean.',
-    author: '@studio.noor · Islamabad',
-    tags: ['Content Studio', 'Client Work'],
-  },
-];
-
 export function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -190,11 +146,10 @@ export function LandingPage() {
   const tplSliderRef = useRef<InstanceType<typeof Slider> | null>(null);
   const flags = useFlagsStore((s) => s.flags);
   const launchOffer = useFlagsStore((s) => s.launchOffer);
-  const bankTransfer = useFlagsStore((s) => s.bankTransfer);
   const loadFlags = useFlagsStore((s) => s.load);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [selectedPassSlug, setSelectedPassSlug] = useState('');
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [selectedPaymentSlug, setSelectedPaymentSlug] = useState('');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   useEffect(() => {
     void loadFlags();
@@ -204,6 +159,20 @@ export function LandingPage() {
       .catch(() => setPlans([]));
   }, [loadFlags]);
 
+  // `<Link to="/#pricing">` (used by upgrade CTAs elsewhere in the app) is a
+  // client-side route change, not a real page load — the browser only
+  // auto-scrolls to a URL hash on an actual navigation, so arriving here
+  // from another route lands at the top instead of the target section
+  // unless we scroll to it ourselves.
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.slice(1);
+    const raf = requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [location.hash]);
+
   // Dismissal is only in-memory (not persisted to storage) — closing the
   // banner hides it for this page view, but it comes back on refresh so a
   // live launch offer keeps getting seen rather than being hidden forever
@@ -212,32 +181,26 @@ export function LandingPage() {
     setBannerDismissed(true);
   }
 
-  async function copyToClipboard(value: string, field: string) {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField((f) => (f === field ? null : f)), 1500);
-    } catch {
-      // Clipboard API unavailable/denied — user can still select+copy manually.
-    }
-  }
-
   const subscriptionPlans = plans?.filter((p) => !p.isOneTime) ?? null;
   const dayPassPlans = plans?.filter((p) => p.isOneTime) ?? [];
-  const selectedPass = dayPassPlans.find((p) => p.slug === selectedPassSlug) ?? dayPassPlans[0];
-  const whatsappHref =
-    bankTransfer.whatsappNumber && selectedPass
-      ? `https://wa.me/${bankTransfer.whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-          `Hi, I've paid for the ${selectedPass.name} — here's my payment proof.`,
-        )}`
-      : undefined;
 
   /** Get Started always resolves against the current session — no session → /login, signed in → /projects/upload. */
   const getStarted = () => {
     if (loading) return;
     navigate(user ? '/projects/upload' : '/login');
     setMobileOpen(false);
+  };
+
+  /** Subscription plan cards have no online checkout — route the pick into
+   *  the manual bank-transfer payment popup instead, same as day passes.
+   *  The free tier has nothing to pay, so it keeps the old sign-up flow. */
+  const selectSubscriptionPlan = (plan: ApiPlan) => {
+    if (plan.priceMonthlyPkr <= 0) {
+      getStarted();
+      return;
+    }
+    setSelectedPaymentSlug(plan.slug);
+    setPaymentModalOpen(true);
   };
 
   const prevTpl = () => tplSliderRef.current?.slickPrev();
@@ -312,15 +275,6 @@ export function LandingPage() {
       },
     ],
   };
-
-  // Admin sets these in Admin > Plans (server/src/models/Plan.ts) — the
-  // "Most Popular" badge lands on the creator plan when present, else the
-  // middle-priced plan, so a newly added plan never breaks the layout.
-  const featuredSlug =
-    subscriptionPlans && subscriptionPlans.length > 0
-      ? (subscriptionPlans.find((p) => p.slug === 'creator') ??
-          subscriptionPlans[Math.floor((subscriptionPlans.length - 1) / 2)])?.slug
-      : undefined;
 
   return (
     <div className="lp-body">
@@ -447,9 +401,6 @@ export function LandingPage() {
                 </button>
               </div>
               <p className="lp-hero-trust">Trusted by thousands of Pakistani creators</p>
-              <p className="lp-hero-rating">
-                <span className="lp-accent-text">★★★★★</span> <strong>4.9</strong>
-              </p>
             </Reveal>
           </div>
         </section>
@@ -532,18 +483,19 @@ export function LandingPage() {
                 <div className="lp-compare-card lp-compare-bad">
                   <p className="lp-compare-label">Other Tools</p>
                   <p className="lp-compare-text">
-                    &quot;Yar aaj ka shoot boht smooth gya -- litraly ek hi take men&quot;
+                    &quot;Super super chai tea ke calm pay nick low&quot;
                   </p>
                 </div>
                 <div className="lp-compare-card lp-compare-good">
                   <p className="lp-compare-label">Asaan Caption</p>
                   <p className="lp-compare-text">
-                    &quot;Yaar, aaj ka <span className="lp-accent-text">shoot</span> bohat smooth
-                    gaya, literally ek hi take mein&quot;
+                    &quot;Subah subah chai peeyo, aur kaam pe niklo tension-free ho ke.&quot;
                   </p>
                 </div>
               </div>
-              <p className="lp-compare-footnote">Same sentence. One tool heard it right.</p>
+              <p className="lp-compare-footnote">
+                Understands local pronunciation, accents, and everyday slangs.
+              </p>
             </Reveal>
           </div>
         </section>
@@ -552,6 +504,7 @@ export function LandingPage() {
           <div className="lp-container">
             <Reveal className="lp-section-head">
               <p className="lp-eyebrow">The Asaan Caption difference</p>
+              <span className="lp-eyebrow-line" aria-hidden="true" />
               <h2 className="lp-h2 lp-h2-wide">
                 Speak in <span className="lp-accent-text">Urdu</span>, English, or both.
                 <br />
@@ -561,9 +514,12 @@ export function LandingPage() {
             <div className="lp-grid-3">
               {DIFFERENTIATORS.map((d, i) => (
                 <Reveal key={d.title} delayMs={i * 100}>
-                  <article className="lp-card">
-                    <div className="lp-card-icon">{d.icon}</div>
+                  <article className="lp-card lp-card-feature">
+                    <div className={`lp-icon-ring${d.badge ? ' is-square' : ''}`}>
+                      {d.icon ? <d.icon size={20} strokeWidth={1.75} /> : d.badge}
+                    </div>
                     <h3 className="lp-card-title">{d.title}</h3>
+                    <div className="lp-card-divider" aria-hidden="true" />
                     <p className="lp-card-body">{d.body}</p>
                   </article>
                 </Reveal>
@@ -576,6 +532,7 @@ export function LandingPage() {
           <div className="lp-container">
             <Reveal className="lp-section-head">
               <p className="lp-eyebrow">The whole workflow. Nothing missing.</p>
+              <span className="lp-eyebrow-line" aria-hidden="true" />
               <h2 className="lp-h2">
                 Upload. Process. Export.
                 <br />
@@ -586,9 +543,15 @@ export function LandingPage() {
               <div className="lp-steps-line" aria-hidden="true" />
               <ol className="lp-steps-list">
                 {STEPS.map((step, i) => (
-                  <Reveal key={step} delayMs={i * 90} className="lp-step">
-                    <div className="lp-step-number">{String(i + 1).padStart(2, '0')}</div>
-                    <h3 className="lp-step-title">{step}</h3>
+                  <Reveal key={step.title} delayMs={i * 90} className="lp-step">
+                    <div className="lp-step-icon-wrap">
+                      <div className="lp-step-icon">
+                        <step.icon size={22} strokeWidth={2} />
+                      </div>
+                      <span className="lp-step-number">{String(i + 1).padStart(2, '0')}</span>
+                    </div>
+                    <h3 className="lp-step-title">{step.title}</h3>
+                    <p className="lp-step-body">{step.body}</p>
                   </Reveal>
                 ))}
               </ol>
@@ -596,68 +559,49 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="lp-section lp-section-surface">
-          <div className="lp-container">
-            <Reveal className="lp-section-head">
-              <p className="lp-eyebrow">Why Asaan Caption?</p>
-              <h2 className="lp-h2">
-                Because <span className="lp-accent-text">Urdish</span> deserves better
-                <br />
-                than a broken transcript.
-              </h2>
-              <p className="lp-body-text lp-narrow-text">
-                Code-switching isn&apos;t the bug. The old tools were.
-              </p>
-            </Reveal>
-            <div className="lp-grid-3">
-              {WHY_US.map((d, i) => (
-                <Reveal key={d.title} delayMs={i * 100}>
-                  <article className="lp-card">
-                    <div className="lp-card-icon">{d.icon}</div>
-                    <h3 className="lp-card-title">{d.title}</h3>
-                    <p className="lp-card-body">{d.body}</p>
-                  </article>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="lp-section lp-export">
-          <div className="lp-blob" aria-hidden="true" />
-          <div className="lp-container">
-            <Reveal className="lp-section-head">
-              <p className="lp-eyebrow">Ready to ship</p>
-              <h2 className="lp-h2 lp-h2-wide">
-                Export in <span className="lp-accent-text">SRT or burned-in 4K</span>
-              </h2>
-              <p className="lp-body-text lp-narrow-text">
-                Burned-in 4K or SRT — ready for your timeline.
-              </p>
-              <div className="lp-export-cta">
-                <button type="button" className="lp-btn lp-btn-primary lp-btn-lg" onClick={getStarted}>
-                  Get Started
-                </button>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-
         <section id="about" className="lp-section lp-section-surface">
           <div className="lp-container">
             <Reveal className="lp-section-head">
               <p className="lp-eyebrow">Why we built this</p>
+              <span className="lp-eyebrow-line" aria-hidden="true" />
               <h2 className="lp-h2 lp-h2-wide">
                 Why we built <span className="lp-accent-text">Asaan Caption</span>
               </h2>
             </Reveal>
             <Reveal>
               <div className="lp-about-card lp-glass">
+                <div className="lp-icon-ring lp-about-icon">
+                  <History size={20} strokeWidth={1.75} />
+                </div>
                 <p className="lp-body-text">
-                  Subtitling was the slowest part of our workflow — every tool treated Pakistani
-                  speech as an afterthought. So we built our own.
+                  <strong className="lp-body-strong">
+                    Subtitling was the slowest part of our workflow — every tool treated Pakistani
+                    speech as an afterthought.
+                  </strong>{' '}
+                  So we built our own. Asaan Caption is trained on real Pakistani speech patterns
+                  to give you captions that are accurate, natural, and actually sound like us.
                 </p>
               </div>
+            </Reveal>
+            <div className="lp-grid-4">
+              {WHY_WE_BUILT.map((d, i) => (
+                <Reveal key={d.title} delayMs={i * 100}>
+                  <article className="lp-card">
+                    <div className="lp-icon-ring">
+                      <d.icon size={20} strokeWidth={1.75} />
+                    </div>
+                    <h3 className="lp-card-title">{d.title}</h3>
+                    <div className="lp-card-divider" aria-hidden="true" />
+                    <p className="lp-card-body">{d.body}</p>
+                  </article>
+                </Reveal>
+              ))}
+            </div>
+            <Reveal className="lp-about-badge-wrap">
+              <span className="lp-pill lp-made-badge">
+                <ShieldCheck size={16} strokeWidth={2} />
+                Made in Pakistan. <span className="lp-accent-text">Built for creators like you.</span>
+              </span>
             </Reveal>
           </div>
         </section>
@@ -691,105 +635,9 @@ export function LandingPage() {
                 </div>
               </div>
             )}
-            <div className="lp-grid-3 lp-pricing-grid">
-              {subscriptionPlans === null && <p className="muted">Loading plans…</p>}
-              {subscriptionPlans?.length === 0 && (
-                <p className="muted">Pricing isn&apos;t configured yet — check back soon.</p>
-              )}
-              {subscriptionPlans?.map((p, i) => {
-                const featured = p.slug === featuredSlug;
-                const monthlyFree = p.priceMonthlyPkr <= 0;
-                const shown = yearly ? p.priceYearlyPkr : p.priceMonthlyPkr;
-                const discounted = discountedPrice(shown, p);
-                // An admin discount takes priority over the yearly-savings
-                // comparison — showing two different "was" prices at once
-                // would be confusing, so pick one: the discount when active,
-                // otherwise the existing monthly-vs-yearly comparison.
-                const showWasPrice = discounted != null || (yearly && !monthlyFree && p.priceYearlyPkr < p.priceMonthlyPkr);
-                const wasPriceValue = discounted != null ? shown : p.priceMonthlyPkr;
-                const figureValue = discounted ?? shown;
-                return (
-                  <Reveal key={p._id} delayMs={i * 100}>
-                    <article className={`lp-card lp-price-card ${featured ? 'lp-price-featured' : ''}`}>
-                      {discounted != null && (
-                        <span className="lp-price-discount-ribbon">{p.discountPercent}% OFF</span>
-                      )}
-                      {featured && <div className="lp-price-glow" aria-hidden="true" />}
-                      {featured && (
-                        <span className="lp-price-badge">
-                          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
-                            <path
-                              d="M8 1.2l1.85 3.9 4.15.55-3.05 2.95.75 4.3L8 10.9l-3.7 2 .75-4.3-3.05-2.95 4.15-.55z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                          Popular
-                        </span>
-                      )}
-                      <div className="lp-price-icon" aria-hidden="true">
-                        <PlanIcon slug={p.slug} />
-                      </div>
-                      <h3 className="lp-price-name">{p.name}</h3>
-                      {p.description && <p className="lp-price-desc">{p.description}</p>}
-                      <div className="lp-price-amount">
-                        {!monthlyFree && (
-                          <div className="lp-price-figure-row">
-                            {showWasPrice && (
-                              <span className="lp-price-was">
-                                PKR {wasPriceValue.toLocaleString()}
-                              </span>
-                            )}
-                            <span className="lp-price-currency">PKR</span>
-                            <span className="lp-price-figure">{figureValue.toLocaleString()}</span>
-                            <span className="lp-price-suffix">/mo</span>
-                          </div>
-                        )}
-                        {monthlyFree && <span className="lp-price-figure lp-price-figure-free">Free</span>}
-                        {!monthlyFree && yearly && (
-                          <span className="lp-price-period">billed yearly</span>
-                        )}
-                      </div>
-                      <ul className="lp-price-features">
-                        {p.features.map((f) => (
-                          <li key={f}>
-                            <span className="lp-price-check" aria-hidden="true">
-                              <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
-                                <path
-                                  d="M3 8.5l3 3 7-7"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.4"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </span>
-                            <span>{f}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        className={`lp-btn ${featured ? 'lp-btn-primary' : 'lp-btn-ghost'} lp-price-cta`}
-                        onClick={getStarted}
-                      >
-                        Get Started
-                        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-                          <path
-                            d="M3 8h9M8 3l5 5-5 5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                    </article>
-                  </Reveal>
-                );
-              })}
-            </div>
+            <Reveal>
+              <PricingCards plans={subscriptionPlans} yearly={yearly} onSelectPlan={selectSubscriptionPlan} />
+            </Reveal>
             <ul className="lp-hero-tags lp-price-notes">
               <li className="lp-pill">✓ No hidden fees</li>
               <li className="lp-pill">✓ Cancel any time</li>
@@ -856,8 +704,8 @@ export function LandingPage() {
                             type="button"
                             className="lp-btn lp-btn-primary lp-price-cta"
                             onClick={() => {
-                              setSelectedPassSlug(p.slug);
-                              document.getElementById('daypass-payment')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              setSelectedPaymentSlug(p.slug);
+                              setPaymentModalOpen(true);
                             }}
                           >
                             Get {p.name}
@@ -877,136 +725,17 @@ export function LandingPage() {
                     );
                   })}
                 </div>
-
-                <Reveal id="daypass-payment" className="lp-glass lp-payment-panel">
-                  <div className="lp-payment-icon" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M3 10 12 4l9 6M4 10v9M20 10v9M8 10v9M16 10v9M2 22h20" />
-                    </svg>
-                  </div>
-                  <h3 className="lp-payment-title">Manual Payment (Bank Transfer)</h3>
-                  <p className="lp-payment-sub">
-                    Prefer bank transfer over card? Pay the amount for your chosen pass below.
-                  </p>
-                  {dayPassPlans.length > 1 && (
-                    <label className="lp-payment-select">
-                      Plan
-                      <select
-                        value={selectedPass?.slug || ''}
-                        onChange={(e) => setSelectedPassSlug(e.target.value)}
-                      >
-                        {dayPassPlans.map((p) => {
-                          const discounted = discountedPrice(p.priceMonthlyPkr, p);
-                          return (
-                            <option key={p.slug} value={p.slug}>
-                              {p.name} — PKR {(discounted ?? p.priceMonthlyPkr).toLocaleString()}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </label>
-                  )}
-                  <p className="lp-payment-fields-label">Bank details &amp; how it works</p>
-                  <div className="lp-payment-fields">
-                    {(
-                      [
-                        ['Account title', bankTransfer.accountTitle, 'accountTitle'],
-                        ['Bank', bankTransfer.bankName, 'bankName'],
-                        ['Account #', bankTransfer.accountNumber, 'accountNumber'],
-                      ] as const
-                    ).map(([label, value, key]) => (
-                      <div className="lp-payment-field" key={key}>
-                        <div className="lp-payment-field-text">
-                          <span className="lp-payment-field-label">{label}</span>
-                          <span className="lp-payment-field-value">{value || '—'}</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="lp-payment-copy"
-                          aria-label={`Copy ${label}`}
-                          onClick={() => void copyToClipboard(value, key)}
-                        >
-                          {copiedField === key ? (
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M3 8.5l3 3 7-7" />
-                            </svg>
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <rect x="8" y="8" width="12" height="12" rx="2" />
-                              <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  {bankTransfer.instructions.length > 0 && (
-                    <ol className="lp-payment-steps">
-                      {bankTransfer.instructions.map((step, i) => (
-                        <li key={i}>
-                          <span className="lp-payment-step-num">{i + 1}</span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                  <a
-                    className="lp-btn lp-whatsapp-btn"
-                    href={whatsappHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-disabled={!whatsappHref}
-                    onClick={(e) => {
-                      if (!whatsappHref) e.preventDefault();
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M17.5 14.4c-.3-.1-1.6-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.2.2-.3.2-.5.1-.3-.1-1.2-.4-2.2-1.3-.8-.7-1.4-1.6-1.5-1.9-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5-.1-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.5 1.1 2.7c.1.2 1.9 2.9 4.6 4 .6.3 1.1.4 1.5.6.6.2 1.2.2 1.6.1.5-.1 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.5-.3z" />
-                      <path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 20.2 12 8.2 8.2 0 0 1 12 20.2z" />
-                    </svg>
-                    Send proof on WhatsApp
-                  </a>
-                </Reveal>
               </div>
             </div>
           </section>
         )}
 
-        <section className="lp-section lp-section-surface">
-          <div className="lp-container">
-            <Reveal className="lp-section-head">
-              <p className="lp-eyebrow">What creators are saying</p>
-              <h2 className="lp-h2 lp-h2-wide">
-                Finally a caption tool
-                <br />
-                that <span className="lp-accent-text">grew up here</span>.
-              </h2>
-              <p className="lp-body-text lp-narrow-text">
-                Built for how Pakistani creators actually talk.
-              </p>
-            </Reveal>
-            <div className="lp-grid-3">
-              {TESTIMONIALS.map((t, i) => (
-                <Reveal key={t.author} delayMs={i * 100}>
-                  <article className="lp-card lp-testimonial-card">
-                    <div className="lp-stars" aria-label="5 out of 5 stars">
-                      ★★★★★
-                    </div>
-                    <p className="lp-testimonial-quote">&ldquo;{t.quote}&rdquo;</p>
-                    <div className="lp-testimonial-meta">
-                      <p className="lp-testimonial-author">{t.author}</p>
-                      <div className="lp-testimonial-tags">
-                        {t.tags.map((tag) => (
-                          <span key={tag}>{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </article>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
+        <ManualPaymentModal
+          open={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          plans={plans}
+          initialSlug={selectedPaymentSlug}
+        />
 
         <section id="start" className="lp-section lp-final-cta">
           <div className="lp-blob" aria-hidden="true" />

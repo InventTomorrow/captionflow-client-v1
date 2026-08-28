@@ -272,6 +272,7 @@ function CaptionWords({
   variants,
   selectedWord,
   onWordClick,
+  onWordDelete,
 }: {
   caption: Caption;
   template: CaptionTemplate;
@@ -284,6 +285,8 @@ function CaptionWords({
   /** Highlighted word index (being edited), or null. */
   selectedWord: number | null;
   onWordClick: (index: number) => void;
+  /** Delete a single word directly from the video (× badge on the selected word). */
+  onWordDelete: (index: number) => void;
 }) {
   const words = useMemo(() => caption.text.split(/\s+/).filter(Boolean), [caption.text]);
   // Cumulative char offsets (spaces excluded) for the typewriter reveal.
@@ -317,11 +320,12 @@ function CaptionWords({
         </>
       );
     }
+    const isSelected = selectedWord === i;
     return (
       <motion.span
         key={i}
         className={`capw ${className || ''} ${karaokeCls} ${
-          selectedWord === i ? 'capw-selected' : ''
+          isSelected ? 'capw-selected' : ''
         }`.trim()}
         style={wordInlineStyle(caption.wordStyles?.[i])}
         variants={variants}
@@ -333,6 +337,26 @@ function CaptionWords({
         }}
       >
         {content}
+        {/* Delete this exact word straight off the video — no trip to the
+            Phrases panel needed. Only shown on the word currently selected
+            (clicked) so it never crowds the rest of the caption. */}
+        {isSelected && (
+          <span
+            className="capw-delete"
+            role="button"
+            title="Delete this word"
+            onClick={(e) => {
+              e.stopPropagation();
+              onWordDelete(i);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </span>
+        )}
       </motion.span>
     );
   };
@@ -509,11 +533,12 @@ function CaptionWords({
     );
   }
 
-  // The Big Red — one monumental hero word with the rest of the phrase
-  // crossing it as a small caption line. Ported from CaptionTemplates.jsx.
-  // The picker preview only ever demos a short single word, so the base
-  // 1.9em size overflowed a narrow 9:16 frame for real (longer) transcribed
-  // words — heroFitScale shrinks it to fit instead.
+  // The Big Red — one monumental hero word with the rest of the phrase as a
+  // small caption pill stacked (horizontally centered) below it, with a
+  // gap so the pill never crosses into the word. Ported from
+  // CaptionTemplates.jsx. The picker preview only ever demos a short single
+  // word, so the base 1.9em size overflowed a narrow 9:16 frame for real
+  // (longer) transcribed words — heroFitScale shrinks it to fit instead.
   if (template === 'theBigRed') {
     const emSet = emphasisSet(words, emphasis || []);
     const bigIdx = emSet.size ? Math.min(...emSet) : emphasisHeroIndex(words);
@@ -559,23 +584,14 @@ function CaptionWords({
     );
   }
 
-  // Manual per-word roles override automatic template emphasis.
-  // Each word is its own line so a Hero never shares a row with neighbours
-  // (matches CapCut / Poetic Stack style from the reference editor).
-  if (emphasis && emphasis.some((r) => r && r !== 'auto')) {
-    return (
-      <span className="cap-custom cap-custom-stack">
-        {words.map((w, i) => {
-          const role = emphasis[i] && emphasis[i] !== 'auto' ? emphasis[i] : 'normal';
-          return (
-            <div key={i} className={`cap-line cap-w-${role}`}>
-              {renderWord(w, i, `cap-w cap-w-${role}`)}
-            </div>
-          );
-        })}
-      </span>
-    );
-  }
+  // Hero/Support roles are auto-picked for every caption regardless of
+  // template (see captionStore.ts), and merging several short transcribed
+  // captions into one display block (sentence/phrase mode) can carry more
+  // than one leftover hero marker from their separate sources. Only the
+  // template branches above/below that are actually DESIGNED around a
+  // hero/support look consume `emphasis` at all — every other (plain,
+  // single-style) template ignores it entirely and renders flat text, so
+  // stray hero markers never surface as unexpected giant/bold words.
   if (template === 'stack') {
     // Poetic Stack beat: small → large serif → tiny → accent caps → …
     return (
@@ -629,6 +645,8 @@ interface CaptionOverlayProps {
   selectedWordIdx: number | null;
   /** Click a word on the video to select it in the Phrases panel. */
   onWordSelect: (caption: DisplayCaption, index: number) => void;
+  /** Delete a single word straight off the video preview. */
+  onWordDelete: (caption: DisplayCaption, index: number) => void;
   /** Save edited caption text (double-click inline editing). */
   onSaveText: (caption: DisplayCaption, text: string) => void;
   /** Commit a whole-chunk resize and/or reposition: just this caption, or every caption. */
@@ -637,6 +655,8 @@ interface CaptionOverlayProps {
     patch: { sizeScale?: number; offsetX?: number; offsetY?: number },
     scope: 'chunk' | 'all',
   ) => void;
+  /** Delete the entire caption chunk currently on screen. */
+  onChunkDelete: (caption: DisplayCaption) => void;
 }
 
 /**
@@ -657,8 +677,10 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   selectedCaptionId,
   selectedWordIdx,
   onWordSelect,
+  onWordDelete,
   onSaveText,
   onChunkStyleCommit,
+  onChunkDelete,
 }: CaptionOverlayProps) {
   const [activeIdx, setActiveIdx] = useState(-1);
   const [visibleCount, setVisibleCount] = useState(0);
@@ -815,14 +837,17 @@ export const CaptionOverlay = memo(function CaptionOverlay({
     style.backgroundColor !== 'transparent' &&
     !/rgba?\([^)]*,\s*0\s*\)/i.test(style.backgroundColor);
 
-  // Selection arrives as (canonical caption id, canonical word index); derived
-  // display captions map back through sourceId/wordOffset.
-  const activeSourceId = active ? (active.sourceId ?? active._id) : null;
-  const activeOffset = active?.wordOffset ?? 0;
-  const selectedWord =
-    active && selectedCaptionId && activeSourceId === selectedCaptionId && selectedWordIdx != null
-      ? selectedWordIdx - activeOffset
-      : null;
+  // Selection arrives as (canonical caption id, canonical word index) — match
+  // it against this block's own per-word wordSources rather than assuming a
+  // single sourceId/wordOffset for the whole block, since a display caption
+  // routinely merges words from more than one canonical caption.
+  const selectedWordFound =
+    active && selectedCaptionId && selectedWordIdx != null
+      ? (active.wordSources?.findIndex(
+          (w) => w.sourceId === selectedCaptionId && w.sourceIndex === selectedWordIdx,
+        ) ?? -1)
+      : -1;
+  const selectedWord = selectedWordFound >= 0 ? selectedWordFound : null;
 
   return (
     <AnimatePresence>
@@ -999,6 +1024,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                   variants={wordVariants}
                   selectedWord={selectedWord ?? null}
                   onWordClick={(i) => onWordSelect(active, i)}
+                  onWordDelete={(i) => onWordDelete(active, i)}
                 />
               </motion.div>
             </>
@@ -1117,6 +1143,22 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                 }}
               >
                 Apply To All
+              </button>
+              <button
+                type="button"
+                className="caption-resize-confirm-btn danger"
+                title="Delete this whole caption chunk"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChunkDelete(active);
+                  setPendingScale(null);
+                  setPendingPosition(null);
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 7h16M9 7V4h6v3m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
+                </svg>
+                Delete
               </button>
             </div>
           )}

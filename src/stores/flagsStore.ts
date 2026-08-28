@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 export interface AppFlags {
   projectsListEnabled: boolean;
   export4kEnabled: boolean;
+  exportsEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
 }
@@ -24,6 +25,7 @@ export interface BankTransferDetails {
 const DEFAULT_FLAGS: AppFlags = {
   projectsListEnabled: false,
   export4kEnabled: true,
+  exportsEnabled: true,
   maintenanceMode: false,
   maintenanceMessage: '',
 };

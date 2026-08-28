@@ -18,6 +18,8 @@ import { useAuthStore } from '../stores/authStore';
 import { PlanBadge } from '../components/AppShell';
 import { joinProjectRoom, connectSocket, getSocket } from '../lib/socket';
 import { PrepareMediaModal } from '../components/PrepareMediaModal';
+import { PricingModal } from '../components/PricingModal';
+import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
 import { CaptionOverlay, findActiveCaption, type CaptionTemplate } from '../components/CaptionOverlay';
 import {
   deriveDisplayCaptions,
@@ -392,23 +394,6 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
     },
   },
   {
-    key: 'neon-glow',
-    name: 'Neon Glow',
-    tag: 'Glow',
-    purpose: 'Night edits · vibes · reels',
-    desc: 'Stacked lines with a neon hero word that owns its own row.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'hero',
-      fontFamily: 'Montserrat',
-      fontWeight: 900,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#5ED2FF',
-      animation: 'pop',
-    },
-  },
-  {
     key: 'word-blast',
     name: 'Word Blast',
     tag: 'Impact',
@@ -527,12 +512,11 @@ const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
   },
   // Antigravity / TikTok-style presets — appended; previous cards unchanged.
   // Hero Word and Industrial are pinned above. Hidden from picker (kept for restore):
-  // Mixed Styles, Mixed Styles 2, Clean White, Editor Masala.
+  // Mixed Styles 2, Clean White, Editor Masala.
   ...ANTIGRAVITY_UNIFIED_TEMPLATES.filter(
     (t) =>
       t.key !== 'hero-word' &&
       t.key !== 'industrial' &&
-      t.key !== 'mixed-styles' &&
       t.key !== 'mixed-styles-2' &&
       t.key !== 'clean-white' &&
       t.key !== 'editor-masala',
@@ -562,24 +546,6 @@ function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
           <span className="uprev-tiny">The</span>
           <span className="uprev-tiny">Quick</span>
           <span className="uprev-hero-word" style={{ color: hl, textShadow: 'none' }}>
-            BROWN
-          </span>
-          <span className="uprev-tiny">fox</span>
-          <span className="uprev-tiny">jumps</span>
-        </span>
-      );
-    case 'neon-glow':
-      return (
-        <span className="uprev uprev-hero">
-          <span className="uprev-tiny">The</span>
-          <span className="uprev-tiny">Quick</span>
-          <span
-            className="uprev-hero-word uprev-glow"
-            style={{
-              color: hl,
-              ['--glow' as string]: hl,
-            }}
-          >
             BROWN
           </span>
           <span className="uprev-tiny">fox</span>
@@ -660,16 +626,6 @@ function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
           FOX
         </span>
       );
-    case 'viral-orange':
-      return (
-        <span className="uprev uprev-tiktok">
-          THE{' '}
-          <span className="uprev-pill" style={{ background: t.preset.activeFill || '#FF5700' }}>
-            BROWN
-          </span>{' '}
-          FOX
-        </span>
-      );
     case 'roboto-word':
       return (
         <span className="uprev uprev-blast">
@@ -712,14 +668,6 @@ function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
             BROWN
           </span>{' '}
           <span className="uprev-hw-s">fox</span>
-        </span>
-      );
-    case 'mixed-styles':
-      return (
-        <span className="uprev uprev-mixed">
-          <span className="uprev-mx-0">BOLD</span>
-          <span className="uprev-mx-1">Elegant</span>
-          <span className="uprev-mx-2">NEON</span>
         </span>
       );
     case 'mixed-styles-2':
@@ -1007,6 +955,8 @@ export function EditorPage() {
   const [exportStatus, setExportStatus] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle');
   const [exportPercent, setExportPercent] = useState(0);
   const [exportError, setExportError] = useState('');
+  const [exportPlanError, setExportPlanError] = useState<PlanErrorInfo | null>(null);
+  const [pricingOpen, setPricingOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -1695,11 +1645,105 @@ export function EditorPage() {
     [saveCaption],
   );
 
+  /**
+   * Delete a single word straight off the video preview (the × badge on the
+   * selected word) — no trip to the Phrases panel. Uses the per-word
+   * wordSources map (not sourceId/wordOffset, which only cover a display
+   * caption backed by exactly one canonical caption) so this also works on
+   * the common case where grouping merged words from several canonical
+   * captions into the block currently on screen.
+   */
+  const deleteDerivedWord = useCallback(
+    (caption: DisplayCaption, i: number) => {
+      if (!id) return;
+      const mapped = caption.wordSources?.[i];
+      const srcId = mapped?.sourceId ?? caption.sourceId ?? caption._id;
+      const srcIdx = mapped ? mapped.sourceIndex : i + (caption.wordOffset ?? 0);
+      const src = srcId ? captionsLive.current.find((c) => c._id === srcId) : undefined;
+      if (!src) return;
+      const srcWords = src.text.split(/\s+/).filter(Boolean);
+      if (srcIdx < 0 || srcIdx >= srcWords.length || srcWords.length <= 1) return;
+      srcWords.splice(srcIdx, 1);
+      const updated: Caption = {
+        ...src,
+        text: srcWords.join(' '),
+        emphasis: src.emphasis ? src.emphasis.filter((_, wi) => wi !== srcIdx) : src.emphasis,
+        wordStyles: src.wordStyles ? src.wordStyles.filter((_, wi) => wi !== srcIdx) : src.wordStyles,
+      };
+      setCaptions(captionsLive.current.map((c) => (c._id === src._id ? updated : c)));
+      setSelectedWordIdx(null);
+      setPhrasePickerOpen(false);
+      void upsertOne(id, updated);
+    },
+    [id, setCaptions],
+  );
+
+  /**
+   * Delete the whole caption chunk currently on screen (the "Delete" button
+   * next to Apply To All in the resize/reposition confirm toolbar). Walks
+   * every word in this display block via wordSources (not sourceIds alone —
+   * a single canonical caption can straddle two adjacent display blocks when
+   * a word-count/silence break lands mid-caption, so this only strips the
+   * exact words that are actually part of THIS chunk) and drops any
+   * canonical caption left with no words at all. Remaining captions are
+   * renumbered so Phrases stays a clean, contiguous list.
+   */
+  const deleteDerivedChunk = useCallback(
+    (caption: DisplayCaption) => {
+      if (!id) return;
+      const sources = caption.wordSources;
+      if (!sources?.length) return;
+      const removeBySource = new Map<string, Set<number>>();
+      for (const w of sources) {
+        if (!w.sourceId) continue;
+        const set = removeBySource.get(w.sourceId) ?? new Set<number>();
+        set.add(w.sourceIndex);
+        removeBySource.set(w.sourceId, set);
+      }
+      if (!removeBySource.size) return;
+
+      const kept: Caption[] = [];
+      for (const c of captionsLive.current) {
+        const remove = c._id ? removeBySource.get(c._id) : undefined;
+        if (!remove) {
+          kept.push(c);
+          continue;
+        }
+        const words = c.text.split(/\s+/).filter(Boolean);
+        const keptWords: string[] = [];
+        const keptEmphasis: WordRole[] = [];
+        const keptStyles: WordStyle[] = [];
+        words.forEach((w, wi) => {
+          if (remove.has(wi)) return;
+          keptWords.push(w);
+          keptEmphasis.push(c.emphasis?.[wi] ?? 'auto');
+          keptStyles.push(c.wordStyles?.[wi] ?? {});
+        });
+        if (!keptWords.length) continue; // this canonical caption sat entirely inside the deleted chunk
+        kept.push({
+          ...c,
+          text: keptWords.join(' '),
+          emphasis: c.emphasis ? keptEmphasis : c.emphasis,
+          wordStyles: c.wordStyles ? keptStyles : c.wordStyles,
+        });
+      }
+      const renumbered = kept.map((c, i) => ({ ...c, sequence: i + 1 }));
+      setCaptions(renumbered);
+      setSelectedWordIdx(null);
+      setPhrasePickerOpen(false);
+      void replaceAllForProject(id, renumbered);
+    },
+    [id, setCaptions],
+  );
+
   /** Click a word on the video → select it in the Phrases panel. Display
-   *  captions are derived, so the click maps back to the canonical caption. */
+   *  captions are derived, so the click maps back to the canonical caption —
+   *  via wordSources, since the clicked word may come from a different
+   *  canonical caption than the display block's first word (merged group). */
   const overlayWordSelect = useCallback((caption: DisplayCaption, i: number) => {
-    setSelectedId(caption.sourceId ?? caption._id ?? null);
-    setSelectedWordIdx(i + (caption.wordOffset ?? 0));
+    const mapped = caption.wordSources?.[i];
+    setSelectedId(mapped?.sourceId ?? caption.sourceId ?? caption._id ?? null);
+    setSelectedWordIdx(mapped ? mapped.sourceIndex : i + (caption.wordOffset ?? 0));
   }, []);
 
   /**
@@ -1939,11 +1983,18 @@ export function EditorPage() {
         captions: captionsSnap,
       });
     } catch (e: unknown) {
+      const data = (e as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
+      const planErr = resolvePlanError(data);
+      if (planErr?.showUpgrade) {
+        // Free-plan export quota is exhausted — surface the pricing popup
+        // in place of the export modal instead of a dead-end error banner.
+        setShowExport(false);
+        setExportStatus('idle');
+        setExportPlanError(planErr);
+        return;
+      }
       setExportStatus('error');
-      setExportError(
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Export failed',
-      );
+      setExportError(data?.message || 'Export failed');
     }
   }
 
@@ -2033,7 +2084,14 @@ export function EditorPage() {
                 ref={accountMenuRef}
                 style={{ left: accountMenuPos.left, bottom: accountMenuPos.bottom }}
               >
-                <PlanBadge userId={user?.id} plan={user?.plan} planName={user?.planName} />
+                <PlanBadge
+                  plan={user?.plan}
+                  planName={user?.planName}
+                  onUpgradeClick={() => {
+                    setAccountMenuOpen(false);
+                    setPricingOpen(true);
+                  }}
+                />
                 <button
                   type="button"
                   className="rail-account-menu-logout"
@@ -2364,7 +2422,6 @@ export function EditorPage() {
           <div
             className="video-wrap"
             ref={videoWrapRef}
-            onClick={togglePlay}
             style={{
               ...(wrapSize
                 ? { width: wrapSize.w, height: wrapSize.h }
@@ -2406,13 +2463,6 @@ export function EditorPage() {
               }}
             />
             <AuthenticatedVideo id={id!} videoRef={videoRef} />
-            {!playing && !processing && (
-              <div className="play-badge">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5.5v13l11-6.5-11-6.5Z" />
-                </svg>
-              </div>
-            )}
             {(processing || busy === 'rebuild') && (
               <ProcessingOverlay
                 stage={
@@ -2446,8 +2496,10 @@ export function EditorPage() {
                 selectedCaptionId={panel === 'captions' ? selectedId : null}
                 selectedWordIdx={selectedWordIdx}
                 onWordSelect={overlayWordSelect}
+                onWordDelete={deleteDerivedWord}
                 onSaveText={saveDerivedText}
                 onChunkStyleCommit={handleChunkStyleCommit}
+                onChunkDelete={deleteDerivedChunk}
               />
             </div>
           </div>
@@ -2960,6 +3012,15 @@ export function EditorPage() {
           </div>
         </div>
       )}
+
+      <PricingModal
+        open={!!exportPlanError || pricingOpen}
+        reason={exportPlanError}
+        onClose={() => {
+          setExportPlanError(null);
+          setPricingOpen(false);
+        }}
+      />
     </div>
   );
 }

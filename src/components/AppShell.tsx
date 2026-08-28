@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
 import { api } from '../lib/api';
+import { PricingModal } from './PricingModal';
 
 function CrownIcon({ crossedOut }: { crossedOut?: boolean }) {
   return (
@@ -20,6 +21,16 @@ function CrownIcon({ crossedOut }: { crossedOut?: boolean }) {
   );
 }
 
+function InfoIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" />
+      <line x1="12" y1="11" x2="12" y2="16.5" />
+      <circle cx="12" cy="7.5" r="0.25" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 type UsageInfo = {
   minutesUsed: number;
   bonusMinutes: number;
@@ -27,21 +38,31 @@ type UsageInfo = {
   periodEnd: string;
 };
 
+/** "23h 45m" / "2d 6h" / "45m" until the plan's usage period rolls over. */
+function formatRenewsIn(periodEnd?: string): string | null {
+  if (!periodEnd) return null;
+  const ms = new Date(periodEnd).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const totalMinutes = Math.floor(ms / 60_000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 export function PlanBadge({
-  userId,
   plan,
   planName,
+  onUpgradeClick,
 }: {
-  userId?: string;
   plan?: string;
   planName?: string;
+  onUpgradeClick?: () => void;
 }) {
   const isFree = !plan || plan === 'starter';
   const label = planName || (plan ? plan[0].toUpperCase() + plan.slice(1) : 'Free');
-  const dismissKey = userId ? `cf_free_badge_dismissed_${userId}` : '';
-  const [dismissed, setDismissed] = useState(
-    () => isFree && !!dismissKey && localStorage.getItem(dismissKey) === '1',
-  );
   const [open, setOpen] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -53,6 +74,24 @@ export function PlanBadge({
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  // Free-tier usage sits directly in the topbar (next to the Upgrade button)
+  // instead of behind a click, so fetch it up front rather than on toggle.
+  useEffect(() => {
+    if (!isFree) return;
+    let cancelled = false;
+    void api
+      .get('/auth/usage')
+      .then(({ data }) => {
+        if (!cancelled) setUsage(data);
+      })
+      .catch(() => {
+        if (!cancelled) setUsage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFree]);
 
   async function toggleOpen() {
     const next = !open;
@@ -67,34 +106,56 @@ export function PlanBadge({
     }
   }
 
-  if (isFree && dismissed) return null;
-
   const used = usage ? usage.minutesUsed : null;
   const limit = usage ? usage.limit + (usage.bonusMinutes || 0) : null;
   const remaining = used != null && limit != null ? Math.max(0, limit - used) : null;
   const pct = used != null && limit ? Math.min(100, (used / limit) * 100) : 0;
 
+  if (isFree) {
+    const renewsIn = formatRenewsIn(usage?.periodEnd);
+    const renewsTitle = usage?.periodEnd
+      ? `Renews on ${new Date(usage.periodEnd).toLocaleString(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        })}`
+      : undefined;
+    return (
+      <>
+        <div className="plan-usage-card">
+          <div className="plan-usage-card-top">
+            <span className="plan-usage-text">
+              {used != null ? used.toFixed(1) : '–'} / {limit ?? '–'} min
+            </span>
+            <span className="plan-usage-bar">
+              <span className="plan-usage-fill" style={{ width: `${pct}%` }} />
+            </span>
+          </div>
+          <div className="plan-usage-card-bottom">
+            <span>{renewsIn ? `Renews in ${renewsIn}` : remaining != null ? `${remaining.toFixed(1)} min left` : '—'}</span>
+            {renewsTitle && (
+              <span title={renewsTitle}>
+                <InfoIcon />
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="plan-badge plan-badge-free">
+          <button type="button" className="plan-badge-link" onClick={() => onUpgradeClick?.()}>
+            <CrownIcon />
+            Upgrade Plan
+          </button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="plan-badge-wrap" ref={boxRef}>
-      <div className={`plan-badge ${isFree ? 'plan-badge-free' : 'plan-badge-paid'}`}>
+      <div className="plan-badge plan-badge-paid">
         <button type="button" className="plan-badge-link" onClick={() => void toggleOpen()}>
-          <CrownIcon crossedOut={isFree} />
+          <CrownIcon />
           {label} Plan
         </button>
-        {isFree && (
-          <button
-            type="button"
-            className="plan-badge-dismiss"
-            aria-label="Dismiss"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (dismissKey) localStorage.setItem(dismissKey, '1');
-              setDismissed(true);
-            }}
-          >
-            ×
-          </button>
-        )}
       </div>
       {open && (
         <div className="plan-badge-pop">
@@ -112,11 +173,6 @@ export function PlanBadge({
                 <div className="plan-badge-pop-fill" style={{ width: `${pct}%` }} />
               </div>
               <p className="plan-badge-pop-remaining">{remaining?.toFixed(1)} min remaining this month</p>
-              {isFree && (
-                <Link to="/#pricing" className="plan-badge-pop-upgrade" onClick={() => setOpen(false)}>
-                  Upgrade for more minutes →
-                </Link>
-              )}
             </>
           )}
         </div>
@@ -134,6 +190,7 @@ export function AppShell() {
   const onDownloadSrt = useEditorChromeStore((s) => s.onDownloadSrt);
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
+  const [pricingOpen, setPricingOpen] = useState(false);
 
   useEffect(() => {
     void loadFlags();
@@ -181,7 +238,8 @@ export function AppShell() {
                 <button
                   type="button"
                   className="btn export"
-                  disabled={!onExport}
+                  disabled={!onExport || !flags.exportsEnabled}
+                  title={!flags.exportsEnabled ? 'Exports are temporarily disabled' : undefined}
                   onClick={() => onExport?.()}
                 >
                   <svg
@@ -211,7 +269,11 @@ export function AppShell() {
               )}
             </nav>
             <div className="topbar-right">
-              <PlanBadge userId={user?.id} plan={user?.plan} planName={user?.planName} />
+              <PlanBadge
+                plan={user?.plan}
+                planName={user?.planName}
+                onUpgradeClick={() => setPricingOpen(true)}
+              />
               <span className="muted topbar-user">{user?.name}</span>
               <button
                 className="btn ghost"
@@ -230,6 +292,11 @@ export function AppShell() {
       <main className={`main ${editorActive ? 'main-editor' : ''}`}>
         <Outlet />
       </main>
+      {/* Rendered here, outside <header>, because .topbar's backdrop-filter
+       *  makes it a containing block for position:fixed descendants — a
+       *  modal nested inside it would size itself to the topbar, not the
+       *  viewport. */}
+      <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
     </div>
   );
 }

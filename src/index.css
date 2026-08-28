@@ -295,27 +295,6 @@ a.lp-brand:hover {
   cursor: pointer;
 }
 
-.plan-badge-dismiss {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 0.1rem;
-  border: none;
-  background: none;
-  color: color-mix(in srgb, var(--cf-on-accent) 85%, transparent);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 50%;
-}
-
-.plan-badge-dismiss:hover {
-  color: var(--cf-on-accent);
-  background: color-mix(in srgb, var(--cf-on-accent) 18%, transparent);
-}
-
 .plan-badge-pop {
   position: absolute;
   top: calc(100% + 0.6rem);
@@ -359,17 +338,61 @@ a.lp-brand:hover {
   color: var(--cf-text-secondary);
 }
 
-.plan-badge-pop-upgrade {
-  display: block;
-  margin-top: 0.65rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--gold-bright);
-  text-decoration: none;
+/* Free-tier usage card, shown to the left of the Upgrade Plan button. */
+
+.plan-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--cf-border);
+  background: color-mix(in srgb, var(--cf-card) 60%, transparent);
+  flex-shrink: 0;
 }
 
-.plan-badge-pop-upgrade:hover {
-  text-decoration: underline;
+.plan-usage-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.plan-usage-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cf-text);
+  white-space: nowrap;
+}
+
+.plan-usage-bar {
+  display: inline-block;
+  width: 88px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--cf-surface-2);
+  overflow: hidden;
+}
+
+.plan-usage-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cf-accent), var(--cf-accent-hover));
+}
+
+.plan-usage-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: var(--cf-text-muted);
+  white-space: nowrap;
+}
+
+.plan-usage-card-bottom svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+  cursor: default;
 }
 
 .main {
@@ -1940,14 +1963,6 @@ legend {
   text-transform: uppercase;
 }
 
-.uprev-glow {
-  animation: uprevGlow 1.8s ease-in-out infinite;
-  text-shadow:
-    0 0 10px var(--glow, #5ed2ff),
-    0 0 22px var(--glow, #5ed2ff),
-    0 2px 4px rgba(0, 0, 0, 0.7);
-}
-
 .uprev-blast-word {
   font-size: 1.45rem;
   font-weight: 900;
@@ -2080,16 +2095,6 @@ legend {
   }
   50% {
     filter: brightness(1.25);
-  }
-}
-
-@keyframes uprevGlow {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.2);
   }
 }
 
@@ -2587,10 +2592,6 @@ legend {
 
 /* ---------- Player (CapCut-style) ---------- */
 
-.video-wrap {
-  cursor: pointer;
-}
-
 /* Inline pipeline progress rendered on top of the video stage. */
 .processing-overlay {
   position: absolute;
@@ -2667,27 +2668,6 @@ legend {
   }
 }
 
-.play-badge {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--cf-bg) 62%, transparent);
-  border: 1px solid var(--line);
-  color: var(--gold);
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-  animation: fadeIn 0.2s ease;
-}
-
-.play-badge svg {
-  margin-left: 3px;
-}
 
 /* Frosted file-name pill overlaid on the video player (top-left). */
 .video-filename-pill {
@@ -2992,13 +2972,41 @@ legend {
 /* Word reveals animate opacity/transform only (GPU-friendly). */
 .caption-overlay .capw {
   display: inline-block;
+  position: relative;
   will-change: opacity, transform;
 }
 
-/* Stacked word lines — strong size contrast like CapCut / Poetic Stack. */
-.caption-overlay .cap-small,
-.caption-overlay .cap-line.cap-w-small,
-.caption-overlay .cap-line.cap-w-normal {
+/* Delete badge on the selected word — remove it straight from the video,
+   no trip to the Phrases panel. Positioned like the CapCut-style corner
+   resize handles, but red so it reads as destructive. */
+.capw-delete {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  border: 1.5px solid var(--cf-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  z-index: 6;
+  transition: transform 0.12s ease, background 0.12s ease;
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+}
+
+.capw-delete:hover {
+  background: #ff6369;
+  transform: scale(1.15);
+}
+
+/* Stacked word lines — strong size contrast like CapCut / Poetic Stack.
+   Used by the 'hero' template's one-hero-word-per-line rendering only. */
+.caption-overlay .cap-small {
   font-size: 0.72em;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -3006,8 +3014,7 @@ legend {
   line-height: 1.05;
 }
 
-.caption-overlay .cap-big,
-.caption-overlay .cap-line.cap-w-hero {
+.caption-overlay .cap-big {
   font-size: 1.55em;
   font-weight: 900;
   text-transform: uppercase;
@@ -3064,37 +3071,6 @@ legend {
   text-shadow:
     3px 3px 0 rgba(0, 0, 0, 0.85),
     0 0 24px rgba(0, 0, 0, 0.5);
-}
-
-/* Manual per-word roles — stacked lines, hero never inline with neighbours */
-
-.caption-overlay .cap-custom {
-  display: grid;
-  justify-items: center;
-  gap: 0.06em;
-  line-height: 1.08;
-}
-
-.caption-overlay .cap-custom-stack .cap-line {
-  display: block;
-  width: 100%;
-  text-align: center;
-}
-
-.caption-overlay .cap-w-hero {
-  font-size: 1em; /* size comes from .cap-line.cap-w-hero */
-  font-weight: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
-  color: inherit;
-  text-shadow: inherit;
-}
-
-.caption-overlay .cap-w-small,
-.caption-overlay .cap-w-normal {
-  font-size: 1em;
-  font-weight: inherit;
-  opacity: inherit;
 }
 
 .caption-overlay .cap-mark {
@@ -3478,6 +3454,16 @@ legend {
   100% { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
+/* Same fade/slide-up as capTplFade, plus a constant translateX(50%) baked
+ * into both ends — .cap-tpl-bigred-line needs that shift held for its
+ * entire resting position (see the comment on that rule), and an
+ * animation's own keyframes always win over any statically-declared
+ * `transform` on the same element, so the shift has to live here instead. */
+@keyframes capTplFadeShiftRight {
+  0% { opacity: 0; transform: translateX(50%) translateY(6px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateX(50%) translateY(0); filter: blur(0); }
+}
+
 @keyframes capTplMarkReveal {
   0% { transform: scaleX(0); }
   100% { transform: scaleX(1); }
@@ -3523,7 +3509,7 @@ legend {
   font-style: italic;
   font-weight: 900;
   font-size: 1.25em;
-  color: #4a4a52;
+  color: #ffffff;
   letter-spacing: -0.01em;
   animation: capTplFade 0.45s ease-out both;
 }
@@ -3548,14 +3534,26 @@ legend {
   color: #ffffff;
 }
 
-/* The Big Red — monumental serif word, thin caption crossing it */
+/* The Big Red — monumental serif word, thin caption stacked under it with a
+ * gap, shifted so its LEFT edge starts at the hero word's horizontal
+ * center (translateX(50%) moves an element by half of its OWN rendered
+ * width, so this lands exactly on the hero's center at any phrase length
+ * without needing to measure either element's width in JS). The line used
+ * to be `position: absolute` inside this box, which excludes it from the
+ * box's own shrink-to-fit width — so the box (and the line's
+ * `max-width: 88%`) was sized to the HERO WORD alone. A short hero word
+ * made that box tiny, so a long rest-of-phrase wrapped one word per line
+ * instead of filling the real caption width. Keeping the line in normal
+ * flow (like Aura/Swiss do) ties its wrap width to the actual available
+ * caption width via .caption-overlay's max-width: 90%, same budget the
+ * export uses (maxWidthPx = frame width * 0.9). */
 .caption-overlay .cap-tpl-theBigRed {
-  position: relative;
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 0.35em 0;
 }
 .caption-overlay .cap-tpl-bigred-word {
-  display: block;
   font-family: 'Playfair Display', serif;
   font-weight: 900;
   font-size: 1.9em;
@@ -3564,13 +3562,18 @@ legend {
   letter-spacing: 0.01em;
   line-height: 0.9;
   white-space: nowrap;
+  /* Overrides .caption-overlay's default layered drop shadow — at this huge
+     a size, an offset shadow reads as a second, separated black copy of the
+     word instead of a shadow. An unoffset halo stays hugged to the glyph
+     edges on every side (matches the burn-in shadow in captionPng.service.ts). */
+  text-shadow: 0 0 0.03em rgba(0, 0, 0, 0.65);
   animation: capTplPop 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
 }
 .caption-overlay .cap-tpl-bigred-line {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  /* Gap below the hero word, not a crossing overlap; horizontal shift baked
+     into capTplFadeShiftRight's keyframes below (see the block comment
+     above for both). */
+  margin-top: 0.25em;
   width: max-content;
   max-width: 88%;
   font-family: Inter, sans-serif;
@@ -3584,7 +3587,7 @@ legend {
   white-space: normal;
   letter-spacing: 0.005em;
   opacity: 0;
-  animation: capTplFade 0.4s ease-out 0.35s both;
+  animation: capTplFadeShiftRight 0.4s ease-out 0.35s both;
 }
 
 /* Scribble — handwritten, green highlighter behind the emphasized word.
@@ -3786,6 +3789,17 @@ legend {
   background: var(--cf-text);
 }
 
+/* Deletes the whole caption chunk currently on screen — red so it reads as
+   destructive next to the two (non-destructive) apply options. */
+.caption-resize-confirm-btn.danger {
+  color: #ff8a8d;
+}
+
+.caption-resize-confirm-btn.danger:hover {
+  background: #e5484d;
+  color: #fff;
+}
+
 /* Click a word on the video to edit it in the Word Styles panel. */
 .caption-overlay.draggable .capw {
   cursor: pointer;
@@ -3838,13 +3852,6 @@ legend {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.7);
-}
-
-.uprev-pill {
-  color: #fff;
-  font-weight: 900;
-  padding: 0.05rem 0.35rem;
-  border-radius: 4px;
 }
 
 .uprev-pillbox {
@@ -3912,31 +3919,6 @@ legend {
   justify-content: center;
   gap: 0.4rem;
   flex-wrap: wrap;
-}
-
-.uprev-mx-0 {
-  font-family: Anton, sans-serif;
-  font-size: 0.85rem;
-  color: #fff;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.9);
-}
-
-.uprev-mx-1 {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-style: italic;
-  font-size: 0.85rem;
-  color: #f5f1e8;
-}
-
-.uprev-mx-2 {
-  font-family: Orbitron, sans-serif;
-  font-weight: 700;
-  font-size: 0.72rem;
-  color: #5ef1ff;
-  text-shadow: 0 0 8px rgba(255, 45, 241, 0.85);
-  background: rgba(10, 10, 20, 0.55);
-  padding: 0.15em 0.4em;
-  border-radius: 0.3em;
 }
 
 .uprev-mx2-0 {
@@ -4240,6 +4222,71 @@ legend {
   gap: 0.6rem;
   padding: 0.85rem 1.25rem 1rem;
   border-top: 1px solid var(--divider);
+}
+
+/* Pricing popup (shown when a free-plan action is blocked, e.g. export quota) */
+
+.pricing-modal-card {
+  width: min(1080px, calc(100vw - 2rem));
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: rise 0.2s ease both;
+}
+
+.pricing-modal-reason {
+  margin: 0 0 1rem;
+}
+
+/* Manual bank-transfer popup (landing page CTAs + PricingModal's payment step) */
+
+.payment-modal-card {
+  position: relative;
+  width: min(480px, calc(100vw - 2rem));
+  max-height: min(90vh, 780px);
+  overflow-y: auto;
+}
+
+.payment-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+}
+
+.payment-modal-back {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  border: none;
+  background: transparent;
+  padding: 0.2rem 0;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--cf-text-muted);
+  cursor: pointer;
+}
+
+.payment-modal-back:hover {
+  color: var(--cf-text);
+}
+
+.payment-modal-card .payment-modal-back + .lp-payment-panel {
+  padding-top: 44px;
+}
+
+/* Plan-limit context shown above the payment step (e.g. "Your free trial is
+   over") — sits below the close/back buttons whether or not both are present. */
+.payment-modal-reason {
+  margin: 44px 20px 0;
+}
+
+.payment-modal-reason + .lp-payment-panel {
+  padding-top: 8px;
 }
 
 /* Prepare Your Media popup (post-upload language selection) */
@@ -4931,9 +4978,103 @@ legend {
   flex: 1;
 }
 
-.lp-card-icon {
-  font-size: 28px;
-  margin-bottom: 14px;
+.lp-grid-4 {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  margin-top: 28px;
+  align-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .lp-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .lp-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.lp-grid-4 > .lp-reveal {
+  display: flex;
+  height: 100%;
+  min-height: 100%;
+}
+
+.lp-grid-4 .lp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.lp-grid-4 .lp-card-body {
+  flex: 1;
+}
+
+.lp-about-badge-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.lp-made-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lp-eyebrow-line {
+  display: block;
+  width: 32px;
+  height: 2px;
+  margin: -8px auto 20px;
+  background: var(--cf-accent);
+  border-radius: 999px;
+}
+
+.lp-icon-ring {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--cf-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--cf-accent) 8%, transparent);
+  color: var(--cf-accent);
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.lp-icon-ring.is-square {
+  border-radius: 12px;
+}
+
+.lp-card-divider {
+  width: 26px;
+  height: 2px;
+  background: var(--cf-accent);
+  border-radius: 999px;
+  margin: 0 0 12px;
+}
+
+.lp-body main .lp-card.lp-card-feature,
+.lp-body main .lp-card-feature h3,
+.lp-body main .lp-card-feature p {
+  text-align: left;
+}
+
+.lp-grid-3 .lp-card.lp-card-feature {
+  align-items: flex-start;
 }
 
 .lp-card-title {
@@ -5330,12 +5471,6 @@ legend {
   }
 }
 
-.lp-hero-rating {
-  margin-top: 8px;
-  font-size: 15px;
-  letter-spacing: 2px;
-}
-
 @keyframes lp-glow-pulse {
   0%,
   100% {
@@ -5543,25 +5678,53 @@ legend {
   padding: 12px;
 }
 
-.lp-step-number {
+.lp-step-icon-wrap {
+  position: relative;
   width: 56px;
   height: 56px;
-  margin: 0 auto 12px;
+  margin: 0 auto 14px;
+}
+
+.lp-step-icon {
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  font-weight: 700;
-  background: color-mix(in srgb, var(--cf-accent) 15%, var(--cf-card));
-  color: var(--cf-accent);
-  border: 1px solid color-mix(in srgb, var(--cf-accent) 35%, transparent);
+  background: var(--cf-accent);
+  color: var(--cf-on-accent);
   position: relative;
   z-index: 1;
 }
 
+.lp-step-number {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--cf-card);
+  color: var(--cf-accent);
+  border: 1px solid color-mix(in srgb, var(--cf-accent) 45%, transparent);
+  z-index: 2;
+}
+
 .lp-step-title {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
+}
+
+.lp-step-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cf-text-muted);
 }
 
 .lp-tpl-showcase {
@@ -5702,37 +5865,23 @@ legend {
   font-size: 16px;
 }
 
-.lp-export {
-  position: relative;
-  overflow: hidden;
-}
-
-.lp-export .lp-blob {
-  top: 50%;
-  transform: translate(-50%, -50%);
-  height: 280px;
-  width: 70%;
-  opacity: 0.22;
-  filter: blur(120px);
-}
-
-.lp-export-cta {
-  display: flex;
-  justify-content: center;
-  margin-top: 28px;
-}
-
 .lp-about-card {
   width: 100%;
   border-radius: 24px;
-  padding: 40px;
+  padding: 32px 40px;
   box-shadow: var(--lp-glow-soft);
   box-sizing: border-box;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
-.lp-about-card .lp-h2 {
-  text-align: center;
+.lp-about-card .lp-icon-ring {
+  margin-bottom: 0;
+}
+
+.lp-body main .lp-about-card p {
+  text-align: left;
 }
 
 .lp-about-card .lp-body-text:last-child {
@@ -5742,6 +5891,11 @@ legend {
 @media (max-width: 640px) {
   .lp-about-card {
     padding: 28px 20px;
+    flex-direction: column;
+  }
+
+  .lp-body main .lp-about-card p {
+    text-align: center;
   }
 }
 
@@ -6121,14 +6275,6 @@ legend {
 .lp-daypass-layout {
   display: grid;
   gap: 24px;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .lp-daypass-layout {
-    grid-template-columns: 1.4fr 1fr;
-  }
 }
 
 .lp-daypass-grid {
@@ -6329,57 +6475,6 @@ legend {
 .lp-whatsapp-btn[aria-disabled='true'] {
   opacity: 0.5;
   pointer-events: none;
-}
-
-.lp-testimonial-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.lp-testimonial-card .lp-stars {
-  color: var(--cf-accent);
-  letter-spacing: 3px;
-  font-size: 15px;
-  line-height: 1;
-  margin-bottom: 16px;
-}
-
-.lp-testimonial-quote {
-  margin: 0 0 28px;
-  font-size: 17px;
-  line-height: 1.55;
-  font-weight: 500;
-  color: var(--cf-text);
-  text-wrap: pretty;
-}
-
-.lp-testimonial-meta {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--cf-border);
-}
-
-.lp-testimonial-author {
-  margin: 0 0 12px;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--cf-text);
-}
-
-.lp-testimonial-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.lp-testimonial-tags span {
-  font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--cf-accent) 10%, var(--cf-surface-2));
-  border: 1px solid color-mix(in srgb, var(--cf-accent) 18%, var(--cf-border));
-  color: var(--cf-text-secondary);
 }
 
 .lp-final-cta {

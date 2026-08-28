@@ -138,48 +138,6 @@ export const TIKTOK_CLASSIC: AntigravityCaptionTemplate = {
   },
 };
 
-/** Template 2 — Viral Orange (Bangers) */
-export const VIRAL_ORANGE: AntigravityCaptionTemplate = {
-  id: 'viral-orange',
-  name: 'Viral Orange',
-  type: 'lines',
-  tag: 'Viral',
-  purpose: 'Reels · hype · product clips',
-  desc: 'White Bangers with an orange pill behind the spoken word.',
-  style: {
-    fontFamily: 'Bangers',
-    fontUrl: 'https://fonts.gstatic.com/s/bangers/v13/FeVQS0BTqb0h60ACL5la2bxii28.ttf',
-    fontSize: 68,
-    color: '#FFFFFF',
-    align: 'center',
-    textTransform: 'uppercase',
-    stroke: { color: '#000000', width: 4 },
-    shadow: { color: '#000000', alpha: 0.5, blur: 4, distance: 0, angle: 0 },
-  },
-  colors: {
-    appeared: '#FFFFFF',
-    active: '#FFFFFF',
-    activeFill: '#FF5700',
-    background: 'transparent',
-    keyword: '#FFFFFF',
-  },
-  layout: { widthPercent: 0.8, bottomOffsetPx: 185 },
-  preset: {
-    displayMode: 'karaoke',
-    template: 'classic',
-    fontFamily: 'Bangers',
-    fontSize: 68,
-    fontWeight: 700,
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(0,0,0,0)',
-    highlightColor: '#FFFFFF',
-    activeFill: '#FF5700',
-    textTransform: 'uppercase',
-    animation: 'pop',
-    displayWords: 5,
-  },
-};
-
 /** Template 3 — Roboto Word Pop */
 export const ROBOTO_WORD: AntigravityCaptionTemplate = {
   id: 'roboto-word',
@@ -456,59 +414,6 @@ export const HERO_WORD_TEMPLATE: AntigravityCaptionTemplate = {
 };
 
 /**
- * Mixed Styles — every sentence gets a different premium look.
- *
- * Unlike every other template (one consistent style for the whole video),
- * Mixed Styles cycles through 8 curated sub-styles — Bold Minimal, Elegant
- * Serif, Neon Glow, Glassmorphism, Editorial Magazine, Handwritten Script,
- * Luxury Typography, Comic Sticker Pop — keyed by `caption.sequence % 8`, so
- * consecutive captions never repeat the same look (see MIXED_STYLE_COUNT in
- * CaptionOverlay.tsx and MIXED_STYLES in server/src/services/export.service.ts,
- * which must stay in sync with each other).
- *
- * `style`/`colors`/`preset.*` below are fallbacks only — the per-caption CSS
- * class (`.cap-mixed-N`) fully overrides font, color, shadow and animation.
- */
-export const MIXED_STYLES: AntigravityCaptionTemplate = {
-  id: 'mixed-styles',
-  name: 'Mixed Styles',
-  type: 'lines',
-  tag: 'New',
-  purpose: 'Maximum scroll-stop · every sentence a new look',
-  desc: 'Eight rotating premium looks — bold, serif, neon, glass, editorial, script, luxury, comic — never the same one twice in a row.',
-  style: {
-    fontFamily: 'Anton',
-    fontSize: 64,
-    color: '#FFFFFF',
-    align: 'center',
-    textTransform: 'none',
-    stroke: null,
-    shadow: null,
-  },
-  colors: {
-    appeared: '#FFFFFF',
-    active: '#FFFFFF',
-    activeFill: 'transparent',
-    background: 'transparent',
-    keyword: '#FFC43D',
-  },
-  preset: {
-    displayMode: 'phrase',
-    template: 'mixed',
-    fontFamily: 'Anton',
-    fontSize: 64,
-    fontWeight: 800,
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(0,0,0,0)',
-    highlightColor: '#FFC43D',
-    activeFill: 'transparent',
-    textTransform: 'none',
-    animation: 'fade',
-    displayWords: 6,
-  },
-};
-
-/**
  * Mixed Styles 2 — a calmer, more "content worthy" successor to Mixed Styles.
  *
  * Same per-sentence rotation mechanic, but every sub-style was picked to feel
@@ -685,10 +590,12 @@ export const BUBBLE_CANDY: AntigravityCaptionTemplate = {
 
 /**
  * Six kinetic templates ported from CaptionTemplates.jsx (self-contained word-
- * by-word animated components). Preview-only for now: CaptionOverlay.tsx
- * renders the equivalent markup/CSS, but there is no ASS/export counterpart
- * in server/src/services/export.service.ts yet, so these do not appear in
- * the burned-in downloaded video (see CAPTION_TEMPLATE.md).
+ * by-word animated components). CaptionOverlay.tsx renders the live preview;
+ * server/src/services/captionPng.service.ts renders the matching burned-in
+ * export for all six via real-metrics canvas PNG overlays (see
+ * PNG_OVERLAY_TEMPLATES in export.service.ts) — not ASS/libass, which can't
+ * measure text precisely enough for these templates' word-fit sizing and
+ * highlighter/mark boxes.
  */
 export const EDITOR_MASALA: AntigravityCaptionTemplate = {
   id: 'editor-masala',
@@ -739,15 +646,15 @@ export const AURA: AntigravityCaptionTemplate = {
   style: {
     fontFamily: 'Playfair Display',
     fontSize: 60,
-    color: '#4A4A52',
+    color: '#FFFFFF',
     align: 'center',
     textTransform: 'none',
     stroke: null,
     shadow: null,
   },
   colors: {
-    appeared: '#4A4A52',
-    active: '#4A4A52',
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
     activeFill: 'transparent',
     background: 'transparent',
     keyword: '#2F6BFF',
@@ -758,7 +665,7 @@ export const AURA: AntigravityCaptionTemplate = {
     fontFamily: 'Playfair Display',
     fontSize: 60,
     fontWeight: 900,
-    color: '#4A4A52',
+    color: '#FFFFFF',
     backgroundColor: 'rgba(0,0,0,0)',
     highlightColor: '#2F6BFF',
     activeFill: 'transparent',
@@ -926,14 +833,12 @@ export const ARCHIVES: AntigravityCaptionTemplate = {
 
 export const CAPTION_TEMPLATES: AntigravityCaptionTemplate[] = [
   HERO_WORD_TEMPLATE,
-  MIXED_STYLES,
   MIXED_STYLES_2,
   CREATOR_YELLOW_BOX,
   CINEMATIC_SUBTITLE,
   BUBBLE_CANDY,
   INDUSTRIAL,
   TIKTOK_CLASSIC,
-  VIRAL_ORANGE,
   ROBOTO_WORD,
   TIKTOK_PILL,
   CLEAN_WHITE,

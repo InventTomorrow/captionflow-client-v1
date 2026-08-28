@@ -17,16 +17,25 @@ export interface ApiErrorPayload {
 }
 
 export interface PlanErrorInfo {
-  reason: 'trial_expired' | 'plan_expired' | 'out_of_credits' | 'other_limit';
+  reason: 'trial_expired' | 'plan_expired' | 'out_of_credits' | 'feature_disabled' | 'other_limit';
   title: string;
   message: string;
-  /** Only the three billing-driven reasons get an upgrade CTA. */
+  /** Only the billing-driven reasons get an upgrade CTA. */
   showUpgrade: boolean;
 }
 
 export function resolvePlanError(data?: ApiErrorPayload): PlanErrorInfo | null {
   if (!data) return null;
   const code = data.code || data.details?.code;
+
+  if (code === 'PLAN_FEATURE_DISABLED') {
+    return {
+      reason: 'feature_disabled',
+      title: data.message || 'Not available on your plan',
+      message: 'Upgrade to a paid plan to unlock this feature.',
+      showUpgrade: true,
+    };
+  }
 
   if (code === 'PLAN_EXPIRED') {
     return {

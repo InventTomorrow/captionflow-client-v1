@@ -57,6 +57,16 @@ export interface DisplayCaption extends Caption {
    *  caption — used by whole-chunk resize to write sizeScale to all of them,
    *  even when a display caption spans more than one canonical caption. */
   sourceIds?: string[];
+  /**
+   * Per-word (aligned with `text.split(whitespace)`) canonical caption id +
+   * word index. `sourceId`/`wordOffset` above only cover the common single-
+   * source case; grouping flattens words across canonical caption boundaries
+   * (a pause/word-count break rarely lines up with where one canonical
+   * caption ends), so most on-screen blocks actually span more than one —
+   * this is what lets a click on ANY word (e.g. to delete it) resolve back
+   * to its real source caption + index regardless of grouping.
+   */
+  wordSources?: Array<{ sourceId?: string; sourceIndex: number }>;
 }
 
 interface FlatWord {
@@ -158,6 +168,7 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
     sourceId: singleSource ? first.sourceId : undefined,
     wordOffset: singleSource ? first.sourceIndex : undefined,
     sourceIds: Array.from(new Set(words.map((w) => w.sourceId).filter((id): id is string => !!id))),
+    wordSources: words.map((w) => ({ sourceId: w.sourceId, sourceIndex: w.sourceIndex })),
   };
 }
 

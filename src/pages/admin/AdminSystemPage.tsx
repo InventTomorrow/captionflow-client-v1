@@ -8,6 +8,7 @@ export function AdminSystemPage() {
   const [flags, setFlags] = useState({
     projectsListEnabled: false,
     export4kEnabled: true,
+    exportsEnabled: true,
     maintenanceMode: false,
     maintenanceMessage: '',
   });
@@ -67,6 +68,7 @@ export function AdminSystemPage() {
               {(
                 [
                   ['projectsListEnabled', 'Projects list enabled'],
+                  ['exportsEnabled', 'Exports enabled (site-wide)'],
                   ['export4kEnabled', '4K export enabled'],
                   ['maintenanceMode', 'Maintenance mode'],
                 ] as const
