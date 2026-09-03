@@ -44,8 +44,22 @@ export function AdminPlansPage() {
   const isAdmin = role === 'admin';
   const [plans, setPlans] = useState<Plan[]>([]);
   const [editing, setEditing] = useState<Partial<Plan> | null>(null);
+  // Snapshot of `editing` as of the last open/save, so we can tell a real
+  // unsaved edit apart from just re-opening the same plan. Previously
+  // clicking "New plan"/"Edit" on another row, or "Cancel", silently
+  // discarded whatever was typed with no warning — easy way to lose a
+  // plan you thought you'd already saved.
+  const [editingSnapshot, setEditingSnapshot] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+
+  function openEditor(next: Partial<Plan> | null) {
+    if (editing && JSON.stringify(editing) !== editingSnapshot) {
+      if (!window.confirm('Discard unsaved changes to this plan?')) return;
+    }
+    setEditing(next);
+    setEditingSnapshot(next ? JSON.stringify(next) : null);
+  }
 
   async function load() {
     const { data } = await api.get('/admin/plans', { params: { all: 1 } });
@@ -93,6 +107,7 @@ export function AdminPlansPage() {
       }
       setMsg('Saved');
       setEditing(null);
+      setEditingSnapshot(null);
       await load();
     } catch (e: unknown) {
       setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Save failed');
@@ -116,7 +131,7 @@ export function AdminPlansPage() {
             type="button"
             className="btn primary"
             onClick={() =>
-              setEditing({
+              openEditor({
                 slug: 'custom',
                 name: 'Custom',
                 priceMonthlyPkr: 0,
@@ -166,7 +181,7 @@ export function AdminPlansPage() {
                 <td className="admin-actions">
                   {isAdmin && (
                     <>
-                      <button type="button" className="btn ghost" onClick={() => setEditing(p)}>
+                      <button type="button" className="btn ghost" onClick={() => openEditor(p)}>
                         Edit
                       </button>
                       {p.isActive && (
@@ -326,7 +341,7 @@ export function AdminPlansPage() {
             <button type="button" className="btn primary" onClick={() => void save()}>
               Save
             </button>
-            <button type="button" className="btn ghost" onClick={() => setEditing(null)}>
+            <button type="button" className="btn ghost" onClick={() => openEditor(null)}>
               Cancel
             </button>
           </div>

@@ -910,6 +910,7 @@ export function EditorPage() {
   const [busy, setBusy] = useState('');
   const [rebuildPercent, setRebuildPercent] = useState(0);
   const [error, setError] = useState('');
+  const [hasFailedChunks, setHasFailedChunks] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showHlPicker, setShowHlPicker] = useState(false);
   const [panel, setPanel] = useState<PanelId>('templates');
@@ -958,6 +959,7 @@ export function EditorPage() {
   const [exportPlanError, setExportPlanError] = useState<PlanErrorInfo | null>(null);
   const [pricingOpen, setPricingOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -1062,8 +1064,12 @@ export function EditorPage() {
           setProcessing(false);
           if (status === 'partial_error' && r.data.project?.errorMessage) {
             setError(r.data.project.errorMessage);
+            setHasFailedChunks(true);
           } else if (done && caps.length === 0 && status !== 'error') {
             setError('No captions found on this device — click Regenerate to create them again.');
+            setHasFailedChunks(false);
+          } else {
+            setHasFailedChunks(false);
           }
           const first = caps[0]?.start;
           if (typeof first === 'number' && videoRef.current) {
@@ -1134,17 +1140,37 @@ export function EditorPage() {
     };
     const onPartial = (p: { chunkIndex: number; captions: Caption[] }) =>
       receivePartialChunk(p.chunkIndex, p.captions);
+    // Sources the browser can't decode natively (HEVC phone recordings, most
+    // commonly) start out serving the original file — audio plays, no frame
+    // — while the server transcodes a browser-safe copy in the background.
+    // Once that lands, reload the <video> element so it picks up the copy
+    // without the user needing to refresh the page.
+    const onPreviewReady = () => {
+      const v = videoRef.current;
+      if (!v) return;
+      const resumeAt = v.currentTime;
+      const wasPlaying = !v.paused;
+      const onLoadedMeta = () => {
+        v.currentTime = resumeAt;
+        if (wasPlaying) void v.play().catch(() => undefined);
+        v.removeEventListener('loadedmetadata', onLoadedMeta);
+      };
+      v.addEventListener('loadedmetadata', onLoadedMeta);
+      v.load();
+    };
     s.on('translation:progress', onTranslate);
     s.on('captions:complete', onComplete);
     s.on('project:error', onProjError);
     s.on('stage:update', onStage);
     s.on('captions:partial', onPartial);
+    s.on('video:preview-ready', onPreviewReady);
     return () => {
       s.off('translation:progress', onTranslate);
       s.off('captions:complete', onComplete);
       s.off('project:error', onProjError);
       s.off('stage:update', onStage);
       s.off('captions:partial', onPartial);
+      s.off('video:preview-ready', onPreviewReady);
     };
   }, [id, receivePartialChunk, reloadFinalCaptions, setPipelineStage]);
 
@@ -1178,6 +1204,31 @@ export function EditorPage() {
       window.clearInterval(t);
     };
   }, [id, processing, busy, reloadFinalCaptions, setPipelineStage]);
+
+  // Safety net for the video-preview swap: 'video:preview-ready' (above)
+  // covers the normal case, but a socket event can be missed (fired before
+  // the client finished joining the project room, a brief reconnect, etc).
+  // videoWidth stays 0 for as long as the browser hasn't decoded a single
+  // frame — an unrecognized codec (HEVC) or a not-yet-ready preview both look
+  // like that, so periodically nudge a reload until one actually paints.
+  // First attempt waits 15s so a normal, merely-slow-to-buffer load isn't
+  // interrupted mid-flight.
+  useEffect(() => {
+    if (!id) return;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20;
+    const t = window.setInterval(() => {
+      attempts++;
+      const v = videoRef.current;
+      if (!v) return;
+      if (v.videoWidth > 0 || attempts > MAX_ATTEMPTS) {
+        window.clearInterval(t);
+        return;
+      }
+      v.load();
+    }, 15000);
+    return () => window.clearInterval(t);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -1780,6 +1831,7 @@ export function EditorPage() {
   async function rebuild() {
     setBusy('rebuild');
     setError('');
+    setHasFailedChunks(false);
     setRebuildPercent(0);
     beginGeneration();
     setProcessing(true);
@@ -1792,6 +1844,31 @@ export function EditorPage() {
       setError(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
           'Rebuild failed',
+      );
+      setBusy('');
+      setProcessing(false);
+    }
+  }
+
+  /** Same full re-transcription as Regenerate Captions (the server has no
+   *  cheaper partial-chunk path), but surfaced directly on the partial_error
+   *  banner so a failed project has an obvious, one-click recovery action
+   *  instead of requiring the user to find Regenerate in the Captions panel. */
+  async function retryChunks() {
+    setBusy('rebuild');
+    setError('');
+    setHasFailedChunks(false);
+    setRebuildPercent(0);
+    beginGeneration();
+    setProcessing(true);
+    setPipelineStage({ current: 'transcribing', percent: 0, message: 'Retrying failed parts…' });
+    didSeekToCaption.current = false;
+    try {
+      await api.post(`/projects/${id}/retry-chunks`);
+    } catch (e: unknown) {
+      setError(
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Retry failed',
       );
       setBusy('');
       setProcessing(false);
@@ -1999,20 +2076,35 @@ export function EditorPage() {
   }
 
   async function downloadVideo() {
+    if (!id) return;
     setDownloading(true);
+    setDownloadError('');
     try {
-      const { data } = await api.get(`/export/${id}/download?type=video`, {
-        responseType: 'blob',
-        timeout: 0,
-      });
-      const url = URL.createObjectURL(data as Blob);
+      // Cheap JSON check first — a plain navigation (below) can't report a
+      // JSON error back to this code, so if the export record already
+      // expired, clicking Download would otherwise just silently hand the
+      // browser a JSON error file instead of the video with no feedback.
+      const { data } = await api.get(`/projects/${id}`);
+      if (data.project?.export?.status !== 'done') {
+        throw new Error('Export is no longer available — render again');
+      }
+      // Hand the actual (often tens-of-MB) transfer to the browser's native
+      // download manager via a direct navigation instead of buffering the
+      // whole file into a JS Blob through XHR — the blob/XHR path was
+      // failing with an opaque "Network Error" on real exports. The
+      // httpOnly auth cookie still rides along on this top-level GET
+      // (SameSite is 'lax' in dev, 'strict' same-site or 'none' cross-site
+      // in production — all of which permit cookies on an anchor-triggered
+      // navigation like this).
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${projectName.replace(/[^\w.-]+/g, '_')}-${exportQuality}.${exportFormat}`;
+      a.href = `${API_URL}/api/export/${id}/download?type=video`;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setExportError('Download failed — try again');
+      a.remove();
+    } catch (err) {
+      console.error('Video download failed', err);
+      setDownloadError(err instanceof Error ? err.message : 'Download failed — try again');
     } finally {
       setDownloading(false);
     }
@@ -2020,7 +2112,16 @@ export function EditorPage() {
 
   return (
     <div className="studio">
-      {error && <div className="error-banner studio-error">{error}</div>}
+      {error && (
+        <div className="error-banner studio-error">
+          <span>{error}</span>
+          {hasFailedChunks && (
+            <button type="button" className="btn ghost" disabled={!!busy} onClick={() => void retryChunks()}>
+              Retry failed parts
+            </button>
+          )}
+        </div>
+      )}
 
       <div className={`studio-body ${drawerOpen ? 'drawer-open' : 'drawer-closed'}`}>
         <div className={`studio-drawer ${drawerOpen ? 'is-open' : 'is-closed'}`}>
@@ -2445,6 +2546,7 @@ export function EditorPage() {
             </div>
             <video
               ref={videoRef}
+              playsInline
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onLoadedMetadata={(e) => {
@@ -2984,6 +3086,7 @@ export function EditorPage() {
                   >
                     {downloading ? 'Downloading…' : `Download ${exportQuality} ${exportFormat.toUpperCase()}`}
                   </button>
+                  {downloadError && <div className="error-banner">{downloadError}</div>}
                 </div>
               )}
             </div>
