@@ -21,6 +21,8 @@ import { PrepareMediaModal } from '../components/PrepareMediaModal';
 import { PricingModal } from '../components/PricingModal';
 import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
 import { CaptionOverlay, findActiveCaption, type CaptionTemplate } from '../components/CaptionOverlay';
+import KineticCaptionLayer from '../components/KineticCaptionLayer';
+import { isKineticTemplate } from '../lib/kinetic/engine';
 import {
   deriveDisplayCaptions,
   legacyModeToDisplay,
@@ -121,6 +123,9 @@ function stackedDisplayMode(template?: string): DisplayMode | null {
     template === 'mixed2'
   )
     return 'phrase';
+  // The kinetic templates lay out a whole caption's letters at once and stagger
+  // them internally, so karaoke/word would fight the engine's own timing.
+  if (isKineticTemplate(template)) return 'phrase';
   return null;
 }
 
@@ -2589,20 +2594,35 @@ export function EditorPage() {
                   : undefined
               }
             >
-              <CaptionOverlay
-                captions={displayCaptions}
-                videoRef={videoRef}
-                wrapRef={captionLayerRef}
-                style={style}
-                displayMode={style.displayMode}
-                selectedCaptionId={panel === 'captions' ? selectedId : null}
-                selectedWordIdx={selectedWordIdx}
-                onWordSelect={overlayWordSelect}
-                onWordDelete={deleteDerivedWord}
-                onSaveText={saveDerivedText}
-                onChunkStyleCommit={handleChunkStyleCommit}
-                onChunkDelete={deleteDerivedChunk}
-              />
+              {isKineticTemplate(style.template) ? (
+                // Per-letter templates own the whole frame, so they replace the
+                // DOM overlay entirely rather than rendering inside its box.
+                // Word selection, drag-to-move and per-word styling do not
+                // apply here — see KINETIC_TEMPLATES.md.
+                <KineticCaptionLayer
+                  captions={displayCaptions}
+                  videoRef={videoRef}
+                  color={style.color}
+                  highlightColor={style.highlightColor}
+                  fontSize={style.fontSize}
+                  onChunkStyleCommit={handleChunkStyleCommit}
+                />
+              ) : (
+                <CaptionOverlay
+                  captions={displayCaptions}
+                  videoRef={videoRef}
+                  wrapRef={captionLayerRef}
+                  style={style}
+                  displayMode={style.displayMode}
+                  selectedCaptionId={panel === 'captions' ? selectedId : null}
+                  selectedWordIdx={selectedWordIdx}
+                  onWordSelect={overlayWordSelect}
+                  onWordDelete={deleteDerivedWord}
+                  onSaveText={saveDerivedText}
+                  onChunkStyleCommit={handleChunkStyleCommit}
+                  onChunkDelete={deleteDerivedChunk}
+                />
+              )}
             </div>
           </div>
           </div>

@@ -30,7 +30,17 @@ export type CaptionTemplate =
   | 'swiss'
   | 'theBigRed'
   | 'scribble'
-  | 'archives';
+  | 'archives'
+  // Per-letter kinetic typography. ONE template with five internal looks
+  // intercut per caption (see lib/kinetic/engine.ts → pickKineticLook), the
+  // same one-id/many-sub-looks shape as mixed/mixed2.
+  //
+  // It does NOT render through this component at all — EditorPage swaps in
+  // <KineticCaptionLayer>, a full-frame canvas, because it positions every
+  // letter independently across the whole frame rather than inside the caption
+  // box. Layout + animation live in lib/kinetic/engine.ts, which the burn-in
+  // export runs unchanged. See client/src/components/KINETIC_TEMPLATES.md.
+  | 'animeEdit';
 
 /**
  * Both Mixed Styles sets rotate through this many curated sub-styles, keyed

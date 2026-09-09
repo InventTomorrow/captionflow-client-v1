@@ -831,8 +831,60 @@ export const ARCHIVES: AntigravityCaptionTemplate = {
   },
 };
 
+/* ---------- Anime Edit (per-letter kinetic canvas) ----------
+ * ONE card, five internal looks. lib/kinetic/engine.ts picks a look per caption
+ * (pickKineticLook) so a sequence never repeats the same treatment — the job an
+ * AMV editor does by hand. Same one-id/many-sub-looks shape as mixed/mixed2.
+ *
+ * The `style`/`colors` block below is picker metadata only. The renderer reads
+ * just `preset`, and of that only displayMode, template, color and
+ * highlightColor have any effect: faces are pinned per look in KINETIC_FONTS
+ * and cannot be changed from the Text panel, and every size and position comes
+ * from the layout engine.
+ */
+
+export const ANIME_EDIT: AntigravityCaptionTemplate = {
+  id: 'anime-edit',
+  name: 'Anime Edit',
+  type: 'lines',
+  tag: 'Kinetic',
+  purpose: 'AMV / anime edits · hard cuts, slowmo',
+  desc: 'Per-letter kinetic typography that changes treatment every line — scatter, slam, chaos, neon and glitch.',
+  style: {
+    fontFamily: 'Bebas Neue',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'uppercase',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FFFFFF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#E11D48',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'animeEdit',
+    fontFamily: 'Bebas Neue',
+    fontSize: 64,
+    fontWeight: 400,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#E11D48',
+    activeFill: 'transparent',
+    textTransform: 'uppercase',
+    animation: 'fade',
+    displayWords: 5,
+  },
+};
+
 export const CAPTION_TEMPLATES: AntigravityCaptionTemplate[] = [
   HERO_WORD_TEMPLATE,
+  ANIME_EDIT,
   MIXED_STYLES_2,
   CREATOR_YELLOW_BOX,
   CINEMATIC_SUBTITLE,
