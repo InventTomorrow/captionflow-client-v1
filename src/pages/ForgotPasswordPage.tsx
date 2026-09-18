@@ -72,12 +72,17 @@ export function ForgotPasswordPage() {
 
         {sent ? (
           <>
-            <div className="auth-heading">
-              <h2>Check your email</h2>
-              <p>
-                If <strong>{email}</strong> has an account, a reset link is on its way. It expires
-                in 30 minutes and can only be used once.
-              </p>
+            <div className="auth-status">
+              <div className="auth-status-icon">
+                <MailIcon />
+              </div>
+              <div className="auth-heading">
+                <h2>Check your email</h2>
+                <p>
+                  If <strong className="auth-email">{email}</strong> has an account, a reset link
+                  is on its way. It expires in 30 minutes and can only be used once.
+                </p>
+              </div>
             </div>
             <p className="auth-note">
               Nothing arrived? Check your spam folder, then{' '}

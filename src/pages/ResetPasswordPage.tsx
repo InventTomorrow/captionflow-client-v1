@@ -1,7 +1,8 @@
 import { type FormEvent, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { AuthBrand } from '../components/AuthParts';
+import { verifyResetLinkPath, type VerifiedResetState } from '../lib/resetLink';
 
 function LockIcon() {
   return (
@@ -21,6 +22,23 @@ function LockIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 function SpinnerIcon() {
   return (
     <svg className="auth-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -34,6 +52,7 @@ export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const navigate = useNavigate();
+  const verifiedToken = (useLocation().state as VerifiedResetState | null)?.verifiedToken;
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -64,6 +83,16 @@ export function ResetPasswordPage() {
     }
   }
 
+  // The form is only ever reached THROUGH the verify page, which hands over the
+  // token it checked. Anyone arriving another way — an older email, a pasted
+  // URL, a bookmark — is sent to verify first, so a dead link is reported before
+  // a password is typed. (Router state survives a refresh, so reloading this
+  // page does not bounce.) A link with no token goes there too — the verify page
+  // owns the "link is incomplete" message.
+  if (!token || verifiedToken !== token) {
+    return <Navigate to={verifyResetLinkPath(token)} replace />;
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-glow" aria-hidden="true" />
@@ -72,31 +101,23 @@ export function ResetPasswordPage() {
       <section className="auth-card">
         <AuthBrand />
 
-        {!token ? (
+        {done ? (
           <>
-            <div className="auth-heading">
-              <h2>Link is incomplete</h2>
-              <p>
-                This reset link is missing its token. Copy the full link from the email, or request
-                a new one.
-              </p>
+            <div className="auth-status" role="status">
+              <div className="auth-status-icon is-ok">
+                <CheckIcon />
+              </div>
+              <div className="auth-heading">
+                <h2>Password updated</h2>
+                <p>
+                  You can sign in with your new password now. Any other devices that were signed in
+                  have been signed out.
+                </p>
+              </div>
+              <Link className="btn primary auth-submit auth-status-action" to="/login">
+                Go to sign in
+              </Link>
             </div>
-            <p className="auth-footer">
-              <Link to="/forgot-password">Request a new link</Link>
-            </p>
-          </>
-        ) : done ? (
-          <>
-            <div className="auth-heading">
-              <h2>Password updated</h2>
-              <p>
-                You can sign in with your new password now. Any other devices that were signed in
-                have been signed out.
-              </p>
-            </div>
-            <p className="auth-footer">
-              <Link to="/login">Go to sign in</Link>
-            </p>
           </>
         ) : (
           <>
