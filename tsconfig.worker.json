@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "WebWorker"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  /* Web Workers compile against the WebWorker lib instead of DOM. Anything a
+     worker imports is pulled in and type-checked here too, which is the guard
+     that keeps DOM-only code (document, window) out of the export path. */
+  "include": ["src/**/*.worker.ts"]
+}

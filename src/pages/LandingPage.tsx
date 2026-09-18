@@ -79,7 +79,7 @@ const DIFFERENTIATORS: Array<{ icon: LucideIcon | null; badge?: string; title: s
   {
     icon: MessageSquare,
     title: 'Trained on Real Pakistani Speech',
-    body: 'Fine-tuned specifically on local accents, slang, and seamless code-switching—not an English AI guessing Urdu phonetics.',
+    body: 'Fine-tuned specifically on local accents, slang, and seamless code-switching - not an English AI guessing Urdu phonetics.',
   },
   {
     icon: SquarePen,
@@ -98,7 +98,7 @@ const WHY_WE_BUILT: Array<{ icon: LucideIcon; title: string; body: string }> = [
   {
     icon: Users,
     title: 'Built for Pakistan',
-    body: 'Trained on how Pakistan actually speaks — not just textbook English.',
+    body: 'Trained on how Pakistan actually speaks - not just textbook English.',
   },
   {
     icon: Target,
@@ -113,7 +113,7 @@ const WHY_WE_BUILT: Array<{ icon: LucideIcon; title: string; body: string }> = [
   {
     icon: FileVideo,
     title: 'Ready for Anything',
-    body: 'Export in multiple formats, including 4K — ready for any platform.',
+    body: 'Export in multiple formats, including 4K - ready for any platform.',
   },
 ];
 
@@ -302,7 +302,7 @@ export function LandingPage() {
         {flags.maintenanceMode && (
           <div className="maintenance-banner">
             {flags.maintenanceMessage ||
-              'Asaan Caption is undergoing maintenance — some features may be unavailable.'}
+              'Asaan Caption is undergoing maintenance - some features may be unavailable.'}
           </div>
         )}
         <nav className="lp-nav-shell lp-glass">
@@ -575,7 +575,7 @@ export function LandingPage() {
                 </div>
                 <p className="lp-body-text">
                   <strong className="lp-body-strong">
-                    Subtitling was the slowest part of our workflow — every tool treated Pakistani
+                    Subtitling was the slowest part of our workflow - every tool treated Pakistani
                     speech as an afterthought.
                   </strong>{' '}
                   So we built our own. Asaan Caption is trained on real Pakistani speech patterns
@@ -655,7 +655,7 @@ export function LandingPage() {
                   Short on time? <span className="lp-accent-text">Grab a Pass</span>
                 </h2>
                 <p className="lp-body-text lp-narrow-text">
-                  One-time access, no auto-renewal — perfect for a single shoot or a quick campaign.
+                  One-time access, no auto-renewal - perfect for a single shoot or a quick campaign.
                 </p>
               </Reveal>
               <div className="lp-daypass-layout">
@@ -788,7 +788,7 @@ export function LandingPage() {
         </div>
         <div className="lp-footer-bottom">
           <div className="lp-container">
-            <p>© 2026 Asaan Caption — Built for the way Pakistan speaks.</p>
+            <p>© 2026 Asaan Caption - Built for the way Pakistan speaks.</p>
           </div>
         </div>
       </footer>

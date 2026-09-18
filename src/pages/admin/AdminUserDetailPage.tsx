@@ -1,21 +1,35 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { AdminSelect } from '../../components/admin/AdminSelect';
+
+/** Slug of the free trial's plan record (server TRIAL_PLAN_SLUG). The free trial is not a plan. */
+const TRIAL_PLAN_SLUG = 'starter';
 
 type Plan = {
   _id: string;
   name: string;
   slug: string;
   priceMonthlyPkr: number;
+  isActive?: boolean;
   isOneTime?: boolean;
   durationDays?: number;
 };
+
+function planOptionLabel(p: Plan) {
+  if (p.slug === TRIAL_PLAN_SLUG) return 'Free trial (ends their plan)';
+  const price = `PKR ${p.priceMonthlyPkr.toLocaleString()}`;
+  return p.isOneTime ? `${p.name} - ${price} (one-time, ${p.durationDays || '?'}d access)` : `${p.name} - ${price}/mo`;
+}
 
 export function AdminUserDetailPage() {
   const { id } = useParams();
   const [data, setData] = useState<{
     user: Record<string, unknown>;
     plan: Plan & { limits?: Record<string, unknown> };
+    onTrial?: boolean;
+    planActive?: boolean;
+    planEndsAt?: string;
     usage: Record<string, unknown>;
     projects: Array<Record<string, unknown>>;
   } | null>(null);
@@ -31,8 +45,14 @@ export function AdminUserDetailPage() {
       api.get('/admin/plans', { params: { all: 1 } }),
     ]);
     setData(userRes.data);
-    setPlans(plansRes.data.plans);
-    setPlanId(String(userRes.data.user.planId || plansRes.data.plans[0]?._id || ''));
+    // Plans that can be assigned; the free trial last (choosing it ends the plan).
+    const assignable = (plansRes.data.plans as Plan[]).filter((p) => p.isActive !== false);
+    const ordered = [
+      ...assignable.filter((p) => p.slug !== TRIAL_PLAN_SLUG),
+      ...assignable.filter((p) => p.slug === TRIAL_PLAN_SLUG),
+    ];
+    setPlans(ordered);
+    setPlanId(String(userRes.data.user.planId || ordered[0]?._id || ''));
   }
 
   useEffect(() => {
@@ -40,12 +60,14 @@ export function AdminUserDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const selectedIsTrial = plans.find((p) => p._id === planId)?.slug === TRIAL_PLAN_SLUG;
+
   async function assign() {
     setMsg('');
     setError('');
     try {
       await api.post(`/admin/users/${id}/assign-plan`, { planId, billingInterval: 'manual' });
-      setMsg('Plan assigned');
+      setMsg(selectedIsTrial ? 'Moved to the free trial' : 'Plan assigned');
       await load();
     } catch (e: unknown) {
       setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed');
@@ -97,7 +119,13 @@ export function AdminUserDetailPage() {
             <dd>{String(u.role)}</dd>
             <dt>Plan</dt>
             <dd>
-              {data.plan?.name} ({data.plan?.slug})
+              {data.onTrial
+                ? 'Free trial'
+                : !data.planActive
+                  ? `${data.plan?.name} - ended`
+                  : data.planEndsAt
+                    ? `${data.plan?.name} - until ${new Date(data.planEndsAt).toLocaleDateString()}`
+                    : data.plan?.name}
             </dd>
             <dt>Usage</dt>
             <dd>
@@ -119,16 +147,14 @@ export function AdminUserDetailPage() {
 
         <section className="admin-card">
           <h2>Assign plan</h2>
-          <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-            {plans.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name} — PKR {p.priceMonthlyPkr}
-                {p.isOneTime ? ` (one-time, ${p.durationDays || '?'}d access)` : '/mo'}
-              </option>
-            ))}
-          </select>
+          <AdminSelect
+            ariaLabel="Plan to assign"
+            value={planId}
+            onChange={setPlanId}
+            options={plans.map((p) => ({ value: p._id, label: planOptionLabel(p) }))}
+          />
           <button type="button" className="btn primary" onClick={() => void assign()}>
-            Assign plan
+            {selectedIsTrial ? 'Move to free trial' : 'Assign plan'}
           </button>
           <h3 style={{ marginTop: '1.5rem' }}>Grant bonus minutes</h3>
           <div className="admin-inline">
@@ -159,7 +185,7 @@ export function AdminUserDetailPage() {
                   <td>
                     {p.video && typeof p.video === 'object' && 'duration' in p.video
                       ? `${Math.round(Number((p.video as { duration?: number }).duration || 0) / 60)} min`
-                      : '—'}
+                      : '-'}
                   </td>
                 </tr>
               ))}

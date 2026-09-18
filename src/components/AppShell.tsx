@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
@@ -28,6 +28,81 @@ function InfoIcon() {
       <line x1="12" y1="11" x2="12" y2="16.5" />
       <circle cx="12" cy="7.5" r="0.25" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
     </svg>
+  );
+}
+
+function NavUploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 13v8" />
+      <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+      <path d="m8 17 4-4 4 4" />
+    </svg>
+  );
+}
+
+function NavUserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4.5" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  );
+}
+
+function NavFolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+/** Avatar + name; opens a small menu with the account email and sign-out. */
+function UserMenu({ name, email, onLogout }: { name?: string; email?: string; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="topbar-user-menu" ref={boxRef}>
+      <button
+        type="button"
+        className="topbar-user-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="topbar-avatar">{(name || '?')[0]?.toUpperCase()}</span>
+        <span className="topbar-user-name">{name}</span>
+        <ChevronDownIcon />
+      </button>
+      {open && (
+        <div className="topbar-user-pop" role="menu">
+          <p className="topbar-user-pop-name">{name}</p>
+          {email && <p className="topbar-user-pop-email">{email}</p>}
+          <button type="button" role="menuitem" onClick={onLogout}>
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -124,14 +199,14 @@ export function PlanBadge({
         <div className="plan-usage-card">
           <div className="plan-usage-card-top">
             <span className="plan-usage-text">
-              {used != null ? used.toFixed(1) : '–'} / {limit ?? '–'} min
+              {used != null ? used.toFixed(1) : '-'} / {limit ?? '-'} min
             </span>
             <span className="plan-usage-bar">
               <span className="plan-usage-fill" style={{ width: `${pct}%` }} />
             </span>
           </div>
           <div className="plan-usage-card-bottom">
-            <span>{renewsIn ? `Renews in ${renewsIn}` : remaining != null ? `${remaining.toFixed(1)} min left` : '—'}</span>
+            <span>{renewsIn ? `Renews in ${renewsIn}` : remaining != null ? `${remaining.toFixed(1)} min left` : '-'}</span>
             {renewsTitle && (
               <span title={renewsTitle}>
                 <InfoIcon />
@@ -192,6 +267,11 @@ export function AppShell() {
   const loadFlags = useFlagsStore((s) => s.load);
   const [pricingOpen, setPricingOpen] = useState(false);
 
+  async function signOut() {
+    await logout();
+    navigate('/login');
+  }
+
   useEffect(() => {
     void loadFlags();
   }, [loadFlags]);
@@ -200,7 +280,7 @@ export function AppShell() {
     <div className={`shell ${editorActive ? 'shell-editor' : ''}`}>
       {flags.maintenanceMode && (
         <div className="maintenance-banner">
-          {flags.maintenanceMessage || 'Asaan Caption is undergoing maintenance — some features may be unavailable.'}
+          {flags.maintenanceMessage || 'Asaan Caption is undergoing maintenance - some features may be unavailable.'}
         </div>
       )}
       <header className="topbar">
@@ -260,31 +340,34 @@ export function AppShell() {
           </>
         ) : (
           <>
-            <nav>
+            <nav className="topbar-nav">
               {/* Admin toggles this via System > Flags > Projects list enabled */}
-              {flags.projectsListEnabled && <Link to="/projects">Projects</Link>}
-              <Link to="/projects/upload">Upload</Link>
+              {flags.projectsListEnabled && (
+                <NavLink to="/projects" end>
+                  <NavFolderIcon />
+                  Projects
+                </NavLink>
+              )}
+              <NavLink to="/projects/upload">
+                <NavUploadIcon />
+                Upload
+              </NavLink>
               {(user?.role === 'admin' || user?.role === 'support') && (
-                <Link to="/admin">Admin</Link>
+                <NavLink to="/admin">
+                  <NavUserIcon />
+                  Admin
+                </NavLink>
               )}
             </nav>
             <div className="topbar-right">
-              <PlanBadge
-                plan={user?.plan}
-                planName={user?.planName}
-                onUpgradeClick={() => setPricingOpen(true)}
-              />
-              <span className="muted topbar-user">{user?.name}</span>
-              <button
-                className="btn ghost"
-                type="button"
-                onClick={async () => {
-                  await logout();
-                  navigate('/login');
-                }}
-              >
-                Log out
-              </button>
+              <div className="topbar-account">
+                <PlanBadge
+                  plan={user?.plan}
+                  planName={user?.planName}
+                  onUpgradeClick={() => setPricingOpen(true)}
+                />
+                <UserMenu name={user?.name} email={user?.email} onLogout={() => void signOut()} />
+              </div>
             </div>
           </>
         )}

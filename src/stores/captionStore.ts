@@ -28,6 +28,10 @@ export interface Caption {
    *  style.fontSize. Null/undefined = use the project's style position. */
   offsetX?: number | null;
   offsetY?: number | null;
+  /** Whole-chunk text-behind-person override. Null/undefined = follow the
+   *  project's style.behindPerson; true/false force this chunk behind or in
+   *  front of the speaker. */
+  behindPerson?: boolean | null;
 }
 
 interface StageState {

@@ -31,16 +31,23 @@ export type CaptionTemplate =
   | 'theBigRed'
   | 'scribble'
   | 'archives'
-  // Per-letter kinetic typography. ONE template with five internal looks
-  // intercut per caption (see lib/kinetic/engine.ts → pickKineticLook), the
-  // same one-id/many-sub-looks shape as mixed/mixed2.
+  // Per-letter kinetic typography. 'animeEdit' is ONE template with five
+  // internal looks intercut per caption (see lib/kinetic/engine.ts →
+  // pickKineticLook), the same one-id/many-sub-looks shape as mixed/mixed2;
+  // 'blockbuster' is the same engine drawing one fixed two-line look.
   //
-  // It does NOT render through this component at all — EditorPage swaps in
-  // <KineticCaptionLayer>, a full-frame canvas, because it positions every
+  // Neither renders through this component at all — EditorPage swaps in
+  // <KineticCaptionLayer>, a full-frame canvas, because they position every
   // letter independently across the whole frame rather than inside the caption
   // box. Layout + animation live in lib/kinetic/engine.ts, which the burn-in
   // export runs unchanged. See client/src/components/KINETIC_TEMPLATES.md.
-  | 'animeEdit';
+  | 'animeEdit'
+  | 'blockbuster'
+  | 'livingBlue'
+  | 'livingTeal'
+  | 'livingOrange'
+  | 'livingRed'
+  | 'livingPurple';
 
 /**
  * Both Mixed Styles sets rotate through this many curated sub-styles, keyed
@@ -74,7 +81,7 @@ export interface OverlayStyle {
  * Seconds of lead time when comparing the playhead to caption/word start
  * times, so words land on the beat instead of feeling slightly late.
  */
-const LEAD = 0.09;
+export const LEAD = 0.09;
 
 /** Binary search for the caption active at time `t` (captions sorted by start). */
 export function findActiveCaption(captions: Caption[], t: number): number {
@@ -177,7 +184,7 @@ function wordInlineStyle(ws?: WordStyle): CSSProperties | undefined {
  * align with the display text (same word count), otherwise spreads the words
  * evenly across the caption block.
  */
-function wordTimings(caption: Caption): number[] {
+export function wordTimings(caption: Caption): number[] {
   const words = caption.text.split(/\s+/).filter(Boolean);
   const timed = caption.words;
   if (timed && timed.length === words.length) return timed.map((w) => w.start);
@@ -185,7 +192,7 @@ function wordTimings(caption: Caption): number[] {
   return words.map((_, i) => caption.start + (span * i) / Math.max(1, words.length));
 }
 
-function countShown(timings: number[], t: number) {
+export function countShown(timings: number[], t: number) {
   let n = 0;
   while (n < timings.length && timings[n] <= t) n++;
   return n;
@@ -195,7 +202,7 @@ function countShown(timings: number[], t: number) {
  * Typewriter: number of characters (spaces excluded) revealed at time `t`.
  * Each word's characters are spread across that word's time slot.
  */
-function charsShownAt(texts: string[], starts: number[], capEnd: number, t: number): number {
+export function charsShownAt(texts: string[], starts: number[], capEnd: number, t: number): number {
   let n = 0;
   for (let i = 0; i < texts.length; i++) {
     const s = starts[i];
@@ -213,7 +220,7 @@ function charsShownAt(texts: string[], starts: number[], capEnd: number, t: numb
 }
 
 /** Per-word reveal animation, mapped from the Text panel's Animation setting. */
-function makeWordVariants(anim: string): Variants {
+export function makeWordVariants(anim: string): Variants {
   switch (anim) {
     case 'none':
       return { hidden: { opacity: 0 }, shown: { opacity: 1, transition: { duration: 0 } } };
@@ -247,7 +254,7 @@ function makeWordVariants(anim: string): Variants {
 }
 
 /** Enter/exit animation for a whole caption block. */
-function makeBlockVariants(anim: string): Variants {
+export function makeBlockVariants(anim: string): Variants {
   const hidden =
     anim === 'pop' || anim === 'bounce'
       ? { opacity: 0, scale: 0.94 }
@@ -267,13 +274,18 @@ function makeBlockVariants(anim: string): Variants {
 }
 
 /** How words inside the active caption behave for each display template. */
-function wordBehavior(mode: DisplayMode): 'block' | 'paint' | 'karaoke' {
+export function wordBehavior(mode: DisplayMode): 'block' | 'paint' | 'karaoke' {
   if (mode === 'paintOn') return 'paint';
   if (mode === 'karaoke') return 'karaoke';
   return 'block';
 }
 
-function CaptionWords({
+/**
+ * The words of one caption, laid out for its template. Exported so the
+ * on-device export (lib/export/layout/compile.tsx) measures the exact markup
+ * the preview renders instead of a hand-kept copy of it.
+ */
+export function CaptionWords({
   caption,
   template,
   behavior,
@@ -338,6 +350,7 @@ function CaptionWords({
           isSelected ? 'capw-selected' : ''
         }`.trim()}
         style={wordInlineStyle(caption.wordStyles?.[i])}
+        data-wi={i}
         variants={variants}
         initial={false}
         animate={behavior === 'paint' && i >= visibleCount ? 'hidden' : 'shown'}

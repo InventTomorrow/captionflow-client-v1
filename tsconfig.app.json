@@ -23,5 +23,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* Workers compile under tsconfig.worker.json (WebWorker lib, no DOM). */
+  "exclude": ["src/**/*.worker.ts"]
 }

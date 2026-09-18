@@ -42,14 +42,14 @@ export function AdminAuditPage() {
             {logs.map((l) => (
               <tr key={l._id}>
                 <td>{new Date(l.createdAt).toLocaleString()}</td>
-                <td>{l.actorId?.email || '—'}</td>
+                <td>{l.actorId?.email || '-'}</td>
                 <td>{l.action}</td>
                 <td>
                   {l.targetType}
                   {l.targetId ? `:${l.targetId.slice(-6)}` : ''}
                 </td>
                 <td className="muted" style={{ maxWidth: 240, fontSize: '0.75rem' }}>
-                  {l.meta ? JSON.stringify(l.meta) : '—'}
+                  {l.meta ? JSON.stringify(l.meta) : '-'}
                 </td>
               </tr>
             ))}

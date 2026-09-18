@@ -22,7 +22,11 @@ import { PricingModal } from '../components/PricingModal';
 import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
 import { CaptionOverlay, findActiveCaption, type CaptionTemplate } from '../components/CaptionOverlay';
 import KineticCaptionLayer from '../components/KineticCaptionLayer';
-import { isKineticTemplate } from '../lib/kinetic/engine';
+import {
+  isKineticTemplate,
+  KINETIC_PARAM_DEFAULTS,
+  type KineticParams,
+} from '../lib/kinetic/engine';
 import {
   deriveDisplayCaptions,
   legacyModeToDisplay,
@@ -35,9 +39,36 @@ import {
   resolveCaptionAnchor,
   type CaptionPosition,
 } from '../lib/captionPosition';
-import { ANTIGRAVITY_UNIFIED_TEMPLATES } from '../lib/captionTemplates';
+import { matchTemplateKey, pickerTemplates } from '../lib/templateCatalog';
+import { TemplateCard } from '../components/TemplateCard';
 import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
 import { captionsToSrt } from '../lib/srt';
+import {
+  evictOldExportsIfNeeded,
+  getSourceFile,
+  markExportDownloaded,
+  storeSourceFile,
+} from '../lib/media/localMedia';
+import { captionLanguageLabel } from '../lib/languageLabel';
+import { probeMediaFile } from '../lib/media/probe';
+import { uploadVideoToProject } from '../lib/export/serverUpload';
+import {
+  authorizeDeviceExport,
+  buildDeviceExportJob,
+  chooseExportRoute,
+  completeDeviceExport,
+  describeDeviceProgress,
+  DeviceExportError,
+  downloadLocalFile,
+  exportFileName,
+  formatBytes,
+  formatSeconds,
+  reportDeviceExportFailure,
+  saveDeviceExportRecord,
+  startDeviceExport,
+  type DeviceExportHandle,
+  type ExportRoute,
+} from '../lib/export/clientExport';
 
 interface StyleState {
   template: CaptionTemplate;
@@ -64,6 +95,18 @@ interface StyleState {
   displayMode: DisplayMode;
   /** Words per caption for phrase-based display templates. */
   displayWords: number;
+  /** Blockbuster's knobs (glow / letter spacing / tilt / script size); missing = as authored. */
+  kinetic?: KineticParams;
+  /** Text behind person (kinetic templates): person composited over the captions. */
+  behindPerson?: boolean;
+  /** Picker card the style started from (lib/templateCatalog.ts); feeds the admin export log. */
+  templateKey?: string;
+}
+
+/** Server-side state of the project's person matte (Project.masks). */
+interface MasksState {
+  status: 'none' | 'queued' | 'running' | 'done' | 'failed' | string;
+  error?: string;
 }
 
 /* Display / Words controls are hidden for now (use Templates instead).
@@ -130,15 +173,18 @@ function stackedDisplayMode(template?: string): DisplayMode | null {
 }
 
 const ASPECT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '9:16', label: '9:16 — Reels / TikTok' },
-  { value: '16:9', label: '16:9 — YouTube' },
-  { value: '1:1', label: '1:1 — Square' },
-  { value: '4:5', label: '4:5 — Instagram' },
-  { value: '4:3', label: '4:3 — Classic' },
-  { value: '21:9', label: '21:9 — Cinema' },
+  { value: '9:16', label: '9:16 - Reels / TikTok' },
+  { value: '16:9', label: '16:9 - YouTube' },
+  { value: '1:1', label: '1:1 - Square' },
+  { value: '4:5', label: '4:5 - Instagram' },
+  { value: '4:3', label: '4:3 - Classic' },
+  { value: '21:9', label: '21:9 - Cinema' },
 ];
 
 const DEFAULT_ASPECT = '9:16';
+
+/** On-device render attempts before the export shows an error (1 automatic retry). */
+const DEVICE_RENDER_ATTEMPTS = 2;
 
 /** Preview canvas ratio — matches export. */
 function resolvePreviewAspect(
@@ -341,449 +387,8 @@ function RailIcon({ id }: { id: PanelId }) {
   }
 }
 
-/**
- * One unified template catalog: every entry is a unique purpose + look.
- * No color-only duplicates — each card must read differently at a glance.
- */
-interface UnifiedTemplate {
-  key: string;
-  name: string;
-  tag?: string;
-  /** One-line “use this when…” purpose. */
-  purpose: string;
-  desc: string;
-  preset: Partial<StyleState> & { displayMode: DisplayMode; template: CaptionTemplate };
-}
-
-const HERO_WORD_CARD = ANTIGRAVITY_UNIFIED_TEMPLATES.find((t) => t.key === 'hero-word')!;
-const INDUSTRIAL_CARD = ANTIGRAVITY_UNIFIED_TEMPLATES.find((t) => t.key === 'industrial')!;
-
-const UNIFIED_TEMPLATES: UnifiedTemplate[] = [
-  // Hero Word pinned first — it's the flagship template.
-  HERO_WORD_CARD,
-  // Industrial Display pinned second.
-  // Mixed Styles / Mixed Styles 2 are hidden from the picker (kept in codebase for restore).
-  INDUSTRIAL_CARD,
-  {
-    key: 'beat-karaoke',
-    name: 'Beat Karaoke',
-    tag: 'Popular',
-    purpose: 'Music · hooks · talking-head',
-    desc: 'Phrase stays up; the spoken word lights in sync with audio.',
-    preset: {
-      displayMode: 'karaoke',
-      template: 'classic',
-      fontFamily: 'Poppins',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFC43D',
-      animation: 'fade',
-    },
-  },
-  {
-    key: 'hero-punch',
-    name: 'Hero Punch',
-    tag: 'Premium',
-    purpose: 'Key message · brand words',
-    desc: 'Each word on its own line — the hero word alone, big and loud.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'hero',
-      fontFamily: 'Montserrat',
-      fontWeight: 900,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#8FE649',
-      animation: 'pop',
-    },
-  },
-  {
-    key: 'word-blast',
-    name: 'Word Blast',
-    tag: 'Impact',
-    purpose: 'Hype · punchlines · drops',
-    desc: 'One giant word at a time, timed to each spoken beat.',
-    preset: {
-      displayMode: 'word',
-      template: 'bigpop',
-      fontFamily: 'Anton',
-      fontWeight: 900,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFFFFF',
-      animation: 'bounce',
-    },
-  },
-  {
-    key: 'soft-flicker',
-    name: 'Soft Flicker',
-    tag: 'Flicker',
-    purpose: 'Cinematic · trailers · drama',
-    desc: 'A bright word with a soft flicker glow for tense moments.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'classic',
-      fontFamily: 'Bebas Neue',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFFFFF',
-      animation: 'pop',
-      displayWords: 3,
-    },
-  },
-  {
-    key: 'marker-pen',
-    name: 'Marker Pen',
-    tag: 'Accent',
-    purpose: 'Tutorials · tips · emphasis',
-    desc: 'Key word sits on a highlighter stroke — teach and point.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'highlight',
-      fontFamily: 'Poppins',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFC43D',
-      animation: 'fade',
-    },
-  },
-  {
-    key: 'stack-verse',
-    name: 'Stack Verse',
-    tag: 'Stylish',
-    purpose: 'Poetry · storytelling · ads',
-    desc: 'Mixed-size stacked lines — reads like a designed poster.',
-    preset: {
-      displayMode: 'phrase',
-      template: 'stack',
-      fontFamily: 'Oswald',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#E7C65C',
-      animation: 'slideUp',
-    },
-  },
-  {
-    key: 'full-sentence',
-    name: 'Full Sentence',
-    purpose: 'Quotes · subtitles · accessibility',
-    desc: 'Keeps a full sentence on screen until the next one starts.',
-    preset: {
-      displayMode: 'sentence',
-      template: 'classic',
-      fontFamily: 'Inter',
-      fontWeight: 600,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFFFFF',
-      animation: 'fade',
-    },
-  },
-  {
-    key: 'word-reveal',
-    name: 'Word Reveal',
-    purpose: 'Story builds · suspense',
-    desc: 'Words paint on one after another as they are spoken.',
-    preset: {
-      displayMode: 'paintOn',
-      template: 'classic',
-      fontFamily: 'Poppins',
-      fontWeight: 700,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#8FE649',
-      animation: 'fade',
-    },
-  },
-  {
-    key: 'typewriter',
-    name: 'Typewriter',
-    purpose: 'Tech · ASMR · focus moments',
-    desc: 'Characters type out one by one with a blinking caret.',
-    preset: {
-      displayMode: 'typewriter',
-      template: 'classic',
-      fontFamily: 'Rubik',
-      fontWeight: 600,
-      color: '#FFFFFF',
-      backgroundColor: 'rgba(0,0,0,0)',
-      highlightColor: '#FFFFFF',
-      animation: 'none',
-    },
-  },
-  // Antigravity / TikTok-style presets — appended; previous cards unchanged.
-  // Hero Word and Industrial are pinned above. Hidden from picker (kept for restore):
-  // Mixed Styles 2, Clean White, Editor Masala.
-  ...ANTIGRAVITY_UNIFIED_TEMPLATES.filter(
-    (t) =>
-      t.key !== 'hero-word' &&
-      t.key !== 'industrial' &&
-      t.key !== 'mixed-styles-2' &&
-      t.key !== 'clean-white' &&
-      t.key !== 'editor-masala',
-  ),
-];
-
 /** Swatches for the caption highlight color (Text panel). */
 const HIGHLIGHT_SWATCHES = ['#FFC43D', '#8FE649', '#FFFFFF', '#5ED2FF', '#FF5FA2', '#89E900'];
-
-/** Per-template card preview — unique look so purpose is obvious at a glance. */
-function UnifiedPreview({ t }: { t: UnifiedTemplate }) {
-  const hl = t.preset.highlightColor || '#FFC43D';
-  switch (t.key) {
-    case 'beat-karaoke':
-      return (
-        <span className="uprev uprev-karaoke">
-          <span className="uprev-dim">The Quick</span>{' '}
-          <span className="uprev-hl" style={{ color: hl }}>
-            BROWN
-          </span>{' '}
-          <span className="uprev-dim">fox jumps</span>
-        </span>
-      );
-    case 'hero-punch':
-      return (
-        <span className="uprev uprev-hero">
-          <span className="uprev-tiny">The</span>
-          <span className="uprev-tiny">Quick</span>
-          <span className="uprev-hero-word" style={{ color: hl, textShadow: 'none' }}>
-            BROWN
-          </span>
-          <span className="uprev-tiny">fox</span>
-          <span className="uprev-tiny">jumps</span>
-        </span>
-      );
-    case 'word-blast':
-      return (
-        <span className="uprev uprev-blast">
-          <span className="uprev-blast-word">BROWN</span>
-        </span>
-      );
-    case 'soft-flicker':
-      return (
-        <span className="uprev uprev-flicker">
-          <span className="uprev-flicker-word">brown</span>
-        </span>
-      );
-    case 'marker-pen':
-      return (
-        <span className="uprev uprev-marker">
-          The Quick <mark style={{ background: hl }}>BROWN</mark> fox
-        </span>
-      );
-    case 'stack-verse':
-      return (
-        <span className="uprev uprev-stack">
-          <span className="uprev-stack-0">the</span>
-          <span className="uprev-stack-1">quick</span>
-          <span className="uprev-stack-2">brown</span>
-          <span className="uprev-stack-3" style={{ color: hl }}>
-            FOX
-          </span>
-        </span>
-      );
-    case 'clean-phrase':
-      return (
-        <span className="uprev uprev-clean">
-          The quick brown fox
-        </span>
-      );
-    case 'full-sentence':
-      return (
-        <span className="uprev uprev-sentence">
-          The quick brown fox jumps over the lazy dog.
-        </span>
-      );
-    case 'live-feed':
-      return (
-        <span className="uprev uprev-live">
-          <span className="uprev-live-old">the quick brown</span>
-          <span className="uprev-live-new">fox jumps over</span>
-        </span>
-      );
-    case 'word-reveal':
-      return (
-        <span className="uprev uprev-reveal">
-          <span>the</span> <span>quick</span>{' '}
-          <span className="uprev-reveal-on" style={{ color: hl }}>
-            brown
-          </span>{' '}
-          <span className="uprev-reveal-off">fox</span>
-        </span>
-      );
-    case 'typewriter':
-      return (
-        <span className="uprev uprev-type">
-          the quick bro<span className="uprev-caret" style={{ background: hl }} />
-        </span>
-      );
-    case 'tiktok-classic':
-      return (
-        <span className="uprev uprev-tiktok">
-          THE QUICK{' '}
-          <span className="uprev-hl" style={{ color: hl }}>
-            BROWN
-          </span>{' '}
-          FOX
-        </span>
-      );
-    case 'roboto-word':
-      return (
-        <span className="uprev uprev-blast">
-          <span className="uprev-blast-word">BROWN</span>
-        </span>
-      );
-    case 'tiktok-pill':
-      return (
-        <span className="uprev uprev-pillbox">
-          the quick brown fox
-        </span>
-      );
-    case 'clean-white':
-      return <span className="uprev uprev-clean">the quick brown fox</span>;
-    case 'poppins-bold':
-      return (
-        <span className="uprev uprev-karaoke">
-          <span className="uprev-dim">The quick</span>{' '}
-          <span className="uprev-hl" style={{ color: hl }}>
-            brown
-          </span>{' '}
-          <span className="uprev-dim">fox</span>
-        </span>
-      );
-    case 'industrial':
-      return (
-        <span className="uprev uprev-industrial">
-          THE QUICK{' '}
-          <span className="uprev-hl" style={{ color: hl }}>
-            BROWN
-          </span>
-        </span>
-      );
-    case 'hero-word':
-      return (
-        <span className="uprev uprev-heroword">
-          <span className="uprev-hw-n">the</span>{' '}
-          <span className="uprev-hw-n">quick</span>{' '}
-          <span className="uprev-hw-h" style={{ color: hl }}>
-            BROWN
-          </span>{' '}
-          <span className="uprev-hw-s">fox</span>
-        </span>
-      );
-    case 'mixed-styles-2':
-      return (
-        <span className="uprev uprev-mixed">
-          <span className="uprev-mx2-0">Modern</span>
-          <span className="uprev-mx2-1">Quiet</span>
-          <span className="uprev-mx2-2">GOLD</span>
-        </span>
-      );
-    case 'creator-yellow-box':
-      return (
-        <span
-          className="uprev-box"
-          style={{
-            background: t.preset.backgroundColor,
-            color: t.preset.color,
-            fontFamily: t.preset.fontFamily,
-            fontWeight: 800,
-            textTransform: 'uppercase',
-          }}
-        >
-          the quick brown fox
-        </span>
-      );
-    case 'cinematic-subtitle':
-      return (
-        <span
-          className="uprev-box"
-          style={{
-            background: t.preset.backgroundColor,
-            color: t.preset.color,
-            fontFamily: t.preset.fontFamily,
-            fontWeight: 500,
-          }}
-        >
-          the quick brown fox
-        </span>
-      );
-    case 'bubble-candy':
-      return (
-        <span
-          className="uprev-box"
-          style={{
-            background: t.preset.backgroundColor,
-            color: t.preset.color,
-            fontFamily: t.preset.fontFamily,
-          }}
-        >
-          the quick brown fox
-        </span>
-      );
-    case 'editor-masala':
-      return (
-        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 0.95 }}>
-          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, fontSize: '0.55em' }}>
-            trust the
-          </span>
-          <span
-            style={{ fontFamily: 'Anton, sans-serif', fontSize: '1.4em', color: hl, textTransform: 'uppercase' }}
-          >
-            process
-          </span>
-        </span>
-      );
-    case 'aura':
-      return (
-        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 1 }}>
-          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', color: hl, textTransform: 'uppercase' }}>
-            forget
-          </span>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 900, fontSize: '1.1em' }}>
-            status
-          </span>
-        </span>
-      );
-    case 'swiss':
-      return (
-        <span className="uprev" style={{ display: 'grid', justifyItems: 'center', lineHeight: 0.9 }}>
-          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', textTransform: 'uppercase' }}>
-            focus
-          </span>
-          <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 900, fontSize: '1.15em', color: hl, textTransform: 'uppercase' }}>
-            deeply
-          </span>
-        </span>
-      );
-    case 'the-big-red':
-      return (
-        <span className="uprev-box" style={{ background: 'transparent', position: 'relative', padding: '0.4em 0' }}>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: '1.5em', color: hl, textTransform: 'uppercase' }}>
-            second
-          </span>
-        </span>
-      );
-    case 'scribble':
-      return (
-        <span className="uprev" style={{ fontFamily: 'Caveat, cursive', fontWeight: 700, fontSize: '1.3em' }}>
-          the <mark style={{ background: hl, color: '#0b0b0d' }}>little</mark> things
-        </span>
-      );
-    case 'archives':
-      return (
-        <span className="uprev" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: '1.2em' }}>
-          Your <span style={{ fontStyle: 'italic', textDecoration: 'underline' }}>Style</span> is it
-        </span>
-      );
-    default:
-      return <span className="uprev">The Quick BROWN fox</span>;
-  }
-}
 
 const STAGE_LABELS: Record<string, string> = {
   extracting: 'Extracting Audio',
@@ -912,10 +517,17 @@ export function EditorPage() {
   const [duration, setDuration] = useState(0);
   const [projectName, setProjectName] = useState('Project');
   const [outputLanguage, setOutputLanguage] = useState('keep_original');
+  /** Spoken language as chosen at upload, and as detected by transcription. */
+  const spokenLanguageRef = useRef<{ chosen?: string; detected?: string }>({});
+  /** File name of the video just downloaded from the export modal. */
+  const [savedAs, setSavedAs] = useState('');
   const [busy, setBusy] = useState('');
   const [rebuildPercent, setRebuildPercent] = useState(0);
   const [error, setError] = useState('');
   const [hasFailedChunks, setHasFailedChunks] = useState(false);
+  /** The server still has this video's transcript, so the captions can be
+   *  rebuilt from it without transcribing (and paying for) it again. */
+  const [canRestoreCaptions, setCanRestoreCaptions] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showHlPicker, setShowHlPicker] = useState(false);
   const [panel, setPanel] = useState<PanelId>('templates');
@@ -948,8 +560,17 @@ export function EditorPage() {
   const captionLayerRef = useRef<HTMLDivElement>(null);
   const [showPrepare, setShowPrepare] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  /** Text-behind-person matte status, mirrored from the server via socket. */
+  const [masks, setMasks] = useState<MasksState>({ status: 'none' });
+  const [masksPercent, setMasksPercent] = useState(0);
+  /** Seconds left on the person matte, estimated from observed progress. */
+  const [matteEtaSec, setMatteEtaSec] = useState<number | null>(null);
+  const matteStartRef = useRef<{ at: number; percent: number } | null>(null);
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
+  /** Picker cards in the order the admin set (Admin → Templates). */
+  const templateLayout = useFlagsStore((s) => s.templateLayout);
+  const templateCards = useMemo(() => pickerTemplates(templateLayout), [templateLayout]);
   useEffect(() => {
     void loadFlags();
   }, [loadFlags]);
@@ -958,13 +579,43 @@ export function EditorPage() {
     if (exportQuality === '4K' && !flags.export4kEnabled) setExportQuality('2K');
   }, [flags.export4kEnabled, exportQuality]);
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
+  const [exportFrameRate, setExportFrameRate] = useState<'fast' | 'original'>('fast');
   const [exportStatus, setExportStatus] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle');
   const [exportPercent, setExportPercent] = useState(0);
   const [exportError, setExportError] = useState('');
+  /** Export succeeded, but a requested effect could not be applied. */
+  const [exportWarning, setExportWarning] = useState('');
   const [exportPlanError, setExportPlanError] = useState<PlanErrorInfo | null>(null);
   const [pricingOpen, setPricingOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
+  /** Where the current/last render ran — shown in the modal so it is never a mystery. */
+  const [exportWhere, setExportWhere] = useState<'device' | 'server' | null>(null);
+  const exportWhereRef = useRef(exportWhere);
+  exportWhereRef.current = exportWhere;
+  /** Stage + ETA line for an on-device render. */
+  const [exportDetail, setExportDetail] = useState('');
+  /** The finished on-device render — downloaded from this device's storage, not the server. */
+  const [deviceResult, setDeviceResult] = useState<{
+    id: string;
+    opfsPath: string;
+    fileName: string;
+    renderMs: number;
+    sizeBytes: number;
+  } | null>(null);
+  const deviceExportRef = useRef<DeviceExportHandle | null>(null);
+  /** Aborts caption-layout measuring before an on-device render starts. */
+  const prepareAbortRef = useRef<AbortController | null>(null);
+  /** The server still holds the uploaded source, so a server render is possible. */
+  const serverHasSourceRef = useRef(false);
+  /** Uploading the video before a cloud render (route.uploadFirst) — Cancel aborts it. */
+  const attachUploadRef = useRef<AbortController | null>(null);
+  /** Audio-only project with no copy on this device: what the original file looked like. */
+  const [missingSource, setMissingSource] = useState<{ size: number; durations: number[] } | null>(null);
+  const [locateBusy, setLocateBusy] = useState(false);
+  const [locateError, setLocateError] = useState('');
+  /** Bumped once the original is located, so AuthenticatedVideo re-reads the local copy. */
+  const [videoSourceKey, setVideoSourceKey] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -979,6 +630,8 @@ export function EditorPage() {
   const playheadTrackRef = useRef<HTMLDivElement>(null);
   /** Debounce timer for persisting per-word style edits. */
   const wordStyleSaveTimer = useRef<number | undefined>(undefined);
+  /** Debounce timer for persisting the Blockbuster knobs (sliders fire per pixel). */
+  const kineticSaveTimer = useRef<number | undefined>(undefined);
   // Mirror of `style` for pointer-up persistence (avoids stale closure values).
   const styleRef = useRef(style);
   styleRef.current = style;
@@ -990,36 +643,59 @@ export function EditorPage() {
   useEffect(() => {
     const s = getSocket();
     const onProgress = (data: { percent: number }) => {
-      if (!showExportRef.current) return;
+      if (!showExportRef.current || exportWhereRef.current === 'device') return;
       setExportStatus('rendering');
       setExportPercent(data.percent);
     };
     const onDone = () => {
-      if (!showExportRef.current) return;
+      // The server releases its copy of the source after any export.
+      serverHasSourceRef.current = false;
+      if (!showExportRef.current || exportWhereRef.current === 'device') return;
       setExportStatus('done');
       setExportPercent(100);
     };
     const onError = (data: { message?: string }) => {
-      if (!showExportRef.current) return;
+      if (!showExportRef.current || exportWhereRef.current === 'device') return;
       setExportStatus('error');
       setExportError(data.message || 'Export failed');
     };
     const onCancelled = () => {
+      if (exportWhereRef.current === 'device') return;
       setExportStatus('idle');
       setExportPercent(0);
       setExportError('');
+    };
+    // The export ran, but something the user asked for could not be honoured
+    // (today: text behind person on a server with no segmentation service).
+    // Not an error — the file is fine — so it must not look like one.
+    const onWarning = (data: { message?: string }) => {
+      if (!showExportRef.current || !data?.message) return;
+      setExportWarning(data.message);
     };
     s.on('export:progress', onProgress);
     s.on('export:done', onDone);
     s.on('export:error', onError);
     s.on('export:cancelled', onCancelled);
+    s.on('export:warning', onWarning);
     return () => {
       s.off('export:progress', onProgress);
       s.off('export:done', onDone);
       s.off('export:error', onError);
       s.off('export:cancelled', onCancelled);
+      s.off('export:warning', onWarning);
     };
   }, []);
+
+  // Leaving the editor mid-render stops the on-device export (its worker would
+  // otherwise keep the GPU busy for a result nobody can collect).
+  useEffect(
+    () => () => {
+      prepareAbortRef.current?.abort();
+      deviceExportRef.current?.cancel();
+      attachUploadRef.current?.abort();
+    },
+    [],
+  );
 
   // Land on the first caption so the overlay is visible (not silence / ended).
   const didSeekToCaption = useRef(false);
@@ -1044,13 +720,14 @@ export function EditorPage() {
         const done = ['ready', 'done', 'partial_error', 'error'].includes(status || '');
         if (done || opts?.fromComplete) {
           let caps = opts?.captions ?? (await getAllForProject(id));
-          if (done && !opts?.fromComplete && caps.length === 0 && status !== 'error') {
+          // Only a caller that already holds fresh captions (the socket event)
+          // skips this; the polling safety net passes fromComplete too.
+          if (done && !opts?.captions && caps.length === 0 && status !== 'error') {
             // Terminal server status but nothing found locally — this browser
             // missed the one-shot captions:complete socket event (or this is a
-            // different device than the one that generated them). Try the
-            // temporary server-side fallback copy before giving up — it's
-            // cleared once the project is exported, so this only helps in the
-            // window between generation and export.
+            // different browser than the one that generated them). Try the
+            // server's caption copy, kept for 30 days or until the project's
+            // last video is deleted.
             try {
               const fallback = await api.get(`/projects/${id}/captions-cache`);
               const fallbackCaps = (fallback.data?.captions || []) as Caption[];
@@ -1067,11 +744,19 @@ export function EditorPage() {
           setBusy('');
           setRebuildPercent(0);
           setProcessing(false);
+          const transcriptWords = (r.data.project?.transcription?.words?.length as number | undefined) ?? 0;
+          setCanRestoreCaptions(caps.length === 0 && transcriptWords > 0);
           if (status === 'partial_error' && r.data.project?.errorMessage) {
             setError(r.data.project.errorMessage);
             setHasFailedChunks(true);
           } else if (done && caps.length === 0 && status !== 'error') {
-            setError('No captions found on this device — click Regenerate to create them again.');
+            // The transcript is the expensive part; if the server still has it,
+            // the captions come back from it for free.
+            setError(
+              transcriptWords > 0
+                ? 'The captions for this video are not on this device. Restore them from the saved transcript.'
+                : 'No captions found - click Regenerate to create them again.',
+            );
             setHasFailedChunks(false);
           } else {
             setHasFailedChunks(false);
@@ -1091,7 +776,7 @@ export function EditorPage() {
         // from the polling safety-net below, left ProcessingOverlay spinning
         // forever with only a console-level unhandled rejection as any trace.
         console.error('reloadFinalCaptions failed', err);
-        setError('Failed to load captions — try refreshing the page.');
+        setError('Failed to load captions - try refreshing the page.');
         setBusy('');
         setRebuildPercent(0);
         setProcessing(false);
@@ -1128,7 +813,7 @@ export function EditorPage() {
             if (attempt < 3) await new Promise((r) => setTimeout(r, 800 * attempt));
           }
         }
-        setError('Captions finished but failed to load — refresh the page');
+        setError('Captions finished but failed to load - refresh the page');
         setBusy('');
         setProcessing(false);
       })();
@@ -1163,12 +848,41 @@ export function EditorPage() {
       v.addEventListener('loadedmetadata', onLoadedMeta);
       v.load();
     };
+    // Text-behind-person matte progress (segmentation.service.ts).
+    const onMasksProgress = (p: { percent?: number }) => {
+      setMasks((m) => ({ ...m, status: 'running', error: undefined }));
+      if (typeof p.percent !== 'number') return;
+      setMasksPercent(p.percent);
+      // Remember when this render actually began so the panel can say how much
+      // longer, not just how far along. Anchored on the first progress event
+      // rather than the enqueue, because queue time is not render time.
+      if (p.percent > 0 && matteStartRef.current === null) {
+        matteStartRef.current = { at: Date.now(), percent: p.percent };
+      }
+      const s = matteStartRef.current;
+      if (s && p.percent > s.percent) {
+        const elapsed = Date.now() - s.at;
+        const done = p.percent - s.percent;
+        setMatteEtaSec(Math.round((elapsed / done) * (100 - p.percent) / 1000));
+      }
+    };
+    const onMasksDone = () => {
+      setMasks({ status: 'done' });
+      setMasksPercent(100);
+      matteStartRef.current = null;
+      setMatteEtaSec(null);
+    };
+    const onMasksError = (p: { message?: string }) =>
+      setMasks({ status: 'failed', error: p.message || 'Person matte failed' });
     s.on('translation:progress', onTranslate);
     s.on('captions:complete', onComplete);
     s.on('project:error', onProjError);
     s.on('stage:update', onStage);
     s.on('captions:partial', onPartial);
     s.on('video:preview-ready', onPreviewReady);
+    s.on('masks:progress', onMasksProgress);
+    s.on('masks:done', onMasksDone);
+    s.on('masks:error', onMasksError);
     return () => {
       s.off('translation:progress', onTranslate);
       s.off('captions:complete', onComplete);
@@ -1176,6 +890,9 @@ export function EditorPage() {
       s.off('stage:update', onStage);
       s.off('captions:partial', onPartial);
       s.off('video:preview-ready', onPreviewReady);
+      s.off('masks:progress', onMasksProgress);
+      s.off('masks:done', onMasksDone);
+      s.off('masks:error', onMasksError);
     };
   }, [id, receivePartialChunk, reloadFinalCaptions, setPipelineStage]);
 
@@ -1241,6 +958,26 @@ export function EditorPage() {
     joinProjectRoom(id);
     void api.get(`/projects/${id}`).then(async (r) => {
       setProjectName(r.data.project.name || 'Project');
+      // An audio-only upload's filePath is the audio track — nothing the server can render.
+      const serverVideo = r.data.project.video;
+      serverHasSourceRef.current =
+        Boolean(serverVideo?.filePath) && serverVideo?.kind !== 'audio';
+      if (serverVideo?.kind === 'audio') {
+        void getSourceFile(id)
+          .then((file) =>
+            setMissingSource(
+              file
+                ? null
+                : {
+                    size: Number(serverVideo.originalSize) || 0,
+                    durations: [serverVideo.originalDuration, serverVideo.duration]
+                      .map(Number)
+                      .filter((d) => d > 0),
+                  },
+            ),
+          )
+          .catch(() => undefined);
+      }
       if (r.data.project.video?.duration) setDuration(r.data.project.video.duration);
       // Display size from upload probe (rotation-aware) — sizes the canvas
       // before the <video> element finishes loading metadata.
@@ -1252,6 +989,7 @@ export function EditorPage() {
       }
       const savedStyle = r.data.project.style || {};
       const settings = r.data.project.settings;
+      if (r.data.project.masks?.status) setMasks(r.data.project.masks as MasksState);
       const rawBg = (savedStyle.backgroundColor as string) || 'rgba(0,0,0,0)';
       // Strip legacy opaque black caption boxes; keep white pill / custom fills.
       const isLegacyBlackBox =
@@ -1306,6 +1044,10 @@ export function EditorPage() {
       if (settings) {
         setOutputLanguage(settings.outputLanguage || 'keep_original');
       }
+      spokenLanguageRef.current = {
+        chosen: settings?.sourceLanguage,
+        detected: r.data.project.transcription?.language,
+      };
       // Freshly uploaded project, never transcribed — show the Prepare Your
       // Media popup so the user can pick languages and start transcription.
       const status = r.data.project.status as string;
@@ -1319,6 +1061,10 @@ export function EditorPage() {
         beginGeneration();
         setProcessing(true);
         if (r.data.project.stage) setPipelineStage(r.data.project.stage);
+      } else if (caps.length === 0 && ['ready', 'done', 'partial_error'].includes(status)) {
+        // Finished while this page was closed (the one-shot captions:complete
+        // event was missed): load the server's copy of the captions.
+        void reloadFinalCaptions();
       } else {
         setCaptions(caps);
       }
@@ -1329,9 +1075,9 @@ export function EditorPage() {
       // from "still loading," discoverable only via an unhandled rejection
       // in the console.
       console.error('Failed to load project', err);
-      setError('Failed to load this project — it may have been deleted, or try refreshing.');
+      setError('Failed to load this project - it may have been deleted, or try refreshing.');
     });
-  }, [id, setCaptions, setPipelineStage, beginGeneration]);
+  }, [id, setCaptions, setPipelineStage, beginGeneration, reloadFinalCaptions]);
 
   useEffect(() => {
     if (didSeekToCaption.current || !captions.length) return;
@@ -1832,19 +1578,28 @@ export function EditorPage() {
     void api.patch(`/projects/${id}/style`, next).catch(() => undefined);
   }
 
-  /** Regenerate captions from the transcript — only needed for language changes. */
-  async function rebuild() {
+  /**
+   * Rebuild the captions. `retranscribe` false rebuilds them from the
+   * transcript the server already has — no transcription, nothing to pay for —
+   * which is what a project whose captions are missing from this device needs;
+   * true re-transcribes the audio (a language change, or no transcript left).
+   */
+  async function rebuild(retranscribe = true) {
     setBusy('rebuild');
     setError('');
     setHasFailedChunks(false);
+    setCanRestoreCaptions(false);
     setRebuildPercent(0);
     beginGeneration();
     setProcessing(true);
-    setPipelineStage({ current: 'extracting', percent: 0, message: 'Starting full re-transcription…' });
+    setPipelineStage({
+      current: retranscribe ? 'extracting' : 'translating',
+      percent: 0,
+      message: retranscribe ? 'Starting full re-transcription…' : 'Rebuilding captions from the transcript…',
+    });
     didSeekToCaption.current = false;
     try {
-      // Full Whisper re-transcription so captions cover the whole video.
-      await api.post(`/projects/${id}/rebuild`, { outputLanguage, retranscribe: true });
+      await api.post(`/projects/${id}/rebuild`, { outputLanguage, retranscribe });
     } catch (e: unknown) {
       setError(
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -1924,7 +1679,7 @@ export function EditorPage() {
       // wrong.
       void upsertOne(projectId, updated).catch((err) => {
         console.error('Failed to save word style', err);
-        setError('Failed to save style change — it may not persist after reload.');
+        setError('Failed to save style change - it may not persist after reload.');
       });
     }, 450);
   }
@@ -1937,13 +1692,93 @@ export function EditorPage() {
   }
 
   /**
+   * Text-behind-person toggle. The server flips style.behindPerson and, the
+   * first time it's turned on, renders the person matte in the background
+   * (progress arrives over the masks:* socket events above).
+   */
+  async function toggleBehindPerson(enabled: boolean) {
+    if (!id) return;
+    setStyle((s) => ({ ...s, behindPerson: enabled }));
+    setError('');
+    // The person cut-out runs on this device — in the preview (MediaPipe) and
+    // in the on-device export (lib/export/personMatte.ts) — so only the
+    // setting needs saving. A server render builds its own matte when it runs.
+    try {
+      await api.patch(`/projects/${id}/style`, { behindPerson: enabled });
+    } catch (e: unknown) {
+      setStyle((s) => ({ ...s, behindPerson: !enabled }));
+      const data = (e as { response?: { data?: { message?: string } } })?.response?.data;
+      setError(data?.message || 'Could not update text behind person');
+    }
+  }
+
+  /**
+   * The matte is actually being built right now — 'queued' before the worker
+   * picks it up, 'running' once frames are flowing. Anything else (idle, done,
+   * failed) is a sentence, not a bar.
+   */
+  const matteBusy: 'queued' | 'running' | null =
+    masks.status === 'queued' || masks.status === 'running' ? masks.status : null;
+
+  /** "about 40s left" / "about 2m left" — only once the estimate is worth showing. */
+  const matteEtaLabel = (() => {
+    if (matteEtaSec === null || matteEtaSec < 2) return '';
+    return matteEtaSec < 90
+      ? `- about ${matteEtaSec}s left`
+      : `- about ${Math.round(matteEtaSec / 60)}m left`;
+  })();
+
+  const masksHint = (() => {
+    if (!style.behindPerson) {
+      return 'Cuts the video around the person so captions sit behind them. Only the stretches where a phrase sits behind the person are processed.';
+    }
+    switch (masks.status) {
+      case 'queued':
+        return 'Preparing the person matte - queued…';
+      case 'running':
+        return `Preparing the person matte… ${masksPercent}%`;
+      case 'done':
+        return 'Matte ready. The preview cut-out is approximate; the export uses the high-quality matte.';
+      case 'failed':
+        return `Matte failed: ${masks.error || 'unknown error'}. Export again, or turn the toggle off and on, to retry.`;
+      default:
+        return 'Preparing the person matte…';
+    }
+  })();
+
+  /** Current value of one Blockbuster knob, falling back to the authored default. */
+  function kineticParam(key: keyof KineticParams): number {
+    const v = style.kinetic?.[key];
+    return typeof v === 'number' && Number.isFinite(v) ? v : KINETIC_PARAM_DEFAULTS[key];
+  }
+
+  /**
+   * Update the Blockbuster knobs (`null` = back to the authored look). The
+   * preview follows immediately; the PATCH is debounced because range inputs
+   * fire on every pixel of a drag.
+   */
+  function setKineticParams(patch: Partial<KineticParams> | null) {
+    const kinetic: KineticParams = patch
+      ? { ...KINETIC_PARAM_DEFAULTS, ...(styleRef.current.kinetic ?? {}), ...patch }
+      : { ...KINETIC_PARAM_DEFAULTS };
+    setStyle((s) => ({ ...s, kinetic }));
+    if (kineticSaveTimer.current) window.clearTimeout(kineticSaveTimer.current);
+    kineticSaveTimer.current = window.setTimeout(() => {
+      void api.patch(`/projects/${id}/style`, { kinetic }).catch((err) => {
+        console.error('Failed to save kinetic style', err);
+        setError('Failed to save style change - it may not persist after reload.');
+      });
+    }, 450);
+  }
+
+  /**
    * Commit a whole-chunk drag-resize and/or reposition from the video
    * overlay: either just the caption(s) behind the resized/moved display
    * block ("Current Preset"), or every caption in the project ("Apply To All").
    */
   async function handleChunkStyleCommit(
     caption: DisplayCaption,
-    patch: { sizeScale?: number; offsetX?: number; offsetY?: number },
+    patch: { sizeScale?: number; offsetX?: number; offsetY?: number; behindPerson?: boolean | null },
     scope: 'chunk' | 'all',
   ) {
     if (!id) return;
@@ -1962,6 +1797,25 @@ export function EditorPage() {
     );
   }
 
+  /**
+   * Push one phrase behind the speaker, or pull it back in front.
+   *
+   * Stored per caption as a tri-state: null follows the project's
+   * style.behindPerson, true/false override it. That mirrors how sizeScale and
+   * offsetX/offsetY already work, so an untouched chunk keeps behaving exactly
+   * as it did before this control existed. The export turns the same values
+   * into ffmpeg `enable=` windows (behindPersonRanges in export.service.ts).
+   */
+  async function setChunkBehindPerson(captionId: string, value: boolean | null) {
+    if (!id) return;
+    const updated = captions.map((c) => (c._id === captionId ? { ...c, behindPerson: value } : c));
+    setCaptions(updated);
+    const target = updated.find((c) => c._id === captionId);
+    if (target) await upsertOne(id, target);
+    // Nothing to request from the server: the cut-out for this phrase is
+    // computed on this device, in the preview and in the on-device export.
+  }
+
   const openExportModal = useCallback(() => setShowExport(true), []);
   const closeExportModal = useCallback(() => {
     const wasRendering = exportStatus === 'rendering';
@@ -1970,8 +1824,19 @@ export function EditorPage() {
     setExportStatus('idle');
     setExportPercent(0);
     setExportError('');
-    // Actually stop the server/ffmpeg job — closing the panel is Cancel.
-    if (wasRendering && id) {
+    setExportWarning('');
+    setExportDetail('');
+    // Actually stop the render — closing the panel is Cancel.
+    const attachUpload = attachUploadRef.current;
+    if (attachUpload) {
+      // Still uploading the video for a cloud render — nothing is rendering yet.
+      attachUploadRef.current = null;
+      attachUpload.abort();
+    } else if (wasRendering && prepareAbortRef.current) {
+      prepareAbortRef.current.abort();
+    } else if (wasRendering && deviceExportRef.current) {
+      deviceExportRef.current.cancel();
+    } else if (wasRendering && id) {
       void api.post(`/projects/${id}/export/cancel`).catch(() => undefined);
     }
   }, [exportStatus, id]);
@@ -1996,10 +1861,198 @@ export function EditorPage() {
     return () => useEditorChromeStore.getState().clearChrome();
   }, [openExportModal, downloadSrt]);
 
+  /**
+   * Render on this device (WebCodecs worker). Returns 'done' or 'stop' when
+   * the export is settled, 'retry' when the render failed in a way another
+   * attempt on this device can fix, 'fallback' only when the admin turned
+   * device exports off. A failed device render no longer moves to the server
+   * (see the commented block in the catch below). Plan errors from the
+   * authorize call are rethrown so the caller shows the pricing popup.
+   */
+  async function renderOnDevice(
+    route: Extract<ExportRoute, { path: 'device' }>,
+    styleSnap: StyleState,
+    attempt = 1,
+  ): Promise<'done' | 'stop' | 'retry' | 'fallback'> {
+    if (!id) return 'stop';
+    setExportWhere('device');
+    setExportDetail('Checking your plan…');
+    try {
+      await authorizeDeviceExport(id, {
+        quality: exportQuality,
+        format: exportFormat,
+        template: styleSnap.template,
+        width: route.width,
+        height: route.height,
+      });
+    } catch (err) {
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (code === 'CLIENT_EXPORT_DISABLED') {
+        setExportWhere('server');
+        return 'fallback';
+      }
+      throw err;
+    }
+
+    await evictOldExportsIfNeeded(80).catch(() => 0);
+    const exportId = crypto.randomUUID();
+    const prepare = new AbortController();
+    prepareAbortRef.current = prepare;
+    let handle: DeviceExportHandle | null = null;
+    // Keep a phone awake for the render, and warn before the tab is closed.
+    type WakeLock = { release(): Promise<void> };
+    const wakeLock = await (navigator as unknown as { wakeLock?: { request(type: 'screen'): Promise<WakeLock> } })
+      .wakeLock?.request('screen')
+      .catch(() => null);
+    const warnBeforeLeaving = (ev: BeforeUnloadEvent) => {
+      ev.preventDefault();
+      ev.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    try {
+      // Non-kinetic templates first measure the preview's own caption layout
+      // in this document (a few seconds for a long video).
+      const job = await buildDeviceExportJob({
+        exportId,
+        source: route.source,
+        width: route.width,
+        height: route.height,
+        durationSec: route.durationSec,
+        format: exportFormat,
+        style: styleSnap,
+        captions,
+        frameRate: exportFrameRate,
+        signal: prepare.signal,
+        onPrepare: (done, total) => {
+          setExportDetail(`Preparing captions… ${done}/${total}`);
+          setExportPercent(Math.round((done / Math.max(1, total)) * 3));
+        },
+      }).catch((err) => {
+        throw prepare.signal.aborted
+          ? new DeviceExportError('CANCELLED', 'Export cancelled')
+          : new DeviceExportError('FAILED', `Couldn’t prepare the captions: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      if (prepareAbortRef.current === prepare) prepareAbortRef.current = null;
+      const startedAt = performance.now();
+      handle = startDeviceExport(job, (p) => {
+        setExportPercent(Math.max(0, Math.min(99, Math.round(p.percent))));
+        setExportDetail(describeDeviceProgress(p, startedAt));
+      });
+      deviceExportRef.current = handle;
+      const result = await handle.promise;
+      const meta = { quality: exportQuality, format: exportFormat, template: styleSnap.template };
+      const language = captionLanguageLabel(
+        spokenLanguageRef.current.chosen,
+        spokenLanguageRef.current.detected,
+        outputLanguage,
+      );
+      await saveDeviceExportRecord({ id: exportId, projectId: id, title: projectName, ...meta, result, language }).catch(
+        (err) => console.warn('[export] could not list the render in Recent exports', err),
+      );
+      try {
+        await completeDeviceExport(id, result, { ...meta, templateKey: styleSnap.templateKey });
+        serverHasSourceRef.current = false;
+      } catch (err) {
+        // The file is fine and on this device; only the bookkeeping missed.
+        console.warn('[export] server did not record the finished render', err);
+      }
+      setSavedAs('');
+      setDeviceResult({
+        id: exportId,
+        opfsPath: result.outputPath,
+        fileName: exportFileName(projectName, exportQuality, exportFormat),
+        renderMs: result.renderMs,
+        sizeBytes: result.sizeBytes,
+      });
+      if (route.notes.length) setExportWarning(route.notes.join(' '));
+      setExportDetail('');
+      setExportPercent(100);
+      setExportStatus('done');
+      return 'done';
+    } catch (err) {
+      const e = err instanceof DeviceExportError ? err : new DeviceExportError('FAILED', String(err));
+      if (e.code === 'CANCELLED') {
+        void reportDeviceExportFailure(id, { code: e.code, message: e.message, fallback: false });
+        return 'stop';
+      }
+      console.warn(`[export] on-device render failed (${e.code}, attempt ${attempt})`, e.message);
+      // Awaited: a retry re-authorizes, and a late failure report would mark
+      // that new render as failed on the server.
+      await reportDeviceExportFailure(id, { code: e.code, message: e.message, fallback: false }).catch(() => undefined);
+      setExportDetail('');
+      setExportPercent(0);
+
+      // SERVER FALLBACK (disabled): a failed device render used to continue on
+      // the server, uploading this device's copy of the video first
+      // (startExport). Kept for reference; re-enable by restoring these lines
+      // and the 'fallback' handling in startExport.
+      //   setExportWhere('server');
+      //   return 'fallback';
+
+      // Retrying can't fix a full disk or a video this browser can't decode.
+      const retryable = e.code !== 'STORAGE' && e.code !== 'UNSUPPORTED';
+      if (retryable && attempt < DEVICE_RENDER_ATTEMPTS) return 'retry';
+      setExportStatus('error');
+      setExportError(
+        e.code === 'STORAGE'
+          ? 'Not enough free storage to save the video. Delete some videos from Recent Videos and try again.'
+          : e.code === 'UNSUPPORTED'
+            ? 'This browser can’t export this video. Try the latest Chrome or Edge on a computer.'
+            : 'Export failed. Please try again.',
+      );
+      return 'stop';
+    } finally {
+      window.removeEventListener('beforeunload', warnBeforeLeaving);
+      void wakeLock?.release().catch(() => undefined);
+      if (prepareAbortRef.current === prepare) prepareAbortRef.current = null;
+      if (handle && deviceExportRef.current === handle) deviceExportRef.current = null;
+    }
+  }
+
+  /** "Locate file" on an audio-only project: accept the original only if it matches, keep it on this device. */
+  async function locateOriginal(file: File) {
+    if (!id || !missingSource) return;
+    setLocateBusy(true);
+    setLocateError('');
+    try {
+      const probe = await probeMediaFile(file);
+      if (!probe?.hasVideo) {
+        setLocateError('That file isn’t a video this browser can read.');
+        return;
+      }
+      const sizeOk =
+        !missingSource.size || Math.abs(file.size - missingSource.size) <= missingSource.size * 0.01;
+      const durationOk =
+        !missingSource.durations.length ||
+        missingSource.durations.some((d) => Math.abs(probe.duration - d) <= 0.5);
+      if (!sizeOk || !durationOk) {
+        const expected = [
+          missingSource.size ? formatBytes(missingSource.size) : '',
+          missingSource.durations.length ? formatSeconds(missingSource.durations[0]) : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        setLocateError(`That doesn’t look like the original video${expected ? ` (expected ${expected})` : ''}.`);
+        return;
+      }
+      await storeSourceFile(id, file, probe);
+      setMissingSource(null);
+      setVideoSourceKey((k) => k + 1);
+    } catch (err) {
+      setLocateError(err instanceof Error ? err.message : 'Couldn’t load that file');
+    } finally {
+      setLocateBusy(false);
+    }
+  }
+
   async function startExport() {
     setExportError('');
+    setExportWarning('');
     setExportPercent(0);
     setExportStatus('rendering');
+    setExportDetail('');
+    setDeviceResult(null);
+    setExportWhere(null);
     try {
       const live = styleRef.current;
       const aspectForBurn =
@@ -2024,6 +2077,10 @@ export function EditorPage() {
         aspectRatio: aspectForBurn,
         displayMode: live.displayMode || 'phrase',
         displayWords: Number(live.displayWords) || 5,
+        kinetic: live.kinetic,
+        behindPerson: !!live.behindPerson,
+        // Older projects saved no key: match the look to a card ("" = custom look).
+        templateKey: matchTemplateKey(live) ?? '',
       };
       // Mirror live editor rules only — do NOT inflate fontSize/weight here
       // (that made burn-in look different from the preview the user approved).
@@ -2051,12 +2108,78 @@ export function EditorPage() {
           emphasis: c.emphasis,
           wordStyles: c.wordStyles,
           sizeScale: c.sizeScale,
+          behindPerson: c.behindPerson ?? null,
           offsetX: c.offsetX,
           offsetY: c.offsetY,
         }));
       // Always persist + send concrete aspect (9:16 / 16:9) — never "original".
       setStyle((s) => ({ ...s, aspectRatio: aspectForBurn }));
       await api.patch(`/projects/${id}/style`, styleSnap);
+
+      const route = await chooseExportRoute({
+        projectId: id!,
+        clientExportEnabled: flags.clientExportEnabled,
+        serverHasSource: serverHasSourceRef.current,
+        style: styleSnap,
+        captions,
+        quality: exportQuality,
+        format: exportFormat,
+        fallbackDims: savedVideoDims.current
+          ? { width: savedVideoDims.current.w, height: savedVideoDims.current.h }
+          : undefined,
+      });
+      console.info('[export] route:', route.path, route.path === 'device' ? `${route.width}x${route.height}` : route.reason);
+      if (route.path === 'device') {
+        // Failed renders retry on this device instead of moving to the server.
+        let outcome = await renderOnDevice(route, styleSnap, 1);
+        for (let attempt = 2; outcome === 'retry' && attempt <= DEVICE_RENDER_ATTEMPTS; attempt++) {
+          setExportDetail('Retrying…');
+          outcome = await renderOnDevice(route, styleSnap, attempt);
+        }
+        // Only the admin switch (CLIENT_EXPORT_DISABLED) still continues on the server.
+        if (outcome !== 'fallback') return;
+      } else if (route.path === 'none') {
+        setExportStatus('error');
+        setExportError(
+          'The original video file is needed to export this project. Use “Locate file” above the preview, or upload the video again.',
+        );
+        return;
+      }
+
+      // A failed or handed-over device render continues on the server, which
+      // may first need this device's copy of the video.
+      const uploadFirst =
+        route.path === 'server' ? route.uploadFirst : serverHasSourceRef.current ? undefined : route.source;
+      if (uploadFirst) {
+        // The server has no copy of the video (audio-only upload, or released
+        // after an export) — send this device's copy before it can render.
+        const upload = new AbortController();
+        attachUploadRef.current = upload;
+        const uploading = (pct: number) => `Preparing export… ${pct}%`;
+        setExportDetail(uploading(0));
+        try {
+          await uploadVideoToProject(
+            id!,
+            uploadFirst,
+            (p) => {
+              setExportPercent(p.percent);
+              setExportDetail(uploading(p.percent));
+            },
+            upload.signal,
+          );
+        } catch (err) {
+          // Cancel closed and reset the modal already.
+          if (upload.signal.aborted) return;
+          throw err;
+        } finally {
+          if (attachUploadRef.current === upload) attachUploadRef.current = null;
+        }
+        serverHasSourceRef.current = true;
+        setExportPercent(0);
+        setExportDetail('');
+      }
+
+      setExportWhere('server');
       await api.post(`/projects/${id}/export`, {
         quality: exportQuality,
         format: exportFormat,
@@ -2084,6 +2207,18 @@ export function EditorPage() {
     if (!id) return;
     setDownloading(true);
     setDownloadError('');
+    if (deviceResult) {
+      try {
+        await downloadLocalFile(deviceResult.opfsPath, deviceResult.fileName);
+        setSavedAs(deviceResult.fileName);
+        void markExportDownloaded(deviceResult.id, deviceResult.fileName).catch(() => undefined);
+      } catch (err) {
+        setDownloadError(err instanceof Error ? err.message : 'Download failed - try again');
+      } finally {
+        setDownloading(false);
+      }
+      return;
+    }
     try {
       // Cheap JSON check first — a plain navigation (below) can't report a
       // JSON error back to this code, so if the export record already
@@ -2091,7 +2226,7 @@ export function EditorPage() {
       // browser a JSON error file instead of the video with no feedback.
       const { data } = await api.get(`/projects/${id}`);
       if (data.project?.export?.status !== 'done') {
-        throw new Error('Export is no longer available — render again');
+        throw new Error('Export is no longer available - render again');
       }
       // Hand the actual (often tens-of-MB) transfer to the browser's native
       // download manager via a direct navigation instead of buffering the
@@ -2109,7 +2244,7 @@ export function EditorPage() {
       a.remove();
     } catch (err) {
       console.error('Video download failed', err);
-      setDownloadError(err instanceof Error ? err.message : 'Download failed — try again');
+      setDownloadError(err instanceof Error ? err.message : 'Download failed - try again');
     } finally {
       setDownloading(false);
     }
@@ -2123,6 +2258,11 @@ export function EditorPage() {
           {hasFailedChunks && (
             <button type="button" className="btn ghost" disabled={!!busy} onClick={() => void retryChunks()}>
               Retry failed parts
+            </button>
+          )}
+          {canRestoreCaptions && !hasFailedChunks && (
+            <button type="button" className="btn ghost" disabled={!!busy} onClick={() => void rebuild(false)}>
+              Restore captions
             </button>
           )}
         </div>
@@ -2399,6 +2539,109 @@ export function EditorPage() {
                     </select>
                   </label>
                 </div>
+                {isKineticTemplate(style.template) && (
+                  <div className="props-section">
+                    <h4 className="props-heading">Kinetic</h4>
+                    <label className="props-field props-toggle">
+                      <span>Text behind person</span>
+                      <input
+                        type="checkbox"
+                        checked={!!style.behindPerson}
+                        onChange={(e) => void toggleBehindPerson(e.target.checked)}
+                      />
+                    </label>
+                    {/* Building the matte takes about a minute a clip, and
+                        without a bar it reads as a hang. Same widget the
+                        export uses, so the two feel like one thing. */}
+                    {matteBusy && (
+                      <div className="export-progress">
+                        <div className="progress-bar thin">
+                          <div style={{ width: `${matteBusy === 'queued' ? 0 : masksPercent}%` }} />
+                        </div>
+                        <span className="muted tiny">
+                          {matteBusy === 'queued'
+                            ? 'Preparing the person matte - queued…'
+                            : `Preparing the person matte… ${masksPercent}%${matteEtaLabel}`}
+                        </span>
+                      </div>
+                    )}
+                    {!matteBusy && <p className="muted tiny">{masksHint}</p>}
+                    <p className="muted tiny">
+                      This sets the default for every phrase. Each row in the Phrases list has its
+                      own Behind/Front button, so you can send just one phrase behind the speaker
+                      without turning it on everywhere.
+                    </p>
+                    {style.template === 'blockbuster' && (
+                      <>
+                    <h4 className="props-heading">Blockbuster</h4>
+                    <label className="props-field">
+                      <span>
+                        Glow <span className="gold-value">{Math.round(kineticParam('glow') * 100)}%</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={200}
+                        step={5}
+                        value={Math.round(kineticParam('glow') * 100)}
+                        onChange={(e) => setKineticParams({ glow: Number(e.target.value) / 100 })}
+                      />
+                    </label>
+                    <label className="props-field">
+                      <span>
+                        Letter spacing{' '}
+                        <span className="gold-value">{Math.round(kineticParam('letterSpacing') * 100)}</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={-5}
+                        max={30}
+                        step={1}
+                        value={Math.round(kineticParam('letterSpacing') * 100)}
+                        onChange={(e) =>
+                          setKineticParams({ letterSpacing: Number(e.target.value) / 100 })
+                        }
+                      />
+                    </label>
+                    <label className="props-field">
+                      <span>
+                        Tilt <span className="gold-value">{kineticParam('tilt')}°</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={-20}
+                        max={20}
+                        step={0.5}
+                        value={kineticParam('tilt')}
+                        onChange={(e) => setKineticParams({ tilt: Number(e.target.value) })}
+                      />
+                    </label>
+                    <label className="props-field">
+                      <span>
+                        Script size{' '}
+                        <span className="gold-value">{Math.round(kineticParam('scriptScale') * 100)}%</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={50}
+                        max={200}
+                        step={5}
+                        value={Math.round(kineticParam('scriptScale') * 100)}
+                        onChange={(e) =>
+                          setKineticParams({ scriptScale: Number(e.target.value) / 100 })
+                        }
+                      />
+                    </label>
+                    <button type="button" className="btn ghost full" onClick={() => setKineticParams(null)}>
+                      Reset to template
+                    </button>
+                    <p className="muted tiny">
+                      Color sets the script line; Highlight color sets the heading and its glow.
+                    </p>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="props-section">
                   <button type="button" className="btn primary full" onClick={() => void saveStyle()}>
                     Save Style
@@ -2412,7 +2655,7 @@ export function EditorPage() {
             <>
               <div className="panel-header">
                 <h3>Templates</h3>
-                <span className="panel-count">{UNIFIED_TEMPLATES.length} unique</span>
+                <span className="panel-count">{templateCards.length} unique</span>
               </div>
               <div className="panel-scroll">
                 <div className="templates-head">
@@ -2420,7 +2663,7 @@ export function EditorPage() {
                   {/* <span className="muted tiny">Each style has a clear job · instant</span> */}
                 </div>
                 <div className="templates-list">
-                  {UNIFIED_TEMPLATES.map((t) => {
+                  {templateCards.map((t) => {
                     const isActive =
                       style.displayMode === t.preset.displayMode &&
                       style.template === t.preset.template &&
@@ -2429,50 +2672,12 @@ export function EditorPage() {
                       (style.highlightColor || '').toUpperCase() ===
                         (t.preset.highlightColor || '').toUpperCase();
                     return (
-                      <button
+                      <TemplateCard
                         key={t.key}
-                        type="button"
-                        className={`display-card ${isActive ? 'active' : ''}`}
-                        title={`${t.name} — ${t.purpose}`}
-                        onClick={() => applyDisplay(t.preset)}
-                      >
-                        <span
-                          className="display-stage"
-                          style={{
-                            fontFamily: t.preset.fontFamily,
-                            ['--cap-hl' as string]: t.preset.highlightColor,
-                          }}
-                        >
-                          {t.tag && <span className="display-badge">{t.tag}</span>}
-                          {isActive && (
-                            <span className="display-check" aria-hidden>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                <circle cx="12" cy="12" r="11" fill="currentColor" />
-                                <path
-                                  d="M7.5 12.5 10.5 15.5 16.5 9"
-                                  stroke="#222222"
-                                  strokeWidth="2.2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </span>
-                          )}
-                          <UnifiedPreview t={t} />
-                        </span>
-                        <span className="display-meta">
-                          <span className="display-name-block">
-                            <span className="display-name">{t.name}</span>
-                            <span className="display-purpose">{t.purpose}</span>
-                          </span>
-                          {isActive ? (
-                            <span className="template-active">Active</span>
-                          ) : (
-                            <span className="template-apply">Apply</span>
-                          )}
-                        </span>
-                        <span className="display-desc">{t.desc}</span>
-                      </button>
+                        t={t}
+                        isActive={isActive}
+                        onApply={() => applyDisplay({ ...t.preset, templateKey: t.key })}
+                      />
                     );
                   })}
                 </div>
@@ -2498,7 +2703,7 @@ export function EditorPage() {
                     <p className="muted tiny">{duration ? `${formatClock(duration)} · source video` : 'Source video'}</p>
                   </div>
                 </div>
-                <p className="muted tiny">Secure stream — authenticated with your session token.</p>
+                <p className="muted tiny">Secure stream - authenticated with your session token.</p>
               </div>
             </>
           )}
@@ -2552,6 +2757,11 @@ export function EditorPage() {
             <video
               ref={videoRef}
               playsInline
+              // CORS-readable with the auth cookie, so the text-behind-person
+              // preview can read its pixels (MediaPipe) without tainting the
+              // canvas. The API already answers with credentialed CORS headers
+              // for every route (cors({ credentials: true }) in server/index.ts).
+              crossOrigin="use-credentials"
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onLoadedMetadata={(e) => {
@@ -2569,7 +2779,29 @@ export function EditorPage() {
                 }
               }}
             />
-            <AuthenticatedVideo id={id!} videoRef={videoRef} />
+            <AuthenticatedVideo key={videoSourceKey} id={id!} videoRef={videoRef} />
+            {missingSource && (
+              <div className="warn-banner local-source-banner" role="status">
+                <span>
+                  The original video file isn’t loaded. Locate it to preview and export this project.
+                </span>
+                <label className={`btn${locateBusy ? ' is-busy' : ''}`}>
+                  {locateBusy ? 'Checking…' : 'Locate file'}
+                  <input
+                    type="file"
+                    accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.flv"
+                    hidden
+                    disabled={locateBusy}
+                    onChange={(e) => {
+                      const picked = e.target.files?.[0];
+                      e.target.value = '';
+                      if (picked) void locateOriginal(picked);
+                    }}
+                  />
+                </label>
+                {locateError && <span className="local-source-error">{locateError}</span>}
+              </div>
+            )}
             {(processing || busy === 'rebuild') && (
               <ProcessingOverlay
                 stage={
@@ -2602,9 +2834,12 @@ export function EditorPage() {
                 <KineticCaptionLayer
                   captions={displayCaptions}
                   videoRef={videoRef}
+                  template={style.template}
                   color={style.color}
                   highlightColor={style.highlightColor}
                   fontSize={style.fontSize}
+                  params={style.kinetic}
+                  behindPerson={!!style.behindPerson}
                   onChunkStyleCommit={handleChunkStyleCommit}
                 />
               ) : (
@@ -2772,6 +3007,35 @@ export function EditorPage() {
                         {formatClock(c.start)} → {formatClock(c.end)}
                       </span>
                       <span className="phrase-count">{words.length} words</span>
+                      {isKineticTemplate(style.template) &&
+                        (() => {
+                          // Effective depth: the chunk's own choice, else the
+                          // project default. Shown for every phrase regardless
+                          // of that default — this button IS how you send one
+                          // phrase behind the speaker.
+                          const behind = c.behindPerson ?? !!style.behindPerson;
+                          return (
+                            <button
+                              type="button"
+                              className={`chunk-depth ${behind ? 'behind' : 'front'}`}
+                              title={
+                                behind
+                                  ? 'This phrase is drawn BEHIND the speaker. Click to bring it in front.'
+                                  : 'This phrase is drawn IN FRONT of the speaker. Click to send it behind.'
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!c._id) return;
+                                // Explicit true/false, never null: with the
+                                // project default off, "behind" has to mean
+                                // behind rather than "inherit, i.e. front".
+                                void setChunkBehindPerson(c._id, !behind);
+                              }}
+                            >
+                              {behind ? '⬤ Behind' : '○ Front'}
+                            </button>
+                          );
+                        })()}
                     </div>
                     {editingText ? (
                       <input
@@ -2883,7 +3147,7 @@ export function EditorPage() {
                   <button
                     type="button"
                     className={`phrase-btn role ${selRole === 'small' ? 'active support' : ''}`}
-                    title="Support — same large size as Hero, plain white (italic)"
+                    title="Support - same large size as Hero, plain white (italic)"
                     onClick={() =>
                       void setWordRole(
                         dockCaption,
@@ -3062,11 +3326,11 @@ export function EditorPage() {
                   onChange={(e) => setExportQuality(e.target.value as typeof exportQuality)}
                   disabled={exportStatus === 'rendering'}
                 >
-                  <option value="720p">720p — HD</option>
-                  <option value="1080p">1080p — Full HD</option>
-                  <option value="2K">2K — 1440p</option>
+                  <option value="720p">720p - HD</option>
+                  <option value="1080p">1080p - Full HD</option>
+                  <option value="2K">2K - 1440p</option>
                   {/* Admin toggles this via System > Flags > 4K export enabled */}
-                  {flags.export4kEnabled && <option value="4K">4K — 2160p</option>}
+                  {flags.export4kEnabled && <option value="4K">4K - 2160p</option>}
                 </select>
               </label>
               <label className="props-field">
@@ -3076,28 +3340,70 @@ export function EditorPage() {
                   onChange={(e) => setExportFormat(e.target.value as typeof exportFormat)}
                   disabled={exportStatus === 'rendering'}
                 >
-                  <option value="mp4">MP4 (H.264) — recommended</option>
+                  <option value="mp4">MP4 (H.264) - recommended</option>
                   <option value="webm">WebM (VP9)</option>
+                </select>
+              </label>
+              <label className="props-field">
+                Frame rate
+                <select
+                  value={exportFrameRate}
+                  onChange={(e) => setExportFrameRate(e.target.value as typeof exportFrameRate)}
+                  disabled={exportStatus === 'rendering'}
+                >
+                  <option value="fast">30 FPS - Faster Export</option>
+                  <option value="original">60 FPS - Slower Export</option>
                 </select>
               </label>
               <p className="muted tiny">
                 Captions are burned into the video with your current template and word styles.
               </p>
 
+              {/* The matte has to finish before an export with text-behind-person
+                  can run. Showing its progress HERE is the point: this is where
+                  someone waits, and a bare "still being prepared" gives no idea
+                  whether that means seconds or an hour. */}
+              {matteBusy && exportStatus !== 'rendering' && (
+                <div className="export-progress">
+                  <div className="progress-bar thin">
+                    <div style={{ width: `${matteBusy === 'queued' ? 0 : masksPercent}%` }} />
+                  </div>
+                  <span className="muted tiny">
+                    {matteBusy === 'queued'
+                      ? 'Preparing the person matte - queued…'
+                      : `Preparing the person matte… ${masksPercent}%${matteEtaLabel}. Export once it finishes.`}
+                  </span>
+                </div>
+              )}
+
               {exportStatus === 'rendering' && (
                 <div className="export-progress">
                   <div className="progress-bar">
                     <div style={{ width: `${exportPercent}%` }} />
                   </div>
-                  <span className="muted tiny">Rendering… {exportPercent}%</span>
+                  <span className="muted tiny">
+                    {exportWhere === 'server' && !exportDetail
+                      ? `Rendering… ${exportPercent}%`
+                      : exportDetail || (exportWhere ? `Rendering… ${exportPercent}%` : 'Preparing…')}
+                  </span>
                 </div>
               )}
 
               {exportStatus === 'error' && <div className="error-banner">{exportError}</div>}
 
+              {/* The render still succeeded — a note, not a failure. */}
+              {exportWarning && exportStatus !== 'error' && (
+                <div className="warn-banner">{exportWarning}</div>
+              )}
+
               {exportStatus === 'done' && (
                 <div className="export-done">
                   <span className="gold-value">Render complete!</span>
+                  <span className="muted tiny">
+                    {deviceResult
+                      ? `Rendered in ${formatSeconds(deviceResult.renderMs / 1000)} · ${formatBytes(deviceResult.sizeBytes)} · also saved under Recent exports`
+                      : 'Your video is ready.'}
+                  </span>
                   <button
                     type="button"
                     className="btn primary full"
@@ -3106,6 +3412,11 @@ export function EditorPage() {
                   >
                     {downloading ? 'Downloading…' : `Download ${exportQuality} ${exportFormat.toUpperCase()}`}
                   </button>
+                  {savedAs && (
+                    <span className="export-saved-path" title={`Downloads/${savedAs}`}>
+                      Saved to <strong>Downloads</strong> › {savedAs}
+                    </span>
+                  )}
                   {downloadError && <div className="error-banner">{downloadError}</div>}
                 </div>
               )}
@@ -3187,7 +3498,7 @@ const TimelineBlocks = memo(function TimelineBlocks({
               left: c.start * pps + 1,
               width: Math.max(30, (c.end - c.start) * pps - 3),
             }}
-            title={editing ? undefined : `${c.text} — double-click to edit`}
+            title={editing ? undefined : `${c.text} - double-click to edit`}
             onClick={(e) => {
               e.stopPropagation();
               if (!editing) onSeek(c.start);
@@ -3234,9 +3545,49 @@ function AuthenticatedVideo({
   videoRef: React.RefObject<HTMLVideoElement | null>;
 }) {
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.src = `${API_URL}/api/projects/${id}/video`;
-    }
+    const v = videoRef.current;
+    if (!v) return;
+    const serverSrc = `${API_URL}/api/projects/${id}/video`;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    // A source kept on this device (localMedia.ts / OPFS) plays straight from
+    // disk — no streaming, no auth cookie, and it keeps working after the
+    // server's copy is deleted. The server stream stays the fallback: projects
+    // uploaded on another device, a cleared OPFS, or a codec this browser
+    // cannot play (the server transcodes a preview for those — onPreviewReady).
+    const streamFromServer = () => {
+      if (!cancelled && v.src !== serverSrc) v.src = serverSrc;
+    };
+    const dropLocal = () => {
+      v.removeEventListener('error', onLocalError);
+      v.removeEventListener('loadedmetadata', onLocalMetadata);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+    };
+    const onLocalError = () => {
+      // The file is here but this engine cannot open it — hand over.
+      dropLocal();
+      streamFromServer();
+    };
+    const onLocalMetadata = () => {
+      // Metadata loaded but no decodable video track (HEVC without hardware
+      // support plays audio only, silently, with videoWidth 0) — hand over.
+      if (v.videoWidth === 0) onLocalError();
+    };
+    void getSourceFile(id)
+      .then((file) => {
+        if (cancelled) return;
+        if (!file) return streamFromServer();
+        objectUrl = URL.createObjectURL(file);
+        v.addEventListener('error', onLocalError);
+        v.addEventListener('loadedmetadata', onLocalMetadata);
+        v.src = objectUrl;
+      })
+      .catch(streamFromServer);
+    return () => {
+      cancelled = true;
+      dropLocal();
+    };
   }, [id, videoRef]);
   return null;
 }

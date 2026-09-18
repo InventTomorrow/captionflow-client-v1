@@ -1,10 +1,15 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
+import type { TemplateLayout } from '../lib/templateCatalog';
 
 export interface AppFlags {
   projectsListEnabled: boolean;
   export4kEnabled: boolean;
   exportsEnabled: boolean;
+  /** Render exports in the browser (WebCodecs) when the device can; off = always the server. */
+  clientExportEnabled: boolean;
+  /** Send only the audio track for transcription; the video stays on the device. */
+  audioOnlyUploadEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
 }
@@ -26,6 +31,8 @@ const DEFAULT_FLAGS: AppFlags = {
   projectsListEnabled: false,
   export4kEnabled: true,
   exportsEnabled: true,
+  clientExportEnabled: true,
+  audioOnlyUploadEnabled: true,
   maintenanceMode: false,
   maintenanceMessage: '',
 };
@@ -44,8 +51,12 @@ interface FlagsState {
   flags: AppFlags;
   launchOffer: LaunchOffer;
   bankTransfer: BankTransferDetails;
+  /** Template picker order from Admin → Templates; null = the catalog's default order. */
+  templateLayout: TemplateLayout | null;
   loaded: boolean;
   load: () => Promise<void>;
+  /** Re-read after an admin saves (the store otherwise loads once per visit). */
+  reload: () => Promise<void>;
 }
 
 /**
@@ -58,19 +69,32 @@ export const useFlagsStore = create<FlagsState>((set, get) => ({
   flags: DEFAULT_FLAGS,
   launchOffer: DEFAULT_LAUNCH_OFFER,
   bankTransfer: DEFAULT_BANK_TRANSFER,
+  templateLayout: null,
   loaded: false,
   async load() {
     if (get().loaded) return;
+    await get().reload();
+  },
+  async reload() {
     try {
       const { data } = await api.get('/billing/flags');
       set({
         flags: { ...DEFAULT_FLAGS, ...data.flags },
         launchOffer: { ...DEFAULT_LAUNCH_OFFER, ...data.launchOffer },
         bankTransfer: { ...DEFAULT_BANK_TRANSFER, ...data.bankTransfer },
+        templateLayout: data.templateLayout ?? null,
         loaded: true,
       });
     } catch {
-      set({ flags: DEFAULT_FLAGS, launchOffer: DEFAULT_LAUNCH_OFFER, bankTransfer: DEFAULT_BANK_TRANSFER, loaded: true });
+      // A failed re-read keeps what was loaded; a failed first read uses defaults.
+      if (get().loaded) return;
+      set({
+        flags: DEFAULT_FLAGS,
+        launchOffer: DEFAULT_LAUNCH_OFFER,
+        bankTransfer: DEFAULT_BANK_TRANSFER,
+        templateLayout: null,
+        loaded: true,
+      });
     }
   },
 }));

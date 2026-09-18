@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
+import { AdminSelect } from '../../components/admin/AdminSelect';
+
+/** Slug of the free trial's plan record (server TRIAL_PLAN_SLUG). The free trial is not a plan. */
+const TRIAL_PLAN_SLUG = 'starter';
+
+const QUALITY_OPTIONS = [
+  { value: '720p', label: '720p' },
+  { value: '1080p', label: '1080p' },
+  { value: '2K', label: '2K' },
+  { value: '4K', label: '4K' },
+];
 
 type Plan = {
   _id: string;
@@ -119,12 +130,16 @@ export function AdminPlansPage() {
     await load();
   }
 
+  const trial = plans.find((p) => p.slug === TRIAL_PLAN_SLUG);
+  const paidPlans = plans.filter((p) => p.slug !== TRIAL_PLAN_SLUG);
+  const editingTrial = editing?.slug === TRIAL_PLAN_SLUG && Boolean(editing._id);
+
   return (
     <div className="admin-page">
       <div className="admin-page-head">
         <div>
           <h1>Packages</h1>
-          <p className="muted">Free / Creator / Studio and custom plans</p>
+          <p className="muted">Plans people buy or are given. The free trial is not a plan - its limits are below.</p>
         </div>
         {isAdmin && (
           <button
@@ -150,6 +165,23 @@ export function AdminPlansPage() {
       {msg && <div className="admin-success">{msg}</div>}
       {error && <div className="error-banner">{error}</div>}
 
+      {trial && (
+        <section className="admin-card admin-trial-card">
+          <div>
+            <h2>Free trial</h2>
+            <p className="muted">
+              Every new account starts here. {trial.limits.minutesPerMonth} caption minutes, up to{' '}
+              {trial.limits.maxExportQuality}, export {trial.limits.exportEnabled === false ? 'off' : 'on'}.
+            </p>
+          </div>
+          {isAdmin && (
+            <button type="button" className="btn ghost" onClick={() => openEditor(trial)}>
+              Edit trial limits
+            </button>
+          )}
+        </section>
+      )}
+
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -167,7 +199,7 @@ export function AdminPlansPage() {
             </tr>
           </thead>
           <tbody>
-            {plans.map((p) => (
+            {paidPlans.map((p) => (
               <tr key={p._id}>
                 <td>{p.name}</td>
                 <td>{p.slug}</td>
@@ -176,7 +208,7 @@ export function AdminPlansPage() {
                 <td>{p.limits.minutesPerMonth}</td>
                 <td>{p.limits.maxExportQuality}</td>
                 <td>{p.limits.exportEnabled === false ? 'Disabled' : 'Yes'}</td>
-                <td>{p.discountActive && p.discountPercent ? `${p.discountPercent}% off` : '—'}</td>
+                <td>{p.discountActive && p.discountPercent ? `${p.discountPercent}% off` : '-'}</td>
                 <td>{p.isActive ? 'Yes' : 'No'}</td>
                 <td className="admin-actions">
                   {isAdmin && (
@@ -200,7 +232,7 @@ export function AdminPlansPage() {
 
       {editing && isAdmin && (
         <div className="admin-card" style={{ marginTop: '1.25rem' }}>
-          <h2>{editing._id ? 'Edit plan' : 'New plan'}</h2>
+          <h2>{editingTrial ? 'Edit free trial' : editing._id ? 'Edit plan' : 'New plan'}</h2>
           {!editing._id && (
             <label>
               Slug
@@ -225,22 +257,26 @@ export function AdminPlansPage() {
             />
           </label>
           <div className="admin-inline">
-            <label>
-              Monthly PKR
-              <input
-                type="number"
-                value={editing.priceMonthlyPkr ?? 0}
-                onChange={(e) => setEditing({ ...editing, priceMonthlyPkr: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Yearly PKR
-              <input
-                type="number"
-                value={editing.priceYearlyPkr ?? 0}
-                onChange={(e) => setEditing({ ...editing, priceYearlyPkr: Number(e.target.value) })}
-              />
-            </label>
+            {!editingTrial && (
+              <>
+                <label>
+                  Monthly PKR
+                  <input
+                    type="number"
+                    value={editing.priceMonthlyPkr ?? 0}
+                    onChange={(e) => setEditing({ ...editing, priceMonthlyPkr: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  Yearly PKR
+                  <input
+                    type="number"
+                    value={editing.priceYearlyPkr ?? 0}
+                    onChange={(e) => setEditing({ ...editing, priceYearlyPkr: Number(e.target.value) })}
+                  />
+                </label>
+              </>
+            )}
             <label>
               Minutes / month
               <input
@@ -254,23 +290,20 @@ export function AdminPlansPage() {
                 }
               />
             </label>
-            <label>
-              Max quality
-              <select
+            <div className="admin-field">
+              <span>Max quality</span>
+              <AdminSelect
+                ariaLabel="Max quality"
                 value={editing.limits?.maxExportQuality || '1080p'}
-                onChange={(e) =>
+                options={QUALITY_OPTIONS}
+                onChange={(maxExportQuality) =>
                   setEditing({
                     ...editing,
-                    limits: { ...emptyLimits, ...editing.limits!, maxExportQuality: e.target.value },
+                    limits: { ...emptyLimits, ...editing.limits!, maxExportQuality },
                   })
                 }
-              >
-                <option value="720p">720p</option>
-                <option value="1080p">1080p</option>
-                <option value="2K">2K</option>
-                <option value="4K">4K</option>
-              </select>
-            </label>
+              />
+            </div>
           </div>
           <label className="admin-check">
             <input
@@ -286,7 +319,7 @@ export function AdminPlansPage() {
             Export enabled on this plan
           </label>
           <label>
-            Features (one per line — shown as checklist bullets)
+            Features (one per line - shown as checklist bullets)
             <textarea
               rows={4}
               value={(editing.features || []).join('\n')}
@@ -295,48 +328,52 @@ export function AdminPlansPage() {
               }
             />
           </label>
-          <div className="admin-inline">
-            <label className="admin-check">
-              <input
-                type="checkbox"
-                checked={Boolean(editing.isOneTime)}
-                onChange={(e) => setEditing({ ...editing, isOneTime: e.target.checked })}
-              />
-              One-time pass (not a recurring subscription)
-            </label>
-            {editing.isOneTime && (
-              <label>
-                Duration (days)
-                <input
-                  type="number"
-                  value={editing.durationDays ?? 3}
-                  onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })}
-                />
-              </label>
-            )}
-          </div>
-          <div className="admin-inline">
-            <label className="admin-check">
-              <input
-                type="checkbox"
-                checked={Boolean(editing.discountActive)}
-                onChange={(e) => setEditing({ ...editing, discountActive: e.target.checked })}
-              />
-              Discount active
-            </label>
-            {editing.discountActive && (
-              <label>
-                Discount %
-                <input
-                  type="number"
-                  min={0}
-                  max={95}
-                  value={editing.discountPercent ?? 0}
-                  onChange={(e) => setEditing({ ...editing, discountPercent: Number(e.target.value) })}
-                />
-              </label>
-            )}
-          </div>
+          {!editingTrial && (
+            <>
+              <div className="admin-inline">
+                <label className="admin-check">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editing.isOneTime)}
+                    onChange={(e) => setEditing({ ...editing, isOneTime: e.target.checked })}
+                  />
+                  One-time pass (not a recurring subscription)
+                </label>
+                {editing.isOneTime && (
+                  <label>
+                    Duration (days)
+                    <input
+                      type="number"
+                      value={editing.durationDays ?? 3}
+                      onChange={(e) => setEditing({ ...editing, durationDays: Number(e.target.value) })}
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="admin-inline">
+                <label className="admin-check">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editing.discountActive)}
+                    onChange={(e) => setEditing({ ...editing, discountActive: e.target.checked })}
+                  />
+                  Discount active
+                </label>
+                {editing.discountActive && (
+                  <label>
+                    Discount %
+                    <input
+                      type="number"
+                      min={0}
+                      max={95}
+                      value={editing.discountPercent ?? 0}
+                      onChange={(e) => setEditing({ ...editing, discountPercent: Number(e.target.value) })}
+                    />
+                  </label>
+                )}
+              </div>
+            </>
+          )}
           <div className="admin-actions">
             <button type="button" className="btn primary" onClick={() => void save()}>
               Save

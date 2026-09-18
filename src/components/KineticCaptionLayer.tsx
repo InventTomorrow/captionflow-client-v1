@@ -31,7 +31,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import type { DisplayCaption } from '../lib/displayCaptions';
-import type { KineticCaptionInput, KineticComposition } from '../lib/kinetic/engine';
+import type {
+  KineticCaptionInput,
+  KineticComposition,
+  KineticParams,
+  KineticTemplateId,
+} from '../lib/kinetic/engine';
 import {
   KINETIC_BASE_FONT_SIZE,
   activeKineticScenes,
@@ -45,6 +50,8 @@ import {
   setupKineticCanvas,
   type KineticFontSet,
 } from '../lib/kinetic/browser';
+// The segmenter module (MediaPipe) is imported only once text behind person is on.
+import type { PersonSegmenter } from '../lib/kinetic/segmenter';
 
 /** Same lead the DOM overlay uses, so kinetic captions land on the same beat. */
 const LEAD = 0.09;
@@ -52,12 +59,26 @@ const LEAD = 0.09;
 interface Props {
   captions: DisplayCaption[];
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** style.template — which kinetic template's looks to draw. */
+  template: KineticTemplateId;
   /** style.color — the plain letter colour. */
   color: string;
   /** style.highlightColor — the accent. */
   highlightColor: string;
   /** style.fontSize — interpreted relative to KINETIC_BASE_FONT_SIZE. */
   fontSize: number;
+  /** style.kinetic — the Text panel's per-template knobs (Blockbuster). */
+  params?: KineticParams;
+  /**
+   * style.behindPerson — cut the person out of the footage (MediaPipe, an
+   * approximation of the export's matte) and draw them back over the captions.
+   * Needs the <video> to be CORS-readable (crossOrigin="use-credentials").
+   *
+   * This is the project DEFAULT. Any caption may override it with its own
+   * `behindPerson`, so the cut-out is gated per chunk, matching the `enable=`
+   * windows the export builds (behindPersonRanges in export.service.ts).
+   */
+  behindPerson?: boolean;
   /**
    * Persist a dragged chunk position. Same callback the DOM overlay uses, so a
    * kinetic caption's offsetX/offsetY travels the identical path to IndexedDB
@@ -73,9 +94,12 @@ interface Props {
 export default function KineticCaptionLayer({
   captions,
   videoRef,
+  template,
   color,
   highlightColor,
   fontSize,
+  params,
+  behindPerson = false,
   onChunkStyleCommit,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -87,19 +111,66 @@ export default function KineticCaptionLayer({
   const [renderScale, setRenderScale] = useState(1);
   const [frame, setFrame] = useState({ W: 1920, H: 1080 });
 
+  /* -- 0. Person segmenter (text behind person) --------------------------- *
+   * Loaded only once the toggle is on. Read through refs by the draw loop so
+   * flipping the toggle never re-subscribes the rAF. */
+  const [segmenter, setSegmenter] = useState<PersonSegmenter | null>(null);
+  const [segmenterError, setSegmenterError] = useState<string | null>(null);
+  const segmenterRef = useRef<PersonSegmenter | null>(null);
+  const cutoutRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Any caption that resolves to "behind" means the effect is in use, even
+  // when the project default is off — one opted-in chunk is enough to need
+  // the segmenter loaded.
+  const anyBehind = useMemo(
+    () => captions.some((c) => (c.behindPerson ?? behindPerson) === true),
+    [captions, behindPerson],
+  );
+  segmenterRef.current = anyBehind ? segmenter : null;
+
+  /**
+   * The windows where the speaker is drawn OVER the captions, mirroring the
+   * export's `enable=` ranges. Padded the same way and for the same reason:
+   * a chunk still fading out must not have the speaker pop in front of it.
+   */
+  const behindRangesRef = useRef<Array<[number, number]>>([]);
+  behindRangesRef.current = useMemo(() => {
+    const on = captions.filter((c) => (c.behindPerson ?? behindPerson) === true);
+    if (on.length === captions.length && captions.length > 0) return [[-Infinity, Infinity]];
+    return on.map((c) => [c.start - 0.25, c.end + 0.6] as [number, number]);
+  }, [captions, behindPerson]);
+
+  useEffect(() => {
+    if (!anyBehind) return;
+    let cancelled = false;
+    setSegmenterError(null);
+    void import('../lib/kinetic/segmenter')
+      .then((m) => m.loadPersonSegmenter())
+      .then((s) => {
+        if (!cancelled) setSegmenter(s);
+      })
+      .catch((err) => {
+        if (!cancelled) setSegmenterError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [anyBehind]);
+
   /* -- 1. Font gate ------------------------------------------------------ *
    * Canvas will happily draw in a fallback face without telling you, and the
    * metrics cache would then be built from the wrong font. Nothing is measured
    * or drawn until every face the looks need is confirmed. */
   useEffect(() => {
     let cancelled = false;
-    void loadKineticFonts().then((set) => {
+    setFonts(null);
+    void loadKineticFonts(template).then((set) => {
       if (!cancelled) setFonts(set);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [template]);
 
   /* -- 2. Track the painted frame size ----------------------------------- *
    * Only the ASPECT of `frame` affects layout (the engine is normalised); the
@@ -142,8 +213,12 @@ export default function KineticCaptionLayer({
     [captions],
   );
 
+  // Knobs are compared by value for the same reason as captions above.
+  const paramsKey = JSON.stringify(params ?? {});
+
   useEffect(() => {
-    if (!fonts) return;
+    // A font set belongs to one template; never lay out with another's faces.
+    if (!fonts || fonts.template !== template) return;
     const input: KineticCaptionInput[] = captions.map((c, i) => ({
       sequence: c.sequence ?? i,
       start: c.start,
@@ -157,6 +232,7 @@ export default function KineticCaptionLayer({
 
     try {
       compRef.current = buildKineticComposition({
+        template,
         captions: input,
         accentColor: highlightColor || '#FFC43D',
         baseColor: color || '#FFFFFF',
@@ -164,15 +240,21 @@ export default function KineticCaptionLayer({
         metricsFor: fonts.metricsFor,
         fontFor: fonts.fontFor,
         fontScale: (fontSize || KINETIC_BASE_FONT_SIZE) / KINETIC_BASE_FONT_SIZE,
+        params,
       });
+      if (import.meta.env.DEV) {
+        // Compare with the server's "Kinetic frame source ready" log line:
+        // equal per-face fingerprints prove both sides measured the same fonts.
+        console.debug('[kinetic] fingerprints', template, compRef.current.fingerprints);
+      }
     } catch (err) {
       console.error('[kinetic] build failed:', err);
       compRef.current = null;
     }
-    // `captions` and `frame` are read but intentionally tracked by content /
-    // aspect rather than identity.
+    // `captions`, `params` and `frame` are read but intentionally tracked by
+    // content / aspect rather than identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fonts, captionsKey, color, highlightColor, fontSize, frame.W, frame.H]);
+  }, [fonts, template, captionsKey, paramsKey, color, highlightColor, fontSize, frame.W, frame.H]);
 
   /* -- 4. Draw loop ------------------------------------------------------ *
    * Reads video.currentTime directly every frame and never sets React state —
@@ -188,8 +270,45 @@ export default function KineticCaptionLayer({
       try {
         const comp = compRef.current;
         if (!comp) return;
-        const t = (videoRef.current?.currentTime ?? 0) + LEAD;
+        const video = videoRef.current;
+        const t = (video?.currentTime ?? 0) + LEAD;
         renderKineticFrame(ctx, comp, { timeSec: t });
+
+        // Text behind person: the footage, kept only where the mask says
+        // "person", drawn back on top of the captions. Same compositing the
+        // export does with ffmpeg's alphamerge — only the mask's quality differs.
+        const seg = segmenterRef.current;
+        // Only inside this chunk's window — outside it the captions stay on
+        // top, which is exactly what the export's `enable=` gate does.
+        const behindNow =
+          seg != null &&
+          behindRangesRef.current.some(([a, b]) => t >= a && t <= b);
+        if (seg && video && behindNow) {
+          const mask = seg.maskFor(video);
+          if (mask) {
+            const cw = canvas.width;
+            const ch = canvas.height;
+            let cut = cutoutRef.current;
+            if (!cut) {
+              cut = document.createElement('canvas');
+              cutoutRef.current = cut;
+            }
+            if (cut.width !== cw || cut.height !== ch) {
+              cut.width = cw;
+              cut.height = ch;
+            }
+            const cctx = cut.getContext('2d');
+            if (cctx) {
+              cctx.globalCompositeOperation = 'source-over';
+              cctx.clearRect(0, 0, cw, ch);
+              cctx.drawImage(video, 0, 0, cw, ch);
+              cctx.globalCompositeOperation = 'destination-in';
+              cctx.drawImage(mask, 0, 0, cw, ch);
+              // The main context is scaled to frame units (setupKineticCanvas).
+              (ctx as unknown as CanvasRenderingContext2D).drawImage(cut, 0, 0, frame.W, frame.H);
+            }
+          }
+        }
       } catch {
         /* skip a bad frame rather than killing the loop */
       }
@@ -283,8 +402,17 @@ export default function KineticCaptionLayer({
       />
       {missing.length > 0 && (
         <div className="kinetic-font-warning">
-          {missing.map((s) => s.family).join(' and ')} did not load — the preview is drawing in a
+          {missing.map((s) => s.family).join(' and ')} did not load - the preview is drawing in a
           fallback face, so letter spacing will not match your export.
+        </div>
+      )}
+      {anyBehind && !segmenter && !segmenterError && (
+        <div className="kinetic-layer-note">Preparing preview mask…</div>
+      )}
+      {anyBehind && segmenterError && (
+        <div className="kinetic-font-warning">
+          Preview cut-out unavailable ({segmenterError}) - the export will still put the text
+          behind the person.
         </div>
       )}
     </div>

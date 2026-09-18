@@ -28,7 +28,7 @@ export function ManualPaymentPanel({
   const whatsappHref =
     bankTransfer.whatsappNumber && selectedPlan
       ? `https://wa.me/${bankTransfer.whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-          `Hi, I've paid for the ${selectedPlan.name} — here's my payment proof.`,
+          `Hi, I've paid for the ${selectedPlan.name} - here's my payment proof.`,
         )}`
       : undefined;
 
@@ -62,7 +62,7 @@ export function ManualPaymentPanel({
               const discounted = discountedPrice(p.priceMonthlyPkr, p);
               return (
                 <option key={p.slug} value={p.slug}>
-                  {p.name} — PKR {(discounted ?? p.priceMonthlyPkr).toLocaleString()}
+                  {p.name} - PKR {(discounted ?? p.priceMonthlyPkr).toLocaleString()}
                   {p.isOneTime ? '' : '/mo'}
                 </option>
               );
@@ -82,7 +82,7 @@ export function ManualPaymentPanel({
           <div className="lp-payment-field" key={key}>
             <div className="lp-payment-field-text">
               <span className="lp-payment-field-label">{label}</span>
-              <span className="lp-payment-field-value">{value || '—'}</span>
+              <span className="lp-payment-field-value">{value || '-'}</span>
             </div>
             <button
               type="button"

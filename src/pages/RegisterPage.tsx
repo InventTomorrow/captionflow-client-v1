@@ -1,6 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { errorMessage } from '../lib/api';
+import { ArrowRightIcon, AuthBrand, PasswordInput } from '../components/AuthParts';
 
 function UserIcon() {
   return (
@@ -38,24 +40,6 @@ function MailIcon() {
   );
 }
 
-function LockIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
 function SpinnerIcon() {
   return (
     <svg className="auth-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -87,10 +71,7 @@ export function RegisterPage() {
       await register(name, email, password);
       navigate('/projects/upload');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Registration failed';
-      setError(msg);
+      setError(errorMessage(err, 'Registration failed'));
     } finally {
       setBusy(false);
     }
@@ -102,12 +83,7 @@ export function RegisterPage() {
       <div className="auth-orb" aria-hidden="true" />
 
       <section className="auth-card">
-        <div className="auth-brand">
-          <img src="/logo.png" alt="Asaan Caption" className="auth-brand-logo" />
-          <div className="auth-brand-text">
-            <p>Captions for long videos</p>
-          </div>
-        </div>
+        <AuthBrand />
 
         <div className="auth-heading">
           <h2>Create account</h2>
@@ -150,19 +126,15 @@ export function RegisterPage() {
 
           <div className="auth-field">
             <label htmlFor="register-password">Password</label>
-            <div className="auth-input-wrap">
-              <LockIcon />
-              <input
-                id="register-password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
+            <PasswordInput
+              id="register-password"
+              autoComplete="new-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
           </div>
 
           <button className="btn primary auth-submit" disabled={busy} type="submit">
@@ -172,7 +144,10 @@ export function RegisterPage() {
                 Creating…
               </>
             ) : (
-              'Create account'
+              <>
+                Create account
+                <ArrowRightIcon />
+              </>
             )}
           </button>
         </form>

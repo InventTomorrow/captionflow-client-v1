@@ -35,3 +35,7 @@ dist-ssr
 .env.*
 !.env.example
 .vercel
+
+# MediaPipe wasm runtime (~34 MB) — copied from node_modules on install by
+# scripts/copy-mediapipe.mjs. The small .tflite model next to it IS committed.
+public/mediapipe/wasm/

@@ -78,6 +78,7 @@ interface FlatWord {
   sizeScale?: number | null;
   offsetX?: number | null;
   offsetY?: number | null;
+  behindPerson?: boolean | null;
   sourceId?: string;
   sourceIndex: number;
 }
@@ -141,6 +142,7 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
         sizeScale: c.sizeScale,
         offsetX: c.offsetX,
         offsetY: c.offsetY,
+        behindPerson: c.behindPerson,
         sourceId: c._id,
         sourceIndex: i,
       });
@@ -165,6 +167,7 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
     sizeScale: first.sizeScale ?? null,
     offsetX: first.offsetX ?? null,
     offsetY: first.offsetY ?? null,
+    behindPerson: first.behindPerson ?? null,
     sourceId: singleSource ? first.sourceId : undefined,
     wordOffset: singleSource ? first.sourceIndex : undefined,
     sourceIds: Array.from(new Set(words.map((w) => w.sourceId).filter((id): id is string => !!id))),

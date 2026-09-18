@@ -44,13 +44,13 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: '2rem',
             textAlign: 'center',
             fontFamily: 'system-ui, sans-serif',
-            color: '#1a1a1a',
-            background: '#fafafa',
+            color: '#FFFFFF',
+            background: '#0B141E',
           }}
         >
           <h1 style={{ fontSize: '1.25rem', margin: 0 }}>Something went wrong</h1>
-          <p style={{ margin: 0, color: '#555', maxWidth: '32rem' }}>
-            The app hit an unexpected error and couldn't continue. Reloading usually fixes it — if
+          <p style={{ margin: 0, color: '#B6BBC7', maxWidth: '32rem' }}>
+            The app hit an unexpected error and couldn't continue. Reloading usually fixes it - if
             it keeps happening, let us know what you were doing when it broke.
           </p>
           <button
@@ -60,8 +60,9 @@ export class ErrorBoundary extends Component<Props, State> {
               padding: '0.6rem 1.4rem',
               borderRadius: '0.5rem',
               border: 'none',
-              background: '#111',
-              color: '#fff',
+              background: '#89E900',
+              color: '#0B141E',
+              fontWeight: 700,
               fontSize: '0.95rem',
               cursor: 'pointer',
             }}

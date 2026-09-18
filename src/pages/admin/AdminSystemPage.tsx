@@ -9,6 +9,8 @@ export function AdminSystemPage() {
     projectsListEnabled: false,
     export4kEnabled: true,
     exportsEnabled: true,
+    clientExportEnabled: true,
+    audioOnlyUploadEnabled: true,
     maintenanceMode: false,
     maintenanceMessage: '',
   });
@@ -70,6 +72,8 @@ export function AdminSystemPage() {
                   ['projectsListEnabled', 'Projects list enabled'],
                   ['exportsEnabled', 'Exports enabled (site-wide)'],
                   ['export4kEnabled', '4K export enabled'],
+                  ['clientExportEnabled', 'In-browser export (device renders; server is the fallback)'],
+                  ['audioOnlyUploadEnabled', 'Audio-only uploads (video stays on the device)'],
                   ['maintenanceMode', 'Maintenance mode'],
                 ] as const
               ).map(([key, label]) => (
@@ -102,7 +106,7 @@ export function AdminSystemPage() {
         <section className="admin-card">
           <h2>API cost assumptions</h2>
           <p className="muted">
-            Drives every cost/profit figure on the Analytics page — nothing is frozen at usage
+            Drives every cost/profit figure on the Analytics page - nothing is frozen at usage
             time, so correcting a rate here immediately corrects past totals too.
           </p>
           {!isAdmin ? (
@@ -110,7 +114,7 @@ export function AdminSystemPage() {
           ) : (
             <>
               <label>
-                Whisper — USD per minute of audio
+                Transcription (Deepgram) - USD per minute of audio
                 <input
                   type="number"
                   step="0.0001"
@@ -121,7 +125,7 @@ export function AdminSystemPage() {
                 />
               </label>
               <label>
-                GPT input — USD per 1,000 tokens
+                GPT input - USD per 1,000 tokens
                 <input
                   type="number"
                   step="0.00001"
@@ -132,7 +136,7 @@ export function AdminSystemPage() {
                 />
               </label>
               <label>
-                GPT output — USD per 1,000 tokens
+                GPT output - USD per 1,000 tokens
                 <input
                   type="number"
                   step="0.00001"
@@ -177,7 +181,7 @@ export function AdminSystemPage() {
                 <input
                   value={launchOffer.text}
                   onChange={(e) => setLaunchOffer({ ...launchOffer, text: e.target.value })}
-                  placeholder="Launch offer — get the Starter plan at 50% off. Offer ends today."
+                  placeholder="Launch offer - get the Starter plan at 50% off. Offer ends today."
                 />
               </label>
               <button type="button" className="btn primary" onClick={() => void save()}>

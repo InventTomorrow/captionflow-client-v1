@@ -7,15 +7,19 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node scripts/copy-mediapipe.mjs"
   },
   "dependencies": {
+    "@mediabunny/aac-encoder": "^1.56.3",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@tanstack/react-virtual": "^3.14.6",
     "axios": "^1.18.1",
     "dayjs": "^1.11.21",
     "framer-motion": "^12.42.2",
     "idb": "^8.0.3",
     "lucide-react": "^1.27.0",
+    "mediabunny": "^1.56.3",
     "react": "^19.2.7",
     "react-colorful": "^5.8.0",
     "react-dom": "^19.2.7",

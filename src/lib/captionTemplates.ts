@@ -34,7 +34,10 @@ export interface AntigravityCaptionTemplate {
   id: string;
   name: string;
   type?: 'word' | 'lines';
+  /** The single badge in the card's corner ("New", "Popular", …). */
   tag?: string;
+  /** Small pills under the name ("Kinetic", "Cinematic", …). */
+  tags?: string[];
   purpose: string;
   desc: string;
   style: {
@@ -187,7 +190,7 @@ export const TIKTOK_PILL: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Pill',
   purpose: 'UGC · clean social · captions over busy video',
-  desc: 'Black text on a white rounded pill — max two lines, centered.',
+  desc: 'Black text on a white rounded pill - max two lines, centered.',
   style: {
     fontFamily: 'Poppins',
     fontUrl: 'https://fonts.gstatic.com/s/poppins/v15/pxiByp8kv8JHgFVrLCz7V1tvFP-KUEg.ttf',
@@ -238,7 +241,7 @@ export const CLEAN_WHITE: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Minimal',
   purpose: 'Subtitles · quotes · minimal edits',
-  desc: 'Plain white captions — no border box, no highlight chrome.',
+  desc: 'Plain white captions - no border box, no highlight chrome.',
   style: {
     fontFamily: 'Bangers',
     fontUrl: 'https://fonts.gstatic.com/s/bangers/v13/FeVQS0BTqb0h60ACL5la2bxii28.ttf',
@@ -434,7 +437,7 @@ export const MIXED_STYLES_2: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Premium',
   purpose: 'Every sentence feels special · still content-worthy, never cartoonish',
-  desc: 'Eight refined rotating looks — grotesk, serif, technical, frosted, editorial, minimal, museum gold, broadcast — premium, not playful.',
+  desc: 'Eight refined rotating looks - grotesk, serif, technical, frosted, editorial, minimal, museum gold, broadcast - premium, not playful.',
   style: {
     fontFamily: 'Archivo Black',
     fontSize: 60,
@@ -474,7 +477,7 @@ export const CREATOR_YELLOW_BOX: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Trending',
   purpose: 'YouTube Shorts · high-retention talking-head',
-  desc: 'Bold black-on-yellow box captions — the most-copied high-view creator caption style.',
+  desc: 'Bold black-on-yellow box captions - the most-copied high-view creator caption style.',
   style: {
     fontFamily: 'Poppins',
     fontUrl: 'https://fonts.gstatic.com/s/poppins/v15/pxiByp8kv8JHgFVrLCz7V1tvFP-KUEg.ttf',
@@ -515,7 +518,7 @@ export const CINEMATIC_SUBTITLE: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Premium',
   purpose: 'Documentary · film · premium brand voiceover',
-  desc: 'Understated serif captions on a soft translucent bar — a premium, cinematic subtitle look.',
+  desc: 'Understated serif captions on a soft translucent bar - a premium, cinematic subtitle look.',
   style: {
     fontFamily: 'Lora',
     fontSize: 44,
@@ -555,7 +558,7 @@ export const BUBBLE_CANDY: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Playful',
   purpose: 'Lifestyle · comedy · beauty · vlogs',
-  desc: 'Bouncy bubble-font captions on a hot-pink box — playful and unmissable.',
+  desc: 'Bouncy bubble-font captions on a hot-pink box - playful and unmissable.',
   style: {
     fontFamily: 'Luckiest Guy',
     fontSize: 52,
@@ -849,7 +852,7 @@ export const ANIME_EDIT: AntigravityCaptionTemplate = {
   type: 'lines',
   tag: 'Kinetic',
   purpose: 'AMV / anime edits · hard cuts, slowmo',
-  desc: 'Per-letter kinetic typography that changes treatment every line — scatter, slam, chaos, neon and glitch.',
+  desc: 'Per-letter kinetic typography that changes treatment every line - scatter, slam, chaos, neon and glitch.',
   style: {
     fontFamily: 'Bebas Neue',
     fontSize: 64,
@@ -882,9 +885,279 @@ export const ANIME_EDIT: AntigravityCaptionTemplate = {
   },
 };
 
+/* ---------- Blockbuster (per-letter kinetic canvas) ----------
+ * The same engine as Anime Edit, drawing one fixed two-line look per caption:
+ * a heavy red condensed uppercase heading (glow, hard dark-red shadow, slight
+ * tilt) over a large white handwritten script line that overlaps its bottom
+ * edge. The last two words of a caption become the script line (the last one
+ * when the caption has three words or fewer) — see splitBlockbusterWords in
+ * lib/kinetic/engine.ts.
+ *
+ * `color` is the script line, `highlightColor` is the heading + its glow;
+ * fontSize is relative to KINETIC_BASE_FONT_SIZE like Anime Edit; the extra
+ * knobs (glow / letter spacing / tilt / script size) live in style.kinetic.
+ */
+
+export const BLOCKBUSTER: AntigravityCaptionTemplate = {
+  id: 'blockbuster',
+  name: 'Blockbuster',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Cinematic'],
+  purpose: 'Trailers · hooks · big reveals',
+  desc: 'Heavy red condensed heading with a glow and a hard shadow, over a big white handwritten punchline.',
+  style: {
+    fontFamily: 'Anton',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#FF1F1F',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#FF1F1F',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'blockbuster',
+    fontFamily: 'Anton',
+    fontSize: 64,
+    fontWeight: 400,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#FF1F1F',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 6,
+  },
+};
+
+
+/* ── "Living Inside It" — five takes on one three-row idea ─────────────────
+ * A small lead-in over two very large lines. Each card has its own face
+ * pairing, alignment and entry (LIVING_VARIANTS in lib/kinetic/engine.ts);
+ * the geometry lives in livingInsideLook there. The faces are pinned by the
+ * engine — fontFamily/fontWeight below only describe them for the Text panel.
+ * Each card is set as the design's HTML preview draws it (LIVING_VARIANTS).
+ * highlightColor paints the headline and color the second line; the presets
+ * below are the design's colours, and the lead-in keeps its design tint until
+ * either colour is changed. */
+
+export const LIVING_BLUE: AntigravityCaptionTemplate = {
+  id: 'livingBlue',
+  name: 'Living - Blue',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Editorial'],
+  purpose: 'Hooks · vlogs · statement openers',
+  desc: 'Electric blue headline over a solid white second line. Barlow Condensed at its heaviest - tight and loud, made for 9:16.',
+  style: {
+    fontFamily: 'Barlow Condensed',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'left',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#38BDF8',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#38BDF8',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'livingBlue',
+    fontFamily: 'Barlow Condensed',
+    fontSize: 64,
+    fontWeight: 900,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#38BDF8',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 7,
+  },
+};
+
+export const LIVING_TEAL: AntigravityCaptionTemplate = {
+  id: 'livingTeal',
+  name: 'Living - Teal',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Editorial'],
+  purpose: 'Hooks · vlogs · statement openers',
+  desc: 'Centred Montserrat block. A glowing teal word over a bold white line - calm authority for talking-head vlogs.',
+  style: {
+    fontFamily: 'Montserrat',
+    fontSize: 64,
+    color: '#FFFFFF',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#FFFFFF',
+    active: '#2DD4BF',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#2DD4BF',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'livingTeal',
+    fontFamily: 'Montserrat',
+    fontSize: 64,
+    fontWeight: 900,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#2DD4BF',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 7,
+  },
+};
+
+export const LIVING_ORANGE: AntigravityCaptionTemplate = {
+  id: 'livingOrange',
+  name: 'Living - Orange',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Editorial'],
+  purpose: 'Hooks · vlogs · statement openers',
+  desc: 'Right-aligned in the top corner. Warm caps lead-in, a glowing orange accent, a near-white closer - punchy drama.',
+  style: {
+    fontFamily: 'Oswald',
+    fontSize: 64,
+    color: '#F0F0F0',
+    align: 'right',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#F0F0F0',
+    active: '#F97316',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#F97316',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'livingOrange',
+    fontFamily: 'Oswald',
+    fontSize: 64,
+    fontWeight: 700,
+    color: '#F0F0F0',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#F97316',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 7,
+  },
+};
+
+export const LIVING_RED: AntigravityCaptionTemplate = {
+  id: 'livingRed',
+  name: 'Living - Red',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Editorial'],
+  purpose: 'Hooks · vlogs · statement openers',
+  desc: 'A huge editorial red serif under a faint italic lead-in, closed by tracked Bebas caps - maximum tension, minimum elements.',
+  style: {
+    fontFamily: 'Playfair Display',
+    fontSize: 64,
+    color: '#F5F5F5',
+    align: 'center',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#F5F5F5',
+    active: '#DC2626',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#DC2626',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'livingRed',
+    fontFamily: 'Playfair Display',
+    fontSize: 64,
+    fontWeight: 700,
+    color: '#F5F5F5',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#DC2626',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 7,
+  },
+};
+
+export const LIVING_PURPLE: AntigravityCaptionTemplate = {
+  id: 'livingPurple',
+  name: 'Living - Purple',
+  type: 'lines',
+  tag: 'New',
+  tags: ['Kinetic', 'Editorial'],
+  purpose: 'Hooks · vlogs · statement openers',
+  desc: 'Chunky Anton caps anchored bottom-left: a hollow purple outline over a solid lilac line - builds mystery from the bottom.',
+  style: {
+    fontFamily: 'Anton',
+    fontSize: 64,
+    color: '#D8B4FE',
+    align: 'left',
+    textTransform: 'none',
+    stroke: null,
+    shadow: null,
+  },
+  colors: {
+    appeared: '#D8B4FE',
+    active: '#A855F7',
+    activeFill: 'transparent',
+    background: 'transparent',
+    keyword: '#A855F7',
+  },
+  preset: {
+    displayMode: 'phrase',
+    template: 'livingPurple',
+    fontFamily: 'Anton',
+    fontSize: 64,
+    fontWeight: 400,
+    color: '#D8B4FE',
+    backgroundColor: 'rgba(0,0,0,0)',
+    highlightColor: '#A855F7',
+    activeFill: 'transparent',
+    textTransform: 'none',
+    animation: 'fade',
+    displayWords: 7,
+  },
+};
+
 export const CAPTION_TEMPLATES: AntigravityCaptionTemplate[] = [
   HERO_WORD_TEMPLATE,
   ANIME_EDIT,
+  BLOCKBUSTER,
+  LIVING_BLUE,
+  LIVING_TEAL,
+  LIVING_ORANGE,
+  LIVING_RED,
+  LIVING_PURPLE,
   MIXED_STYLES_2,
   CREATOR_YELLOW_BOX,
   CINEMATIC_SUBTITLE,
@@ -908,6 +1181,7 @@ export const ANTIGRAVITY_UNIFIED_TEMPLATES = CAPTION_TEMPLATES.map((t) => ({
   key: t.id,
   name: t.name,
   tag: t.tag,
+  tags: t.tags,
   purpose: t.purpose,
   desc: t.desc,
   preset: t.preset,

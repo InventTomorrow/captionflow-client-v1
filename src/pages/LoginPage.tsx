@@ -1,6 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { errorMessage } from '../lib/api';
+import { ArrowRightIcon, AuthBrand, PasswordInput } from '../components/AuthParts';
 
 function MailIcon() {
   return (
@@ -16,24 +18,6 @@ function MailIcon() {
     >
       <path d="m22 7-8.991 5.667a2 2 0 0 1-2.009 0L2 7" />
       <rect x="2" y="4" width="20" height="16" rx="3" />
-    </svg>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
@@ -69,10 +53,7 @@ export function LoginPage() {
       const role = useAuthStore.getState().user?.role;
       navigate(role === 'admin' || role === 'support' ? '/admin' : '/projects/upload');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Login failed';
-      setError(msg);
+      setError(errorMessage(err, 'Login failed'));
     } finally {
       setBusy(false);
     }
@@ -84,12 +65,7 @@ export function LoginPage() {
       <div className="auth-orb" aria-hidden="true" />
 
       <section className="auth-card">
-        <div className="auth-brand">
-          <img src="/logo.png" alt="Asaan Caption" className="auth-brand-logo" />
-          <div className="auth-brand-text">
-            <p>Captions for long videos</p>
-          </div>
-        </div>
+        <AuthBrand />
 
         <div className="auth-heading">
           <h2>Welcome back</h2>
@@ -116,20 +92,21 @@ export function LoginPage() {
           </div>
 
           <div className="auth-field">
-            <label htmlFor="login-password">Password</label>
-            <div className="auth-input-wrap">
-              <LockIcon />
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
+            <div className="auth-label-row">
+              <label htmlFor="login-password">Password</label>
+              <Link to="/forgot-password" className="auth-forgot">
+                Forgot password?
+              </Link>
             </div>
+            <PasswordInput
+              id="login-password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
           </div>
 
           <button className="btn primary auth-submit" disabled={busy} type="submit">
@@ -139,7 +116,10 @@ export function LoginPage() {
                 Signing in…
               </>
             ) : (
-              'Sign in'
+              <>
+                Sign in
+                <ArrowRightIcon />
+              </>
             )}
           </button>
         </form>

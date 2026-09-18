@@ -79,7 +79,7 @@ export function PricingCards({
   return (
     <div className="lp-grid-3 lp-pricing-grid">
       {plans === null && <p className="muted">Loading plans…</p>}
-      {plans?.length === 0 && <p className="muted">Pricing isn&apos;t configured yet — check back soon.</p>}
+      {plans?.length === 0 && <p className="muted">Pricing isn&apos;t configured yet - check back soon.</p>}
       {plans?.map((p) => {
         const featured = p.slug === featuredSlug;
         const monthlyFree = p.priceMonthlyPkr <= 0;

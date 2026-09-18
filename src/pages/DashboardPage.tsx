@@ -80,7 +80,7 @@ export function DashboardPage() {
             <div>
               <strong>{p.name}</strong>
               <div className="muted">
-                {p.status} · {p.video?.duration ? `${Math.round(p.video.duration / 60)} min` : '—'}
+                {p.status} · {p.video?.duration ? `${Math.round(p.video.duration / 60)} min` : '-'}
               </div>
             </div>
             <div className="row-actions">

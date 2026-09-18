@@ -1,8 +1,19 @@
-# Anime Edit — per-letter caption template
+# Kinetic templates — Anime Edit & Blockbuster (per-letter canvas)
 
-**One template** (`style.template === 'animeEdit'`, "Anime Edit" in the picker)
-where every letter is an independently positioned, rotated, sized and coloured
-object rather than a word in a line of text.
+Two picker cards share one per-letter canvas engine (`lib/kinetic/engine.ts`,
+`KINETIC_TEMPLATE_IDS`):
+
+- **Anime Edit** (`style.template === 'animeEdit'`) — five internal looks
+  intercut per caption. Described first and in most detail below.
+- **Blockbuster** (`style.template === 'blockbuster'`) — one fixed two-line
+  look: a heavy red condensed heading over a white handwritten script line.
+  See [Blockbuster](#blockbuster) at the end; everything about the contract,
+  fonts, export architecture, sizing and placement applies to it unchanged.
+
+Both draw every letter as an independently positioned, rotated, sized and
+coloured object rather than a word in a line of text.
+
+## Anime Edit
 
 It has **five internal looks**, and picks one per caption. That is the whole
 point: it replaces what an AMV editor does by hand — varying the treatment line
@@ -57,8 +68,9 @@ numbers for that to hold, so this template works differently:
 | The engine (synced copy) | `server/src/services/kinetic/engine.ts` |
 | Browser adapter (fonts, DPR, metrics) | [`client/src/lib/kinetic/browser.ts`](../lib/kinetic/browser.ts) |
 | Preview component | [`KineticCaptionLayer.tsx`](./KineticCaptionLayer.tsx) |
-| Export renderer | `server/src/services/kineticPng.service.ts` |
-| ffmpeg wiring | `server/src/services/export.service.ts` → `renderVideo`, `opts.kineticFrames` |
+| On-device export (default) | [`client/src/lib/export/export.worker.ts`](../lib/export/export.worker.ts) + [`workerFonts.ts`](../lib/export/workerFonts.ts) (fonts from `client/public/fonts/`) |
+| Server export (fallback) | `server/src/services/kineticPng.service.ts` |
+| ffmpeg wiring (fallback) | `server/src/services/export.service.ts` → `renderVideo`, `opts.kineticFrames` |
 | Accent word picking | `server/src/services/emphasis.service.ts` |
 
 `client/` and `server/` are separate git repos that deploy independently, so a
@@ -97,10 +109,17 @@ These layouts depend on a condensed display face; letting a user select Caveat
 or Noto Nastaliq would break them. Same principle as `KINETIC_FONT_FILES` in
 `captionPng.service.ts`.
 
-| Look | Family | File in `server/fonts/` | Weight |
-| --- | --- | --- | --- |
-| `scatteredStack`, `neonDisappear`, `letterChaos`, `impactSlam` | Bebas Neue | `BebasNeue-Regular.ttf` | 400 |
-| `glitchSplit` | Orbitron | `Orbitron-Bold.ttf` | 700 |
+Faces are named in `KINETIC_FACES`; each look's primary face is in
+`KINETIC_LOOK_FACES`, and a look that mixes faces names the second one on the
+letters themselves (`KineticLetter.face`). `facesForTemplate(id)` is what both
+renderers load up front.
+
+| Look | Face id | Family | File in `server/fonts/` | Weight |
+| --- | --- | --- | --- | --- |
+| `scatteredStack`, `neonDisappear`, `letterChaos`, `impactSlam` | `bebasNeue` | Bebas Neue | `BebasNeue-Regular.ttf` | 400 |
+| `glitchSplit` | `orbitron` | Orbitron | `Orbitron-Bold.ttf` | 700 |
+| `blockbuster` heading | `anton` | Anton | `Anton-Regular.ttf` | 400 |
+| `blockbuster` script line | `caveatBold` | Caveat | `Caveat-Bold.ttf` | 700 |
 
 Both are already bundled (`BUNDLED_FONT_FILES` + `download-fonts.mjs TARGETS`)
 and already `@import`ed in `client/src/index.css`. Because one project intercuts
@@ -123,9 +142,12 @@ built from the wrong font* — the "letters overlap or drift apart" bug.
 - Export: `registerKineticFace()` logs at **error** level if the TTF is missing.
 
 Every composition carries `fingerprints` — the measured width of
-`HAMBURGEFONTSIV` × 10000, per look. Both sides compute them; **if they differ,
+`HAMBURGEFONTSIV` × 10000, per face. Both sides compute them; **if they differ,
 the two are using different fonts and the export will not match.** Current
-values: Bebas Neue `58030`, Orbitron `118810`.
+values: `bebasNeue` `58030`, `orbitron` `118810`, `anton` `69917`,
+`caveatBold` `78330`. The preview logs its set to the console (`[kinetic]
+fingerprints`) and the export logs the server's in `Kinetic frame source
+ready`; `npm run test:parity` asserts they are equal.
 
 ## Colour
 
@@ -313,11 +335,15 @@ leaves the canvas.
 1. Edit **`client/src/lib/kinetic/engine.ts`** only.
 2. `cd server && npm run kinetic:sync`.
 3. To add a new LOOK: add it to `KINETIC_LOOK_NAMES`, give it an entry in
-   `KINETIC_TEMPLATES` and `KINETIC_FONTS`, and put it in a bucket in
-   `pickKineticLook` — otherwise it is defined but never chosen.
+   `KINETIC_TEMPLATES` and `KINETIC_LOOK_FACES` (and `KINETIC_FACES` if it
+   needs a new face), then either put it in a `pickKineticLook` bucket (Anime
+   Edit) or list it under a template id in `KINETIC_TEMPLATE_LOOKS` — otherwise
+   it is defined but never chosen. A look that needs user knobs reads them
+   from `params` (`KineticParams`, persisted as `style.kinetic`).
 
-   The template id `animeEdit` is already registered in the four places that
-   need it, and only changes if you rename the template:
+   To add a new TEMPLATE (a new picker card): add its id to
+   `KINETIC_TEMPLATE_IDS` + `KINETIC_TEMPLATE_LOOKS`, then register the id in
+   the four places below, exactly as `animeEdit` and `blockbuster` are:
    - `CaptionTemplate` union — `client/src/components/CaptionOverlay.tsx`
    - picker preset — `client/src/lib/captionTemplates.ts` (`ANIME_EDIT`)
    - Zod `styleSchema` — `server/src/controllers/project.controller.ts`
@@ -336,3 +362,171 @@ leaves the canvas.
      repeat count that should always be 0
    - `npx tsx src/scripts/_kinetic-preview.ts` — one frame per caption on a
      dark ground, named by look, for eyeballing
+
+   Every one of these takes `--template blockbuster` (default `animeEdit`).
+
+## Blockbuster
+
+`style.template === 'blockbuster'`, one look (`KINETIC_TEMPLATES.blockbuster`).
+It came from an external design spec (supplied with the feature request, not
+checked in) which proposed its own render package; it was adapted onto this
+engine instead, so that preview and export keep sharing one drawing path. The
+numbers that spec fixed live as the `BB_*` constants in `engine.ts`, each with
+a comment saying what it is — treat those as the source of truth.
+
+| Slot | Face | Size | Colour | Treatment |
+| --- | --- | --- | --- | --- |
+| heading | Anton, UPPERCASE | 7.8 % | `style.highlightColor` | glow (stroke rings, see below), hard shadow in the accent mixed 57 % to black, whole-line tilt |
+| script | Caveat Bold, as written | 12.5 % | `style.color` | soft shadow, sits `0.92` em below the heading's last baseline so it overlaps its bottom edge |
+
+- **Sizing is aspect-independent.** Those percentages are of the height of the
+  frame the look was *designed* on (9:16, `BB_REF_ASPECT`) — not of the live
+  frame. Keyed to the live aspect instead, the whole template shrank to a third
+  of its weight on the 16:9 and 1:1 canvases the editor also offers (7.8 % of
+  720 px is 56 px of type on a 1280-wide frame). Every other look here sizes as
+  a fraction of frame WIDTH for the same reason. On any 9:16 canvas the two are
+  identical, so the authored look is untouched.
+- **Vertical rhythm is em-relative.** Heading line-height `1.12` (1.0 let
+  Anton's caps and the line above's hard shadow touch on wrapped headings), and
+  the script gap is em of the *script* size, so `scriptScale` moves that line
+  clear of the heading instead of driving it through.
+
+- **Split.** `splitBlockbusterWords`: the last two words are the script line,
+  the last one when the caption has three words or fewer, and a lone word is
+  script only. Users steer it by editing the caption text.
+- **Animation.** Heading pops in (0.85 → 1 about the block centre, 200 ms),
+  script slides up (267 ms), both fade out over the caption's last 133 ms —
+  `exitInside: true`, so consecutive captions never overlap the way the Anime
+  Edit looks deliberately do (`holdMs`/`exitMs`/`exit()` on the look def).
+- **Glow.** Concentric `strokeText` rings, the `neonDisappear` technique — not
+  `shadowBlur`, which costs ~20 ms per glyph (see "Why the neon bloom is
+  strokes" above). The rings are the template's whole cost, and they scale with
+  glyph area: `_kinetic-diag --template blockbuster --size 1080x1920` measures
+  15.6 ms/frame (Anime Edit 8.1 ms) and the same run at 1920×1080 measures
+  43 ms, because type is a fraction of frame WIDTH and a landscape frame is
+  wider. Quote the 9:16 number — that is what almost every export is. Ring
+  RADIUS grows as `sqrt(glow)` while alpha grows linearly, so the 200 % end of
+  the slider blooms instead of flooding to a solid slab.
+- **Tilt.** Letter origins are rotated about the heading's centre and each
+  letter carries the same rotation — a rigid transform, so it equals rotating
+  the line as one piece even though the renderer only rotates letters.
+- **Knobs.** `style.kinetic` — `glow` (0–2), `letterSpacing` (em, additive in
+  the spec, converted to the engine's multiplicative tracking via Anton's mean
+  advance), `tilt` (deg), `scriptScale`. Text panel → "Kinetic" section.
+  Missing fields mean "as authored" (`KINETIC_PARAM_DEFAULTS`).
+- **Card.** `New` badge, `Kinetic`/`Cinematic` pills, and a live thumbnail
+  drawn by the engine (`components/KineticThumb.tsx`, also used by the Anime
+  Edit card).
+
+## Living Inside It
+
+Five template ids — `livingBlue`, `livingTeal`, `livingOrange`, `livingRed`,
+`livingPurple` — five takes on one three-row idea: a small lead-in over two
+very large lines. One factory (`livingInsideLook`) builds all of them from a
+row of `LIVING_VARIANTS`, so the row split, the block centring and the paint
+order exist once; what a variant owns is its face pairing, alignment, entry
+and second-line treatment. Blue is the original 880×495 thumbnail design as
+drawn, and its numbers do not move; the other four were rebuilt against it so
+the five cards read apart at a glance.
+
+| Variant | Big lines | Lead-in | Align | Entry | Line 2 |
+| --- | --- | --- | --- | --- | --- |
+| Blue | Barlow Condensed 900, 130/100 | Barlow Condensed 700 *italic*, lowercase, 22, +0.18em | left, at 40/880 | `rise` — lead fades, each big line rises in turn | `white` |
+| Teal | Montserrat 900, 96/72 | Montserrat 700, CAPS, 18, +0.32em | centred | `pop` — the block scales 0.82→1 about its centre, lead-in 120 ms behind | `darkWhiteStroke` (dark fill, 2% white rule) |
+| Orange | Alfa Slab One, 104/80 | Oswald 700, CAPS, 20, +0.22em | right, at 40/880 from the edge | `slideLeft` — rows push in from the right, 90 ms apart | `whiteDarkStroke` (white over a near-black halo) |
+| Red | Playfair Display 700, 112/86 | Playfair Display 400 *italic*, lowercase, 24, +0.10em | justified block, centred | `sweep` — letters fade up left to right, rows 140 ms apart | `white` |
+| Purple | Bungee, 90/68 | Bungee, CAPS, 17, +0.28em | stair — line 2 steps in 42% of line 1's width | `converge` — line 1 from the left, line 2 from the right | `outline` (hollow, 5% accent stroke) |
+
+Sizes are px of the 880-wide design card; line 1 is `style.highlightColor`
+with a hard offset shadow, the lead-in is `style.color`.
+
+- **Sizes are fractions of the design's WIDTH** (880px), then `LI_SCALE`d by
+  1.45. The source is a wide thumbnail where type fills the left half; on 9:16
+  video those raw fractions read small and lost. Scaling one factor keeps each
+  variant's internal proportions exactly. Dividing by the 495 height instead
+  is the mistake `BB_REF_ASPECT` documents.
+- **Justify** (Red) tracks the narrower big line out to the wider one's width,
+  capped at 0.5 em per gap so a short word never reads as scattered letters;
+  whatever the cap leaves over is centred. The width both sides align by is
+  ink width — tracking is added after every glyph (so `adv` includes it, like
+  CSS `letter-spacing`) but the run after the last glyph is invisible.
+- **Stagger** (Purple) indents line 2 by `LI_STAGGER_INDENT` of line 1's ink
+  width; the two lines then slide in from opposite sides to meet.
+- **Entry travel is stored per em** (`slamFrom`, `flyFromX`), never as a
+  finished offset: `scaleAbout` and `fitToSafeArea` rescale `nSize` afterwards,
+  so `animate()` multiplies by the letter's final size. Delays live on
+  `KineticLetter.delay`, so the scene's `animMs` is right for every variant.
+- **Split.** `splitLivingWords`: the lead-in takes the leading SHORT words — up
+  to 3, within 12 characters — then the remainder splits with `floor`. That is
+  what makes the design's own copy fall out of a plain caption: "it should be /
+  LIVING / INSIDE IT". A fixed 2-word lead would give "it should / BE LIVING /
+  INSIDE IT", and `ceil` would give "LIVING INSIDE / IT". Each picker card
+  shows its own line (`LIVING_CARD_COPY` in EditorPage.tsx), chosen to split
+  the same way.
+- **Italic faces.** Blue and Red lead with an italic face. The browser selects
+  it with the CSS `italic` keyword (`KineticFaceSpec.style` →
+  `KineticLetter.fontStyle`); the server registers the italic TTF under its own
+  alias and passes no style keyword, because the alias already carries italic
+  outlines and asking for italic on top would synthesise a second slant. Two
+  different mechanisms for the same glyphs — the five Living parity fixtures
+  are what prove they agree, one per variant because no other fixture loads
+  these faces.
+- **Faces.** All seven new faces (`montserratBlack`, `montserratBold`,
+  `alfaSlab`, `oswaldBold`, `playfairBold`, `playfairItalic`, `bungee`) are
+  files already in `server/fonts` and families already loaded by the client, so
+  nothing new is downloaded.
+- **Cost.** ~23 ms/frame at 1080×1920 for Blue (Blockbuster 15.6, Anime Edit
+  8.1): the type is very large and line 2 is stroked. Quote the 9:16 number.
+
+## Text behind person
+
+Every kinetic template can composite the person back over the captions
+(`style.behindPerson`, Text panel → "Kinetic" → toggle), and each phrase can
+override it — see "Per-phrase depth" below.
+
+- **Export.** A per-project person matte — one luma-only `mask.mp4` at the
+  overlay fps, rendered once by the Python Robust Video Matting service in
+  `segmentation/` when the toggle is first turned on (`POST
+  /projects/:id/behind-person`, `services/segmentation.service.ts`, the
+  `segment` queue). `renderVideo` (export.service.ts) gives the matte the same
+  rotation/scale/pad chain as the footage, `alphamerge`s it, and overlays the
+  cut-out on top of the captions. Export refuses (`MASKS_NOT_READY`) until
+  the matte is done; the matte is deleted with the source video.
+- **Preview.** MediaPipe's selfie segmenter in the browser
+  (`lib/kinetic/segmenter.ts`, runtime served from `public/mediapipe/`, never a
+  CDN) — a live approximation. This is the one place preview and export are
+  allowed to differ, and only in the cut-out's edge quality; text layout is
+  identical. Needs the editor `<video>` to be `crossOrigin="use-credentials"`.
+- Off by default and inert unless `SEGMENT_SERVICE_URL` is set.
+
+### Per-phrase depth
+
+`Caption.behindPerson` is a tri-state — `null` follows `style.behindPerson`,
+`true`/`false` override it — stored per caption exactly like `sizeScale` and
+`offsetX/offsetY`, so an untouched phrase behaves as it always did. Every row
+in the Phrases list shows a `Behind`/`Front` button whenever the template is
+kinetic (NOT only when the project toggle is on: the button is how you send a
+single phrase behind, and gating it on the project default made it
+unreachable). It writes an explicit `true`/`false`, never `null`.
+
+- **Export.** `behindPersonRanges` turns those values into ffmpeg `enable=`
+  windows on the final overlay, merged and padded (−0.25s/+0.6s, because a
+  caption can still be fading out past its `end`). All-inherit with the default
+  on returns `null` → no `enable=` at all → the graph is byte-identical to
+  before this was per-chunk. The matte is required if ANY phrase resolves to
+  behind, not just when the project flag is on.
+- **Preview.** `KineticCaptionLayer` gates the cut-out on the same windows, so
+  the canvas shows the decision the export will make. Note the preview works
+  without the Python service (MediaPipe is in-browser); only export needs the
+  matte.
+
+## Parity test
+
+`cd server && npm run test:parity` (`src/scripts/parity-check.ts`; run
+`npx playwright install chromium` once). Renders fixed Blockbuster and Anime
+Edit compositions with the browser's real preview code path (Chromium on the
+client's dev-only `/parity` page) and the server's real export code path, and
+asserts every frame differs by < 0.5 % of pixels and the font fingerprints
+match. The script serves `server/fonts/` to the page itself, so both sides
+rasterise the same TTF bytes and the test never depends on Google Fonts being
+reachable. Failing frames land in `server/test-out/parity/`.
