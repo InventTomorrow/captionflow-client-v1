@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
     // mid-upload, which lands the user back on the upload page.
     optimizeDeps: {
       entries: ['index.html', 'src/**/*.worker.ts'],
-      include: ['mediabunny', '@mediabunny/aac-encoder', '@mediapipe/tasks-vision', 'idb'],
+      include: ['mediabunny', '@mediabunny/aac-encoder', '@mediapipe/tasks-vision', 'idb', 'three'],
     },
     server: {
       port: 5610,

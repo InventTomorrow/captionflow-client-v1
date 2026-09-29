@@ -32,6 +32,15 @@ export interface Caption {
    *  project's style.behindPerson; true/false force this chunk behind or in
    *  front of the speaker. */
   behindPerson?: boolean | null;
+  /**
+   * Placed by hand on the timeline — added there, or dragged to a new time.
+   * Display blocks are regrouped from the word stream on every render
+   * (displayCaptions.ts), so without this a moved chunk's words would be
+   * re-chunked together with whatever they now sit next to. When true, this
+   * caption's words are only ever grouped with each other. Mirrored by the
+   * server export (regroupForDisplay) so the burn-in matches the preview.
+   */
+  ownBlock?: boolean;
 }
 
 interface StageState {

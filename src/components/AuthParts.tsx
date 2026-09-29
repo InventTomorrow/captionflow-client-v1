@@ -1,9 +1,11 @@
 /**
  * Pieces shared by the sign-in / register / password pages: the stacked
- * brand block and a password input with a show/hide toggle.
+ * brand block, a password input with a show/hide toggle, and the new-password
+ * rules checklist.
  */
 
 import { useState, type InputHTMLAttributes } from 'react';
+import { PASSWORD_RULES } from '../lib/passwordPolicy';
 
 export function AuthBrand() {
   return (
@@ -88,5 +90,56 @@ export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>,
         <EyeIcon off={visible} />
       </button>
     </div>
+  );
+}
+
+function RuleIcon({ met }: { met: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.25" />
+      {met && <path d="m5.2 8.3 1.9 1.9 3.7-4" />}
+    </svg>
+  );
+}
+
+/**
+ * The new-password rules as a live checklist — each one ticks as it is met.
+ * Goes under every field where a password is CHOSEN (sign-up, reset), never
+ * under sign-in. Point the input's `aria-describedby` at `id`.
+ *
+ * `flagUnmet` turns the rules still missing red. Set it once a submit has been
+ * refused, so the list stays calm while someone is typing their first attempt.
+ */
+export function PasswordChecklist({
+  id,
+  password,
+  flagUnmet = false,
+}: {
+  id: string;
+  password: string;
+  flagUnmet?: boolean;
+}) {
+  return (
+    <ul id={id} className="auth-pw-rules" aria-label="Password requirements">
+      {PASSWORD_RULES.map((rule) => {
+        const met = rule.test(password);
+        return (
+          <li key={rule.id} className={met ? 'is-met' : flagUnmet ? 'is-missing' : undefined}>
+            <RuleIcon met={met} />
+            <span>{rule.label}</span>
+            <span className="auth-sr-only">{met ? ' (met)' : ' (not met yet)'}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

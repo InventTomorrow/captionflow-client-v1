@@ -81,6 +81,9 @@ interface FlatWord {
   behindPerson?: boolean | null;
   sourceId?: string;
   sourceIndex: number;
+  /** Set for every word of an `ownBlock` caption, and the same for all of
+   *  them: two neighbouring words whose keys differ never share a group. */
+  ownKey?: string;
 }
 
 const SENTENCE_END = /[.!?。！？۔]$/;
@@ -90,7 +93,7 @@ const SENTENCE_END = /[.!?。！？۔]$/;
  * the (possibly translated) display text, otherwise spreads words evenly
  * across the caption block — the same fallback the overlay uses.
  */
-function wordTimes(caption: Caption): Array<{ start: number; end: number }> {
+export function wordTimes(caption: Caption): Array<{ start: number; end: number }> {
   const words = caption.text.split(/\s+/).filter(Boolean);
   const timed = caption.words;
   if (timed && timed.length === words.length) {
@@ -129,9 +132,10 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
   }
 
   const out: FlatWord[] = [];
-  for (const c of canonical) {
+  canonical.forEach((c, ci) => {
     const words = c.text.split(/\s+/).filter(Boolean);
     const times = wordTimes(c);
+    const ownKey = c.ownBlock ? (c._id ?? `own-${ci}`) : undefined;
     words.forEach((w, i) => {
       out.push({
         text: w,
@@ -145,9 +149,10 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
         behindPerson: c.behindPerson,
         sourceId: c._id,
         sourceIndex: i,
+        ownKey,
       });
     });
-  }
+  });
   return out.sort((a, b) => a.start - b.start);
 }
 
@@ -195,7 +200,10 @@ function groupFlatWords(words: FlatWord[], mode: DisplayMode, phraseWords: numbe
   const groups: FlatWord[][] = [];
   let cur: FlatWord[] = [];
   for (const w of words) {
-    if (cur.length && w.start - cur[cur.length - 1].end > MAX_WORD_GAP) {
+    const last = cur[cur.length - 1];
+    // A hand-placed caption (ownBlock) never shares a block with its
+    // neighbours — a change of ownKey is a boundary as hard as a silence.
+    if (last && (w.start - last.end > MAX_WORD_GAP || w.ownKey !== last.ownKey)) {
       groups.push(cur);
       cur = [];
     }
@@ -218,8 +226,17 @@ function groupFlatWords(words: FlatWord[], mode: DisplayMode, phraseWords: numbe
     const next = groups[i + 1];
     const prevGap = prev ? g[0].start - prev[prev.length - 1].end : Infinity;
     const nextGap = next ? next[0].start - g[g.length - 1].end : Infinity;
-    const canPrev = prev != null && prevGap <= MAX_WORD_GAP && prev.length + g.length <= size + 1;
-    const canNext = next != null && nextGap <= MAX_WORD_GAP && next.length + g.length <= size + 1;
+    // Never across an ownBlock boundary (every word of a group shares one key).
+    const canPrev =
+      prev != null &&
+      prev[0].ownKey === g[0].ownKey &&
+      prevGap <= MAX_WORD_GAP &&
+      prev.length + g.length <= size + 1;
+    const canNext =
+      next != null &&
+      next[0].ownKey === g[0].ownKey &&
+      nextGap <= MAX_WORD_GAP &&
+      next.length + g.length <= size + 1;
     if (canPrev && (!canNext || prevGap <= nextGap)) {
       prev.push(...g);
       groups.splice(i, 1);

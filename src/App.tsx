@@ -7,6 +7,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyResetLinkPage } from './pages/VerifyResetLinkPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { UploadPage } from './pages/UploadPage';
 import { AppShell } from './components/AppShell';
 import { AdminShell } from './components/admin/AdminShell';
@@ -97,6 +98,8 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      {/* Where the sign-up confirmation email's link lands. */}
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/verify" element={<VerifyResetLinkPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

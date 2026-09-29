@@ -1,7 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
-import { AuthBrand } from '../components/AuthParts';
+import { AuthBrand, PasswordChecklist } from '../components/AuthParts';
+import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { verifyResetLinkPath, type VerifiedResetState } from '../lib/resetLink';
 
 function LockIcon() {
@@ -59,11 +60,23 @@ export function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  // True once a submit was refused over the password. From then on the checklist
+  // marks what is still missing in red and the banner names it — both derived
+  // from the field, so they clear themselves as the password is corrected.
+  const [flagUnmet, setFlagUnmet] = useState(false);
+  const policyError = passwordPolicyMessage(password);
+  const banner = (flagUnmet && policyError) || error;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    // Checked here as well as by the browser so the message is ours and the
-    // request is never sent with a mismatch.
+    // Both checked here rather than left to the browser, so the message is ours
+    // and the request is never sent with a weak password or a mismatch — a
+    // refused request would still spend one of the 5 reset attempts per hour.
+    if (policyError) {
+      setFlagUnmet(true);
+      setError('');
+      return;
+    }
     if (password !== confirm) {
       setError('Those passwords do not match.');
       return;
@@ -123,10 +136,10 @@ export function ResetPasswordPage() {
           <>
             <div className="auth-heading">
               <h2>Choose a new password</h2>
-              <p>Make it at least 8 characters.</p>
+              <p>It has to meet every rule listed under the field.</p>
             </div>
 
-            {error && <div className="error-banner">{error}</div>}
+            {banner && <div className="error-banner">{banner}</div>}
 
             <form className="auth-form" onSubmit={onSubmit}>
               <div className="auth-field">
@@ -141,10 +154,15 @@ export function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={8}
+                    aria-describedby="reset-password-rules"
                     autoFocus
                   />
                 </div>
+                <PasswordChecklist
+                  id="reset-password-rules"
+                  password={password}
+                  flagUnmet={flagUnmet}
+                />
               </div>
 
               <div className="auth-field">
@@ -159,7 +177,6 @@ export function ResetPasswordPage() {
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     required
-                    minLength={8}
                   />
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api';
-import { PricingCards, type ApiPlan } from './PricingCards';
+import { usePlans } from '../lib/usePlans';
+import { PricingCards } from './PricingCards';
 import { ManualPaymentPanel } from './ManualPaymentPanel';
 import type { PlanErrorInfo } from '../lib/planErrors';
 
@@ -21,19 +21,13 @@ export function PricingModal({
   onClose: () => void;
   reason?: PlanErrorInfo | null;
 }) {
-  const [allPlans, setAllPlans] = useState<ApiPlan[] | null>(null);
+  // Loaded each time the modal opens; a failure is retried and then reported,
+  // never shown as "no plans" (see usePlans).
+  const { plans: allPlans, failed: plansFailed, retry: retryPlans } = usePlans(open);
   const [paymentSlug, setPaymentSlug] = useState<string | null>(null);
   // Guards the auto-select-on-load below from re-firing and clobbering an
   // explicit "Change plan" click (which clears paymentSlug back to null).
   const autoSelectedRef = useRef(false);
-
-  useEffect(() => {
-    if (!open) return;
-    void api
-      .get('/billing/plans')
-      .then((r) => setAllPlans(r.data.plans as ApiPlan[]))
-      .catch(() => setAllPlans([]));
-  }, [open]);
 
   // Reset back to the payment step's default plan once the modal fully
   // closes, so the next open starts fresh instead of resuming wherever the
@@ -98,7 +92,13 @@ export function PricingModal({
         </div>
         <div className="modal-body">
           {reason?.message && <p className="muted pricing-modal-reason">{reason.message}</p>}
-          <PricingCards plans={subscriptionPlans} onSelectPlan={(p) => setPaymentSlug(p.slug)} ctaLabel="Upgrade" />
+          <PricingCards
+            plans={subscriptionPlans}
+            failed={plansFailed}
+            onRetry={retryPlans}
+            onSelectPlan={(p) => setPaymentSlug(p.slug)}
+            ctaLabel="Upgrade"
+          />
         </div>
       </div>
     </div>

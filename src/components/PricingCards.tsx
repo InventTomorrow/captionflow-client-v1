@@ -60,11 +60,16 @@ function PlanIcon({ slug }: { slug: string }) {
  */
 export function PricingCards({
   plans,
+  failed = false,
+  onRetry,
   yearly = false,
   onSelectPlan,
   ctaLabel = 'Get Started',
 }: {
   plans: ApiPlan[] | null;
+  /** The plan list could not be loaded (see usePlans) — not the same as none existing. */
+  failed?: boolean;
+  onRetry?: () => void;
   yearly?: boolean;
   onSelectPlan: (plan: ApiPlan) => void;
   ctaLabel?: string;
@@ -75,6 +80,19 @@ export function PricingCards({
     plans && plans.length > 0
       ? (plans.find((p) => p.slug === 'creator') ?? plans[Math.floor((plans.length - 1) / 2)])?.slug
       : undefined;
+
+  if (failed) {
+    return (
+      <div className="lp-plans-failed" role="alert">
+        <p className="muted">We couldn&apos;t load pricing just now.</p>
+        {onRetry && (
+          <button type="button" className="lp-btn lp-btn-ghost" onClick={onRetry}>
+            Try again
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="lp-grid-3 lp-pricing-grid">

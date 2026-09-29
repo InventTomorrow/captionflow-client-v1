@@ -24,11 +24,25 @@ export interface User {
   limits?: PlanLimits;
 }
 
+/** What sign-up led to. */
+export interface RegisterResult {
+  /**
+   * True: the account exists but nobody is signed in — the emailed link has to
+   * be opened first. False: signed in, as sign-up always used to be (a server
+   * with verification switched off, or one that predates it).
+   */
+  verificationRequired: boolean;
+  /** False when the account was made but the email could not be sent. */
+  emailSent: boolean;
+  /** How long the emailed link lasts, when the server says. */
+  expiresInHours?: number;
+}
+
 interface AuthState {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
 }
@@ -57,8 +71,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   async register(name, email, password) {
     const { data } = await api.post('/auth/register', { name, email, password });
+    // Decided by the reply, not assumed: client and server deploy separately,
+    // and this has to work against a server on either side of the feature.
+    if (data?.verificationRequired) {
+      return {
+        verificationRequired: true,
+        emailSent: data.emailSent !== false,
+        expiresInHours: typeof data.expiresInHours === 'number' ? data.expiresInHours : undefined,
+      };
+    }
     set({ user: mapUser(data.user) });
     connectSocket();
+    return { verificationRequired: false, emailSent: false };
   },
   async logout() {
     try {

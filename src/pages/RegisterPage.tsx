@@ -1,8 +1,15 @@
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore, type RegisterResult } from '../stores/authStore';
 import { errorMessage } from '../lib/api';
-import { ArrowRightIcon, AuthBrand, PasswordInput } from '../components/AuthParts';
+import { useResendVerification } from '../lib/emailVerification';
+import {
+  ArrowRightIcon,
+  AuthBrand,
+  PasswordChecklist,
+  PasswordInput,
+} from '../components/AuthParts';
+import { passwordPolicyMessage } from '../lib/passwordPolicy';
 
 function UserIcon() {
   return (
@@ -54,6 +61,109 @@ function SpinnerIcon() {
   );
 }
 
+/**
+ * What sign-up turns into once the account exists: nobody is signed in, and the
+ * emailed link is the way forward. Owns its resend state, so coming back here
+ * after "use a different email" starts clean.
+ */
+function CheckYourEmail({
+  email,
+  pending,
+  onDifferentEmail,
+}: {
+  email: string;
+  pending: RegisterResult;
+  onDifferentEmail: () => void;
+}) {
+  const resend = useResendVerification();
+  const sending = resend.state === 'sending';
+  // The account was made but the first email never left the server — so there
+  // is nothing to check an inbox for until a resend goes through.
+  const undelivered = !pending.emailSent && resend.state !== 'sent';
+  const hours = pending.expiresInHours;
+
+  const resendButton = (label: string) => (
+    <button
+      type="button"
+      className="auth-linkbtn"
+      disabled={sending}
+      onClick={() => resend.resend(email)}
+    >
+      {sending ? 'sending…' : label}
+    </button>
+  );
+
+  return (
+    <>
+      <div className="auth-status" role="status">
+        <div className="auth-status-icon">
+          <MailIcon />
+        </div>
+        <div className="auth-heading">
+          <h2>{undelivered ? 'One more step' : 'Check your email'}</h2>
+          {undelivered ? (
+            <p>
+              Your account is ready, but we couldn't send the confirmation email to{' '}
+              <strong className="auth-email">{email}</strong> just now. Send it again to finish
+              signing up.
+            </p>
+          ) : (
+            <p>
+              We sent a confirmation link to <strong className="auth-email">{email}</strong>. Open
+              it to confirm your address, then sign in.
+              {hours ? ` The link expires in ${hours} ${hours === 1 ? 'hour' : 'hours'}.` : ''}
+            </p>
+          )}
+        </div>
+
+        {undelivered && (
+          <button
+            type="button"
+            className="btn primary auth-submit auth-status-action"
+            disabled={sending}
+            onClick={() => resend.resend(email)}
+          >
+            {sending ? (
+              <>
+                <SpinnerIcon />
+                Sending…
+              </>
+            ) : (
+              'Send the email'
+            )}
+          </button>
+        )}
+      </div>
+
+      {resend.state === 'failed' && <div className="error-banner">{resend.message}</div>}
+
+      <p className="auth-note" aria-live="polite">
+        {undelivered ? (
+          <>Wrong address? </>
+        ) : resend.state === 'sent' ? (
+          <>
+            A new link is on its way — the earlier one no longer works. Still nothing?{' '}
+            {resendButton('Send it again')} or{' '}
+          </>
+        ) : (
+          <>
+            Nothing arrived? Check your spam folder, or {resendButton('resend the email')}. Wrong
+            address?{' '}
+          </>
+        )}
+        <button type="button" className="auth-linkbtn" onClick={onDifferentEmail}>
+          {resend.state === 'sent' ? 'use a different email' : 'Use a different email'}
+        </button>
+        .
+      </p>
+
+      <p className="auth-footer">
+        Already confirmed? <Link to="/login">Sign in</Link>
+      </p>
+    </>
+  );
+}
+
 export function RegisterPage() {
   const register = useAuthStore((s) => s.register);
   const navigate = useNavigate();
@@ -62,14 +172,31 @@ export function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // True once a submit was refused over the password. From then on the checklist
+  // marks what is still missing in red and the banner names it — both derived
+  // from the field, so they clear themselves as the password is corrected.
+  const [flagUnmet, setFlagUnmet] = useState(false);
+  const policyError = passwordPolicyMessage(password);
+  const banner = (flagUnmet && policyError) || error;
+  // Set once the account exists but its email still has to be confirmed: the
+  // form gives way to "check your email", and nobody is signed in yet.
+  const [pending, setPending] = useState<RegisterResult | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    // Checked here rather than left to the browser's minLength/pattern bubble,
+    // so the message is ours and the request is never sent with a weak password.
+    if (policyError) {
+      setFlagUnmet(true);
+      setError('');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      await register(name, email, password);
-      navigate('/projects/upload');
+      const result = await register(name, email, password);
+      if (result.verificationRequired) setPending(result);
+      else navigate('/projects/upload');
     } catch (err: unknown) {
       setError(errorMessage(err, 'Registration failed'));
     } finally {
@@ -85,76 +212,91 @@ export function RegisterPage() {
       <section className="auth-card">
         <AuthBrand />
 
-        <div className="auth-heading">
-          <h2>Create account</h2>
-          <p>Start captioning in minutes.</p>
-        </div>
-
-        {error && <div className="error-banner">{error}</div>}
-
-        <form className="auth-form" onSubmit={onSubmit}>
-          <div className="auth-field">
-            <label htmlFor="register-name">Name</label>
-            <div className="auth-input-wrap">
-              <UserIcon />
-              <input
-                id="register-name"
-                autoComplete="name"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+        {pending ? (
+          <CheckYourEmail
+            email={email}
+            pending={pending}
+            onDifferentEmail={() => setPending(null)}
+          />
+        ) : (
+          <>
+            <div className="auth-heading">
+              <h2>Create account</h2>
+              <p>Start captioning in minutes.</p>
             </div>
-          </div>
 
-          <div className="auth-field">
-            <label htmlFor="register-email">Email</label>
-            <div className="auth-input-wrap">
-              <MailIcon />
-              <input
-                id="register-email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+            {banner && <div className="error-banner">{banner}</div>}
 
-          <div className="auth-field">
-            <label htmlFor="register-password">Password</label>
-            <PasswordInput
-              id="register-password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
+            <form className="auth-form" onSubmit={onSubmit}>
+              <div className="auth-field">
+                <label htmlFor="register-name">Name</label>
+                <div className="auth-input-wrap">
+                  <UserIcon />
+                  <input
+                    id="register-name"
+                    autoComplete="name"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-          <button className="btn primary auth-submit" disabled={busy} type="submit">
-            {busy ? (
-              <>
-                <SpinnerIcon />
-                Creating…
-              </>
-            ) : (
-              <>
-                Create account
-                <ArrowRightIcon />
-              </>
-            )}
-          </button>
-        </form>
+              <div className="auth-field">
+                <label htmlFor="register-email">Email</label>
+                <div className="auth-input-wrap">
+                  <MailIcon />
+                  <input
+                    id="register-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-        <p className="auth-footer">
-          Have an account? <Link to="/login">Sign in</Link>
-        </p>
+              <div className="auth-field">
+                <label htmlFor="register-password">Password</label>
+                <PasswordInput
+                  id="register-password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  aria-describedby="register-password-rules"
+                />
+                <PasswordChecklist
+                  id="register-password-rules"
+                  password={password}
+                  flagUnmet={flagUnmet}
+                />
+              </div>
+
+              <button className="btn primary auth-submit" disabled={busy} type="submit">
+                {busy ? (
+                  <>
+                    <SpinnerIcon />
+                    Creating…
+                  </>
+                ) : (
+                  <>
+                    Create account
+                    <ArrowRightIcon />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="auth-footer">
+              Have an account? <Link to="/login">Sign in</Link>
+            </p>
+          </>
+        )}
       </section>
     </main>
   );

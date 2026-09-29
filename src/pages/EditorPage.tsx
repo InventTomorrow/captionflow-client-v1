@@ -1,5 +1,4 @@
 import {
-  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -42,6 +41,8 @@ import {
 import { matchTemplateKey, pickerTemplates } from '../lib/templateCatalog';
 import { TemplateCard } from '../components/TemplateCard';
 import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
+import { TimelineBlocks } from '../components/TimelineBlocks';
+import { applyBlockMoves, findFreeSlot, inTimelineOrder, newCaption } from '../lib/timelineEdit';
 import { captionsToSrt } from '../lib/srt';
 import {
   evictOldExportsIfNeeded,
@@ -1273,7 +1274,7 @@ export function EditorPage() {
           // Keep the playhead in view while playing (the user scrolls freely
           // when paused).
           const scroller = timelineScrollRef.current;
-          if (scroller && video && !video.paused) {
+          if (scroller && video && !video.paused && !timelineDragging.current) {
             const view = scroller.clientWidth;
             if (px < scroller.scrollLeft + 24 || px > scroller.scrollLeft + view - 48) {
               scroller.scrollLeft = Math.max(0, px - view * 0.2);
@@ -1446,6 +1447,81 @@ export function EditorPage() {
     },
     [saveCaption],
   );
+
+  /* ---------- Timeline: add a chunk, drag a chunk (lib/timelineEdit.ts) ---------- */
+
+  /** True while a block is being dragged — playback's follow-scroll stands down. */
+  const timelineDragging = useRef(false);
+  /** Stored id of a chunk just added, until its block has opened for typing. */
+  const [timelineEditId, setTimelineEditId] = useState<string | null>(null);
+  const clearTimelineEditId = useCallback(() => setTimelineEditId(null), []);
+  const [timelineNote, setTimelineNote] = useState('');
+  useEffect(() => {
+    if (!timelineNote) return;
+    const t = window.setTimeout(() => setTimelineNote(''), 5000);
+    return () => window.clearTimeout(t);
+  }, [timelineNote]);
+
+  /** A timeline edit changes which captions exist, so the whole set is saved. */
+  const commitTimelineCaptions = useCallback(
+    (next: Caption[]) => {
+      if (!id) return;
+      setCaptions(next);
+      // A selected word's index may no longer point at the same word.
+      setSelectedWordIdx(null);
+      setPhrasePickerOpen(false);
+      void replaceAllForProject(id, next);
+    },
+    [id, setCaptions],
+  );
+
+  /** A block was dropped: block id → new start, for it and any it displaced. */
+  const moveTimelineBlocks = useCallback(
+    (moves: Map<string, number>) => {
+      commitTimelineCaptions(
+        applyBlockMoves(
+          captionsLive.current,
+          timelineCaptionsLive.current,
+          moves,
+          newTimelineCaptionId,
+          styleRef.current.displayWords,
+        ),
+      );
+    },
+    [commitTimelineCaptions],
+  );
+
+  /**
+   * Add a chunk at the playhead — or, when the playhead is on a chunk, in the
+   * nearest free space. It needs no audio behind it: it is plain text with a
+   * start and an end, opened for typing straight away and draggable like any
+   * other chunk.
+   */
+  const addTimelineChunk = useCallback(() => {
+    const blocks = timelineCaptionsLive.current
+      .filter((b) => b._id)
+      .map((b) => ({ id: b._id as string, start: b.start, end: b.end }));
+    const at = videoRef.current?.currentTime ?? 0;
+    const slot = findFreeSlot(blocks, at, timelineDurationLive.current);
+    if (!slot) {
+      setTimelineNote('No empty space on the timeline - delete a chunk to make room.');
+      return;
+    }
+    const caption = newCaption(newTimelineCaptionId(), slot);
+    commitTimelineCaptions(inTimelineOrder([...captionsLive.current, caption]));
+    setTimelineNote('');
+    setTimelineEditId(caption._id ?? null);
+    seek(slot.start);
+    // Paused playback does not follow the playhead, so bring the new chunk into view.
+    const scroller = timelineScrollRef.current;
+    if (scroller) {
+      const px = slot.start * ppsLive.current;
+      const view = scroller.clientWidth;
+      if (px < scroller.scrollLeft + 24 || px > scroller.scrollLeft + view - 200) {
+        scroller.scrollLeft = Math.max(0, px - view * 0.3);
+      }
+    }
+  }, [commitTimelineCaptions, seek]);
 
   /**
    * Delete a single word straight off the video preview (the × badge on the
@@ -2111,6 +2187,8 @@ export function EditorPage() {
           behindPerson: c.behindPerson ?? null,
           offsetX: c.offsetX,
           offsetY: c.offsetY,
+          // Hand-placed on the timeline: the server must group it on its own too.
+          ownBlock: c.ownBlock,
         }));
       // Always persist + send concrete aspect (9:16 / 16:9) — never "original".
       setStyle((s) => ({ ...s, aspectRatio: aspectForBurn }));
@@ -3264,6 +3342,20 @@ export function EditorPage() {
         </div>
 
       <footer className="studio-timeline">
+        <div className="timeline-tools">
+          <button
+            type="button"
+            className="timeline-add"
+            onClick={addTimelineChunk}
+            disabled={processing}
+            title="Add a caption chunk at the playhead"
+          >
+            <span aria-hidden="true">+</span> Add chunk
+          </button>
+          <span className={`timeline-hint ${timelineNote ? 'is-note' : ''}`} role="status">
+            {timelineNote || 'Drag a chunk to move it - double-click to edit'}
+          </span>
+        </div>
         <div className="timeline-scroll" ref={timelineScrollRef}>
           <div
             className="timeline-content"
@@ -3283,8 +3375,15 @@ export function EditorPage() {
                 captions={timelineCaptions}
                 activeId={timelineActiveIdx >= 0 ? timelineCaptions[timelineActiveIdx]?._id : undefined}
                 pps={pps}
+                maxEnd={timelineDuration}
+                contentRef={timelineRef}
+                scrollerRef={timelineScrollRef}
+                draggingRef={timelineDragging}
+                editSourceId={timelineEditId}
+                onEditOpened={clearTimelineEditId}
                 onSeek={seek}
                 onEdit={saveDerivedText}
+                onMove={moveTimelineBlocks}
               />
               <div className="playhead tall" ref={playheadTrackRef} style={{ left: 0 }} />
             </div>
@@ -3459,6 +3558,15 @@ export function EditorPage() {
   );
 }
 
+/** Ids for captions made in the browser (a hand-added chunk, a block split off by a drag). */
+function newTimelineCaptionId(): string {
+  const unique =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `tl-${unique}`;
+}
+
 const WORD_COLOR_SWATCHES = [
   '#FFC43D',
   '#FFFFFF',
@@ -3468,74 +3576,6 @@ const WORD_COLOR_SWATCHES = [
   '#C77DFF',
   '#FF9F45',
 ];
-
-const TimelineBlocks = memo(function TimelineBlocks({
-  captions,
-  activeId,
-  pps,
-  onSeek,
-  onEdit,
-}: {
-  captions: DisplayCaption[];
-  activeId?: string;
-  /** Timeline zoom: pixels per second. */
-  pps: number;
-  onSeek: (seconds: number) => void;
-  onEdit: (caption: DisplayCaption, text: string) => void;
-}) {
-  // Caption being edited in place after a double-click, or null.
-  const [editingId, setEditingId] = useState<string | null>(null);
-  return (
-    <>
-      {captions.map((c) => {
-        const editing = editingId != null && editingId === c._id;
-        return (
-          <div
-            key={c._id || c.sequence}
-            role="button"
-            className={`timeline-block ${activeId === c._id ? 'active' : ''} ${editing ? 'editing' : ''}`}
-            style={{
-              left: c.start * pps + 1,
-              width: Math.max(30, (c.end - c.start) * pps - 3),
-            }}
-            title={editing ? undefined : `${c.text} - double-click to edit`}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!editing) onSeek(c.start);
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setEditingId(c._id || null);
-            }}
-          >
-            {editing ? (
-              <input
-                autoFocus
-                defaultValue={c.text}
-                onFocus={(e) => e.currentTarget.select()}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.currentTarget.blur();
-                  if (e.key === 'Escape') {
-                    e.currentTarget.value = c.text;
-                    e.currentTarget.blur();
-                  }
-                }}
-                onBlur={(e) => {
-                  const text = e.target.value.trim();
-                  setEditingId(null);
-                  if (text && text !== c.text) onEdit(c, text);
-                }}
-              />
-            ) : (
-              c.text
-            )}
-          </div>
-        );
-      })}
-    </>
-  );
-});
 
 function AuthenticatedVideo({
   id,
