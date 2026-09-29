@@ -1,10 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-<<<<<<< HEAD
 import { AuthBrand } from '../components/AuthParts';
-=======
->>>>>>> backup-local-auth
 
 function MailIcon() {
   return (
@@ -71,7 +68,6 @@ export function ForgotPasswordPage() {
       <div className="auth-orb" aria-hidden="true" />
 
       <section className="auth-card">
-<<<<<<< HEAD
         <AuthBrand />
 
         {sent ? (
@@ -87,23 +83,6 @@ export function ForgotPasswordPage() {
                   is on its way. It expires in 30 minutes and can only be used once.
                 </p>
               </div>
-=======
-        <div className="auth-brand">
-          <img src="/logo.png" alt="Asaan Caption" className="auth-brand-logo" />
-          <div className="auth-brand-text">
-            <p>Captions for long videos</p>
-          </div>
-        </div>
-
-        {sent ? (
-          <>
-            <div className="auth-heading">
-              <h2>Check your email</h2>
-              <p>
-                If <strong>{email}</strong> has an account, a reset link is on its way. It expires
-                in 30 minutes and can only be used once.
-              </p>
->>>>>>> backup-local-auth
             </div>
             <p className="auth-note">
               Nothing arrived? Check your spam folder, then{' '}

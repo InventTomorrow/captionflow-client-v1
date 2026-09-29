@@ -1,14 +1,9 @@
 import { type FormEvent, useState } from 'react';
-<<<<<<< HEAD
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { AuthBrand, PasswordChecklist } from '../components/AuthParts';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { verifyResetLinkPath, type VerifiedResetState } from '../lib/resetLink';
-=======
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../lib/api';
->>>>>>> backup-local-auth
 
 function LockIcon() {
   return (
@@ -28,7 +23,6 @@ function LockIcon() {
   );
 }
 
-<<<<<<< HEAD
 function CheckIcon() {
   return (
     <svg
@@ -46,8 +40,6 @@ function CheckIcon() {
   );
 }
 
-=======
->>>>>>> backup-local-auth
 function SpinnerIcon() {
   return (
     <svg className="auth-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -61,17 +53,13 @@ export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const navigate = useNavigate();
-<<<<<<< HEAD
   const verifiedToken = (useLocation().state as VerifiedResetState | null)?.verifiedToken;
-=======
->>>>>>> backup-local-auth
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-<<<<<<< HEAD
   // True once a submit was refused over the password. From then on the checklist
   // marks what is still missing in red and the banner names it — both derived
   // from the field, so they clear themselves as the password is corrected.
@@ -89,13 +77,6 @@ export function ResetPasswordPage() {
       setError('');
       return;
     }
-=======
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    // Checked here as well as by the browser so the message is ours and the
-    // request is never sent with a mismatch.
->>>>>>> backup-local-auth
     if (password !== confirm) {
       setError('Those passwords do not match.');
       return;
@@ -109,20 +90,12 @@ export function ResetPasswordPage() {
       // mailbox is not the same as knowing the new password.
       setTimeout(() => navigate('/login'), 2500);
     } catch (err: unknown) {
-<<<<<<< HEAD
       setError(errorMessage(err, 'Could not reset your password. Request a new link.'));
-=======
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Could not reset your password. Request a new link.';
-      setError(msg);
->>>>>>> backup-local-auth
     } finally {
       setBusy(false);
     }
   }
 
-<<<<<<< HEAD
   // The form is only ever reached THROUGH the verify page, which hands over the
   // token it checked. Anyone arriving another way — an older email, a pasted
   // URL, a bookmark — is sent to verify first, so a dead link is reported before
@@ -133,15 +106,12 @@ export function ResetPasswordPage() {
     return <Navigate to={verifyResetLinkPath(token)} replace />;
   }
 
-=======
->>>>>>> backup-local-auth
   return (
     <main className="auth-page">
       <div className="auth-glow" aria-hidden="true" />
       <div className="auth-orb" aria-hidden="true" />
 
       <section className="auth-card">
-<<<<<<< HEAD
         <AuthBrand />
 
         {done ? (
@@ -161,56 +131,15 @@ export function ResetPasswordPage() {
                 Go to sign in
               </Link>
             </div>
-=======
-        <div className="auth-brand">
-          <img src="/logo.png" alt="Asaan Caption" className="auth-brand-logo" />
-          <div className="auth-brand-text">
-            <p>Captions for long videos</p>
-          </div>
-        </div>
-
-        {!token ? (
-          <>
-            <div className="auth-heading">
-              <h2>Link is incomplete</h2>
-              <p>
-                This reset link is missing its token. Copy the full link from the email, or request
-                a new one.
-              </p>
-            </div>
-            <p className="auth-footer">
-              <Link to="/forgot-password">Request a new link</Link>
-            </p>
-          </>
-        ) : done ? (
-          <>
-            <div className="auth-heading">
-              <h2>Password updated</h2>
-              <p>
-                You can sign in with your new password now. Any other devices that were signed in
-                have been signed out.
-              </p>
-            </div>
-            <p className="auth-footer">
-              <Link to="/login">Go to sign in</Link>
-            </p>
->>>>>>> backup-local-auth
           </>
         ) : (
           <>
             <div className="auth-heading">
               <h2>Choose a new password</h2>
-<<<<<<< HEAD
               <p>It has to meet every rule listed under the field.</p>
             </div>
 
             {banner && <div className="error-banner">{banner}</div>}
-=======
-              <p>Make it at least 8 characters.</p>
-            </div>
-
-            {error && <div className="error-banner">{error}</div>}
->>>>>>> backup-local-auth
 
             <form className="auth-form" onSubmit={onSubmit}>
               <div className="auth-field">
@@ -225,7 +154,6 @@ export function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-<<<<<<< HEAD
                     aria-describedby="reset-password-rules"
                     autoFocus
                   />
@@ -235,12 +163,6 @@ export function ResetPasswordPage() {
                   password={password}
                   flagUnmet={flagUnmet}
                 />
-=======
-                    minLength={8}
-                    autoFocus
-                  />
-                </div>
->>>>>>> backup-local-auth
               </div>
 
               <div className="auth-field">
@@ -255,10 +177,6 @@ export function ResetPasswordPage() {
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     required
-<<<<<<< HEAD
-=======
-                    minLength={8}
->>>>>>> backup-local-auth
                   />
                 </div>
               </div>
