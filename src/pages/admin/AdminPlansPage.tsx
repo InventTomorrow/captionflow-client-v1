@@ -36,6 +36,8 @@ type Plan = {
     priorityProcessing: boolean;
     brandKits: boolean;
     exportEnabled: boolean;
+    /** Absent on plans saved before Clips existed; the server reads that as 0 (off). */
+    clipRunsPerMonth?: number;
   };
 };
 
@@ -48,6 +50,7 @@ const emptyLimits = {
   priorityProcessing: false,
   brandKits: false,
   exportEnabled: true,
+  clipRunsPerMonth: 0,
 };
 
 export function AdminPlansPage() {
@@ -286,6 +289,25 @@ export function AdminPlansPage() {
                   setEditing({
                     ...editing,
                     limits: { ...emptyLimits, ...editing.limits!, minutesPerMonth: Number(e.target.value) },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Clip runs / month
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={editing.limits?.clipRunsPerMonth ?? 0}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    limits: {
+                      ...emptyLimits,
+                      ...editing.limits!,
+                      clipRunsPerMonth: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                    },
                   })
                 }
               />

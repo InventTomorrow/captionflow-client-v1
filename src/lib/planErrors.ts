@@ -13,11 +13,13 @@ export interface ApiErrorPayload {
     reason?: string;
     used?: number;
     limit?: number;
+    /** What ran out, for QUOTA_EXCEEDED rows that are not caption minutes ('clip_runs', 'projects', ...). */
+    kind?: string;
   };
 }
 
 export interface PlanErrorInfo {
-  reason: 'trial_expired' | 'plan_expired' | 'out_of_credits' | 'feature_disabled' | 'other_limit';
+  reason: 'trial_expired' | 'plan_expired' | 'out_of_credits' | 'clip_runs' | 'feature_disabled' | 'other_limit';
   title: string;
   message: string;
   /** Only the billing-driven reasons get an upgrade CTA. */
@@ -65,6 +67,18 @@ export function resolvePlanError(data?: ApiErrorPayload): PlanErrorInfo | null {
           used != null && limit != null
             ? `You've used ${used} of ${limit} minutes for this billing period.`
             : 'You have used all the caption minutes for this billing period.',
+        showUpgrade: true,
+      };
+    }
+    if (data.details?.kind === 'clip_runs') {
+      const { used, limit } = data.details;
+      return {
+        reason: 'clip_runs',
+        title: "You're out of clip runs",
+        message:
+          used != null && limit != null
+            ? `You've used ${used} of ${limit} clip runs for this billing period. Upgrade for more.`
+            : 'You have used all your clip runs for this billing period. Upgrade for more.',
         showUpgrade: true,
       };
     }

@@ -11,6 +11,7 @@ export function AdminSystemPage() {
     exportsEnabled: true,
     clientExportEnabled: true,
     audioOnlyUploadEnabled: true,
+    clipsEnabled: false,
     maintenanceMode: false,
     maintenanceMessage: '',
   });
@@ -74,6 +75,7 @@ export function AdminSystemPage() {
                   ['export4kEnabled', '4K export enabled'],
                   ['clientExportEnabled', 'In-browser export (device renders; server is the fallback)'],
                   ['audioOnlyUploadEnabled', 'Audio-only uploads (video stays on the device)'],
+                  ['clipsEnabled', 'Clips (AI highlight clips; each plan sets its clip runs / month)'],
                   ['maintenanceMode', 'Maintenance mode'],
                 ] as const
               ).map(([key, label]) => (

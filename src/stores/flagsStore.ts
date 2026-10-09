@@ -10,6 +10,8 @@ export interface AppFlags {
   clientExportEnabled: boolean;
   /** Send only the audio track for transcription; the video stays on the device. */
   audioOnlyUploadEnabled: boolean;
+  /** Clips (AI highlight clips): the nav item, pages and endpoints. Off until an admin turns it on. */
+  clipsEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
 }
@@ -33,6 +35,7 @@ const DEFAULT_FLAGS: AppFlags = {
   exportsEnabled: true,
   clientExportEnabled: true,
   audioOnlyUploadEnabled: true,
+  clipsEnabled: false,
   maintenanceMode: false,
   maintenanceMessage: '',
 };

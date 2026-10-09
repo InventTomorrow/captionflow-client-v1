@@ -10,6 +10,8 @@ export interface PlanLimits {
   bulkUpload?: boolean;
   priorityProcessing?: boolean;
   brandKits?: boolean;
+  /** AI clip analyses per billing period; 0 or absent = Clips are off for this plan. */
+  clipRunsPerMonth?: number;
 }
 
 export interface User {
