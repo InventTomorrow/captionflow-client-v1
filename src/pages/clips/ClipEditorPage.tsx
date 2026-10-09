@@ -208,7 +208,8 @@ export function ClipEditorPage() {
             sentences={data.sentences}
             busy={saving}
             onChange={(startIdx, endIdx) => {
-              void save({ startIdx, endIdx, ...(clip.crop.mode === 'auto' ? { crop: { mode: 'auto' as const, track: [] } } : {}) });
+              // The server clears an Auto face track when the range moves; it is recomputed here.
+              void save({ startIdx, endIdx });
             }}
           />
 
@@ -268,7 +269,10 @@ export function ClipEditorPage() {
             </button>
           )}
           {!source.local && !source.loading && (
-            <p className="clips-sub">Rendering needs the original video on this device.</p>
+            <p className="clips-sub">
+              Rendering needs the original video on this device.{' '}
+              <Link to={`/clips/${projectId}`}>Locate the original file</Link>
+            </p>
           )}
         </section>
       </div>

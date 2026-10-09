@@ -17,6 +17,10 @@ import {
 } from '../lib/clips/api';
 import { renderClip, type ClipRenderContext, type ClipRenderOptions } from '../lib/clips/renderClip';
 import { describeDeviceProgress } from '../lib/export/clientExport';
+import { createLatestGate } from '../lib/clips/latestGate';
+
+/** Only the newest feed request may write the list (a filter change mid-load must win). */
+const feedGate = createLatestGate();
 
 export interface LiveRunStatus {
   status: ClipRunStatus;
@@ -84,7 +88,10 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
 
   async loadFeed(reset = false) {
     const f = get().feed;
-    if (f.loading || (!reset && f.done)) return;
+    // A reset (new filter) always runs and supersedes whatever is in flight;
+    // "load more" waits its turn.
+    if (!reset && (f.loading || f.done)) return;
+    const ticket = feedGate.next();
     set((s) => ({ feed: { ...s.feed, loading: true } }));
     try {
       const page = await listClips({
@@ -94,6 +101,7 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
         projectId: f.projectId,
         status: f.rendered ? 'rendered' : undefined,
       });
+      if (!feedGate.isCurrent(ticket)) return;
       set((s) => ({
         feed: {
           ...s.feed,
@@ -104,6 +112,7 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
         },
       }));
     } catch (err) {
+      if (!feedGate.isCurrent(ticket)) return;
       set((s) => ({ feed: { ...s.feed, loading: false } }));
       throw err;
     }

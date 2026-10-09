@@ -7,6 +7,7 @@ import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
 import { clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
+import { createLatestGate } from '../../src/lib/clips/latestGate';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -14,6 +15,15 @@ function assert(cond: unknown, msg: string): void {
   passed++;
 }
 const near = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps;
+
+// ── createLatestGate (only the newest feed request may write the list) ──
+{
+  const g = createLatestGate();
+  const first = g.next();
+  const second = g.next();
+  assert(!g.isCurrent(first), 'an older request is stale once a newer one starts');
+  assert(g.isCurrent(second), 'the newest request is current');
+}
 
 function cap(seq: number, words: Array<[string, number, number]>, extra: Partial<Caption> = {}): Caption {
   return {
@@ -60,7 +70,7 @@ function cap(seq: number, words: Array<[string, number, number]>, extra: Partial
   // emphasis / wordStyles stay aligned with the kept words.
   const out = sliceCaptionsToRange(
     [
-      cap(1, [['a', 9, 9.5], ['b', 9.5, 10.2], ['c', 10.2, 11]], {
+      cap(1, [['a', 9, 9.5], ['b', 9.85, 10.4], ['c', 10.4, 11]], {
         emphasis: ['hero', 'small', 'normal'],
         wordStyles: [{ color: '#f00' }, { scale: 120 }, {}],
       }),
@@ -72,6 +82,16 @@ function cap(seq: number, words: Array<[string, number, number]>, extra: Partial
   assert(out[0].emphasis?.join(',') === 'small,normal', `emphasis aligned, got ${out[0].emphasis}`);
   assert(out[0].wordStyles?.[0].scale === 120, 'wordStyles aligned');
   assert(near(out[0].start, 0), 'clamped word starts at 0');
+}
+{
+  // RF5 at the padded edges: a neighbouring sentence's word that only pokes
+  // into the 0.25 s / 0.35 s padding is not shown (word midpoint decides).
+  const out = sliceCaptionsToRange(
+    [cap(1, [['previous.', 9.4, 9.9]]), cap(2, [['Hook', 10.1, 10.5], ['payoff.', 38.0, 40.0]]), cap(3, [['Next', 40.2, 40.6]])],
+    9.85,
+    40.35,
+  );
+  assert(out.map((c) => c.text).join('|') === 'Hook payoff.', `edge words from neighbours dropped, got "${out.map((c) => c.text).join('|')}"`);
 }
 {
   // Captions entirely outside are dropped; remaining ones renumbered in order.

@@ -195,11 +195,13 @@ export function ClipSetPage() {
       )}
       {planError && <UpgradeBanner info={planError} />}
 
-      {source.missing && (
+      {project && !source.local && !source.loading && (
         <div className="clips-locate" role="status">
           <p>
-            The original video isn’t on this device, so clips can’t be previewed or rendered here. Pick the same file
-            you uploaded to continue.
+            {source.missing
+              ? 'The original video isn’t on this device, so clips can’t be previewed or rendered here.'
+              : 'Previews stream from the server, but rendering needs the original video on this device.'}{' '}
+            Pick the same file you uploaded to continue.
           </p>
           <input
             ref={fileInput}

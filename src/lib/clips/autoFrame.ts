@@ -36,7 +36,10 @@ export function ensureFaceTrack(projectId: string, clip: Clip, onProgress?: (don
       probe && !needsReframe(probe.width, probe.height)
         ? [[0, 0.5]]
         : await computeFaceTrack(file, clip.start, clip.end, undefined, onProgress);
-    return patchClip(clip._id, { crop: { mode: 'auto', track } });
+    // Saved only if the clip is still Auto over this exact range — the user may
+    // have switched to Manual/Fit or trimmed it while this one waited its turn.
+    // Either way the reply is the clip as it really is now.
+    return patchClip(clip._id, { crop: { track, trackFor: { start: clip.start, end: clip.end } } });
   });
   chain = run.catch(() => undefined);
   const p = run.finally(() => inflight.delete(key));

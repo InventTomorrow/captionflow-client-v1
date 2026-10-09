@@ -105,7 +105,13 @@ export interface ClipPatch {
   endIdx?: number;
   title?: string;
   templateKey?: string | null;
-  crop?: { mode?: ClipCropMode; x?: number; track?: CropTrack };
+  crop?: {
+    mode?: ClipCropMode;
+    x?: number;
+    track?: CropTrack;
+    /** An automatic track's clip range: the server saves it only if the clip still has that range and Auto framing. */
+    trackFor?: { start: number; end: number };
+  };
 }
 
 export async function patchClip(id: string, patch: ClipPatch): Promise<Clip> {

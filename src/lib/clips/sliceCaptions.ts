@@ -20,7 +20,14 @@ export function sliceCaptionsToRange(captions: Caption[], start: number, end: nu
     if (c.end <= start || c.start >= end) continue;
     const tokens = c.text.split(/\s+/).filter(Boolean);
     const times = wordTimes(c);
-    const kept = tokens.map((_, i) => i).filter((i) => times[i].end > start && times[i].start < end);
+    // A word belongs to the clip when most of it is inside: a neighbouring
+    // sentence's word that only reaches into the clip's padding stays out.
+    const kept = tokens
+      .map((_, i) => i)
+      .filter((i) => {
+        const mid = (times[i].start + times[i].end) / 2;
+        return mid >= start && mid <= end;
+      });
     if (!kept.length) continue;
 
     const rebase = (t: number) => Math.min(end, Math.max(start, t)) - start;
