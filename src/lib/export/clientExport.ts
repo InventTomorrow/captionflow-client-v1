@@ -484,6 +484,7 @@ export async function saveDeviceExportRecord(args: {
   format: ExportFormat;
   result: ExportResult;
   language?: string;
+  clipId?: string;
 }): Promise<LocalExportRecord> {
   const record: LocalExportRecord = {
     id: args.id,
@@ -502,6 +503,7 @@ export async function saveDeviceExportRecord(args: {
     fileSize: args.result.sizeBytes,
     opfsPath: args.result.outputPath,
     language: args.language,
+    ...(args.clipId ? { clipId: args.clipId } : {}),
   };
   await saveExportRecord(record);
   return record;

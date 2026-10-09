@@ -5,6 +5,7 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
+import { clipFrameTime, clipStyle, thumbKey, cropTrackFor } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 
 let passed = 0;
@@ -184,6 +185,29 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   const hero = buildExportStyle({ template: 'heroWord', highlightColor: '#FFFFFF', fontFamily: 'Inter' }, { defaultAspect: '9:16' });
   assert(hero.displayMode === 'paintOn' && hero.highlightColor === '#FF2D9A' && hero.fontFamily === 'Montserrat', 'Hero Word rules');
   assert(buildExportStyle({ template: 'blockbuster', displayMode: 'karaoke' }, { defaultAspect: '9:16' }).displayMode === 'phrase', 'kinetic forces phrase');
+}
+
+// ── clipMath (data-layer helpers) ───────────────────────────────────────
+{
+  const clip = { _id: 'c1', start: 10, end: 40, crop: { mode: 'auto' as const, x: 0.5, track: [[0, 0.3]] as Array<[number, number]> } };
+  assert(Math.abs(clipFrameTime(clip) - 11.5) < 1e-9, 'poster frame 1.5 s in');
+  assert(Math.abs(clipFrameTime({ ...clip, end: 12 }) - (10 + 2 / 3)) < 1e-9, 'short clip: a third in');
+  assert(thumbKey(clip) !== thumbKey({ ...clip, start: 11 }), 'thumb key changes with the in-point');
+  assert(thumbKey(clip) !== thumbKey({ ...clip, crop: { ...clip.crop, mode: 'manual', x: 0.8 } }), 'thumb key changes with framing');
+  assert(thumbKey(clip) === thumbKey({ ...clip }), 'thumb key is stable');
+
+  assert(JSON.stringify(cropTrackFor(clip)) === '[[0,0.3]]', 'auto → saved face track');
+  assert(JSON.stringify(cropTrackFor({ ...clip, crop: { mode: 'manual', x: 0.8, track: [] } })) === '[[0,0.8]]', 'manual → fixed centre');
+  assert(cropTrackFor({ ...clip, crop: { mode: 'none', x: 0.5, track: [] } }) === null, 'none → letterbox (no crop)');
+  assert(JSON.stringify(cropTrackFor({ ...clip, crop: { mode: 'auto', x: 0.5, track: [] } })) === '[[0,0.5]]', 'auto without a track yet → centre');
+
+  const base = { template: 'classic', fontFamily: 'Inter', color: '#00FF00', offsetY: 40, aspectRatio: '16:9', behindPerson: true };
+  const st = clipStyle(base, 'hero-word');
+  assert(st.aspectRatio === '9:16' && st.behindPerson === false, 'clips are 9:16, never behind-person');
+  assert(st.template === 'heroWord' && st.templateKey === 'hero-word', `template preset applied, got ${st.template}`);
+  assert(st.offsetY === 40, 'keeps the project caption position');
+  const keep = clipStyle(base, null);
+  assert(keep.template === 'classic' && keep.color === '#00FF00' && keep.fontFamily === 'Inter', 'no template key → project look');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

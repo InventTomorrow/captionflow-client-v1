@@ -49,6 +49,8 @@ export interface LocalExportRecord {
   /** File name of the last download and when it happened. */
   downloadedAs?: string;
   downloadedAt?: number;
+  /** Set when this export is a rendered Clips clip. */
+  clipId?: string;
 }
 
 interface MediaDbSchema extends DBSchema {
@@ -299,6 +301,14 @@ export async function latestExportForProject(projectId: string): Promise<LocalEx
   const db = await getDb();
   const rows = await db.getAllFromIndex('exports', 'by-project', projectId);
   return rows.sort((a, b) => b.exportedAt - a.exportedAt)[0] ?? null;
+}
+
+/** The newest render of one clip on this device. */
+export async function latestExportForClip(projectId: string, clipId: string): Promise<LocalExportRecord | null> {
+  if (!isLocalMediaSupported()) return null;
+  const db = await getDb();
+  const rows = await db.getAllFromIndex('exports', 'by-project', projectId);
+  return rows.filter((r) => r.clipId === clipId).sort((a, b) => b.exportedAt - a.exportedAt)[0] ?? null;
 }
 
 /** Remember that an export was downloaded (shown on its card). */
