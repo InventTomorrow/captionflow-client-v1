@@ -4,7 +4,7 @@
  */
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
-import { cropRect, cropXAt, integerCrop } from '../../src/lib/clips/cropTrack';
+import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -123,6 +123,55 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(all[2].left === 656 && all[2].width === 608, `centre crop snaps to 656/608, got ${all[2].left}/${all[2].width}`);
   const odd = integerCrop(cropRect(1279, 719, 1080, 1920, 1), 1279, 719);
   assert(odd.left + odd.width <= 1279, 'right-edge crop never overflows an odd-width source');
+}
+
+// ── smoothTrack (face samples → camera path) ────────────────────────────
+{
+  const at = (track: Array<[number, number]>, t: number) => cropXAt(track, t);
+  const series = (fn: (t: number) => FaceSample['faces'], seconds: number): FaceSample[] =>
+    Array.from({ length: seconds * 2 + 1 }, (_, i) => ({ t: i / 2, faces: fn(i / 2) }));
+
+  // Jitter inside the dead zone never moves the camera.
+  const jitter = smoothTrack(series((t) => [{ cx: (t * 2) % 2 ? 0.52 : 0.5, area: 0.1 }], 6));
+  const xs = jitter.map(([, x]) => x);
+  assert(Math.max(...xs) - Math.min(...xs) < 1e-9, `dead zone holds still, got ${xs.join(',')}`);
+
+  // A big jump (camera cut / speaker switch) is a hard cut: no pan across empty background,
+  // and no anticipation — the camera moves only after the median has seen the new position.
+  const jump = smoothTrack(series((t) => [{ cx: t < 1 ? 0.2 : 0.8, area: 0.1 }], 8));
+  assert(at(jump, 0) < 0.21 && Math.abs(at(jump, 1) - 0.2) < 1e-9, 'holds the old framing until the cut is seen');
+  assert(Math.abs(at(jump, 1.5) - 0.8) < 1e-9, `snaps to the new framing, got ${at(jump, 1.5)}`);
+  assert(Math.abs(at(jump, 1.01) - 0.8) < 1e-9, `the cut is instant, not a fast swipe (got ${at(jump, 1.01)} at t=1.01)`);
+  assert(Math.abs(at(jump, 6) - 0.8) < 1e-9, 'stays there');
+
+  // A moderate move pans, no faster than maxSpeed (0.18 at 0.35/s ≥ 0.51 s after t=1).
+  const drift = smoothTrack(series((t) => [{ cx: t < 1 ? 0.4 : 0.58, area: 0.1 }], 8));
+  const reach = drift.find(([, x]) => x > 0.579)?.[0] ?? Infinity;
+  assert(reach >= 1 + 0.18 / 0.35 - 1e-6 && reach <= 3, `pans at the speed limit, reached at t=${reach}`);
+  for (let i = 1; i < drift.length; i++) {
+    const v = Math.abs(drift[i][1] - drift[i - 1][1]) / (drift[i][0] - drift[i - 1][0]);
+    assert(v <= 0.35 + 1e-9, `pan speed ${v} at t=${drift[i][0]}`);
+  }
+
+  // Frames with no face hold the last framing.
+  const gaps = smoothTrack(series((t) => (t <= 1 ? [{ cx: 0.3, area: 0.1 }] : []), 4));
+  assert(Math.abs(at(gaps, 3.5) - 0.3) < 1e-9, `gap holds last value, got ${at(gaps, 3.5)}`);
+
+  // Leading frames before the first face use that face's position.
+  const late = smoothTrack(series((t) => (t >= 2 ? [{ cx: 0.7, area: 0.1 }] : []), 4));
+  assert(Math.abs(at(late, 0) - 0.7) < 1e-9, `backfilled start, got ${at(late, 0)}`);
+
+  // The biggest face wins.
+  const two = smoothTrack(series(() => [{ cx: 0.2, area: 0.02 }, { cx: 0.75, area: 0.2 }], 3));
+  assert(Math.abs(at(two, 1) - 0.75) < 1e-9, 'largest face is followed');
+
+  // A lone mis-detection is filtered out (median of 5).
+  const blip = smoothTrack(series((t) => [{ cx: t === 2 ? 0.95 : 0.4, area: 0.1 }], 5));
+  assert(blip.every(([, x]) => Math.abs(x - 0.4) < 1e-9), 'single-frame blip ignored');
+
+  assert(JSON.stringify(smoothTrack([])) === '[[0,0.5]]', 'no samples → centred');
+  assert(JSON.stringify(smoothTrack(series(() => [], 3))) === '[[0,0.5]]', 'no faces → centred');
+  assert(jitter.length <= 3, `flat stretches are compressed, got ${jitter.length} points`);
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

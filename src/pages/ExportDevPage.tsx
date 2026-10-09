@@ -107,6 +107,15 @@ function clipPreset(params: URLSearchParams) {
   };
 }
 
+/** ?cx=auto: replace the fixed crop with an on-device face track (clips/reframe.ts). */
+async function withFaceTrack(params: URLSearchParams, file: File, preset: ReturnType<typeof clipPreset>) {
+  if (params.get('cx') !== 'auto' || !('trim' in preset) || !preset.trim) return preset;
+  const { computeFaceTrack } = await import('../lib/clips/reframe');
+  const track = await computeFaceTrack(file, preset.trim.start, preset.trim.end);
+  (window as unknown as { __faceTrack?: unknown }).__faceTrack = track;
+  return { ...preset, framing: { mode: 'cover' as const, track } };
+}
+
 export function ExportDevPage() {
   const [params] = useSearchParams();
   const initialTemplate = params.get('template');
@@ -166,8 +175,8 @@ export function ExportDevPage() {
       style,
       captions,
       frameRate: params.get('fps') === 'original' ? 'original' : 'fast',
-      // Clip preset: ?clip=10-30&cx=0.5 → trim to 10–30 s, cover-crop centred at cx.
-      ...clipPreset(params),
+      // Clip preset: ?clip=10-30&cx=0.5 → trim to 10–30 s, cover-crop centred at cx (cx=auto: face track).
+      ...(await withFaceTrack(params, file, clipPreset(params))),
     });
     job.tuning = {
       hardwareAcceleration: (params.get('hw') as NonNullable<typeof job.tuning>['hardwareAcceleration']) ?? undefined,

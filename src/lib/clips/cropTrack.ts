@@ -64,3 +64,82 @@ export function integerCrop(rect: CropRect, srcW: number, srcH: number): CropRec
   const top = Math.min(srcH - height, Math.max(0, Math.round(rect.top)));
   return { left, top, width, height };
 }
+
+/** Faces found in one sampled frame: centre x (0..1 of the frame width) and area (0..1 of the frame). */
+export interface FaceSample {
+  t: number;
+  faces: Array<{ cx: number; area: number }>;
+}
+
+export interface SmoothOptions {
+  /** Ignore movements smaller than this (fraction of the source width). */
+  deadZone?: number;
+  /** Fastest pan, in source widths per second. */
+  maxSpeed?: number;
+  /** A move bigger than this is a camera cut or a speaker switch: cut, don't pan. */
+  cutThreshold?: number;
+}
+
+/**
+ * Face detections → a calm virtual camera path (CropTrack keyframes).
+ *
+ * Follows the largest face, holds the framing through frames with no face,
+ * drops one-frame mis-detections (median of 5), ignores jitter inside a dead
+ * zone and pans no faster than maxSpeed — a camera operator, not a tracker.
+ * A jump past cutThreshold (a multi-camera cut, the other speaker) is taken
+ * as a hard cut instead, so the frame never drifts across empty background.
+ * The camera starts moving after it has seen the subject move, never before.
+ */
+export function smoothTrack(samples: FaceSample[], opts: SmoothOptions = {}): CropTrack {
+  const deadZone = opts.deadZone ?? 0.08;
+  const maxSpeed = opts.maxSpeed ?? 0.35;
+  const cutThreshold = opts.cutThreshold ?? 0.25;
+  const sorted = [...samples].sort((a, b) => a.t - b.t);
+
+  // 1. Largest face per frame; gaps hold, leading gaps take the first face seen.
+  const raw: Array<number | null> = sorted.map((s) =>
+    s.faces.length ? s.faces.reduce((best, f) => (f.area > best.area ? f : best)).cx : null,
+  );
+  const first = raw.find((x): x is number => x !== null);
+  if (first === undefined) return [[0, 0.5]];
+  let held = first;
+  const targets = raw.map((x) => (held = x ?? held));
+
+  // 2. Median of 5 (symmetric window, narrowed at the ends).
+  const median = targets.map((_, i) => {
+    const r = Math.min(2, i, targets.length - 1 - i);
+    const win = targets.slice(i - r, i + r + 1).sort((a, b) => a - b);
+    return win[r];
+  });
+
+  // 3. Dead zone + speed limit, reacting to the previous frame's target.
+  const out: CropTrack = [[sorted[0].t, clamp01(median[0])]];
+  let pos = clamp01(median[0]);
+  let moving = false;
+  for (let i = 1; i < sorted.length; i++) {
+    const dt = Math.max(0, sorted[i].t - sorted[i - 1].t);
+    const target = clamp01(median[i - 1]);
+    const d = target - pos;
+    if (Math.abs(d) > cutThreshold) {
+      // A step, not a ramp: the new framing starts right after the frame that revealed it.
+      out.push([sorted[i - 1].t + Math.min(0.001, dt / 2), target]);
+      pos = target;
+      moving = false;
+    } else if (!moving && Math.abs(d) > deadZone) moving = true;
+    if (moving) {
+      const step = maxSpeed * dt;
+      if (Math.abs(d) <= step) {
+        pos = target;
+        moving = false;
+      } else {
+        pos += Math.sign(d) * step;
+      }
+    }
+    out.push([sorted[i].t, pos]);
+  }
+
+  // 4. Keep only points that carry information (flat stretches → their ends).
+  return out.filter(
+    (p, i) => i === 0 || i === out.length - 1 || p[1] !== out[i - 1][1] || p[1] !== out[i + 1][1],
+  );
+}
