@@ -4,6 +4,7 @@
  */
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
+import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 
 let passed = 0;
@@ -172,6 +173,17 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(JSON.stringify(smoothTrack([])) === '[[0,0.5]]', 'no samples → centred');
   assert(JSON.stringify(smoothTrack(series(() => [], 3))) === '[[0,0.5]]', 'no faces → centred');
   assert(jitter.length <= 3, `flat stretches are compressed, got ${jitter.length} points`);
+}
+
+// ── buildExportStyle (shared by the editor export and clip renders) ──────
+{
+  const d = buildExportStyle({}, { defaultAspect: '9:16' });
+  assert(d.template === 'classic' && d.fontSize === 48 && d.fontWeight === 700 && d.offsetY === 72, 'editor defaults');
+  assert(d.aspectRatio === '9:16' && d.displayMode === 'phrase' && d.displayWords === 5, 'aspect/display defaults');
+  assert(buildExportStyle({ aspectRatio: 'original' }, { defaultAspect: '9:16' }).aspectRatio === '9:16', '"original" → concrete aspect');
+  const hero = buildExportStyle({ template: 'heroWord', highlightColor: '#FFFFFF', fontFamily: 'Inter' }, { defaultAspect: '9:16' });
+  assert(hero.displayMode === 'paintOn' && hero.highlightColor === '#FF2D9A' && hero.fontFamily === 'Montserrat', 'Hero Word rules');
+  assert(buildExportStyle({ template: 'blockbuster', displayMode: 'karaoke' }, { defaultAspect: '9:16' }).displayMode === 'phrase', 'kinetic forces phrase');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

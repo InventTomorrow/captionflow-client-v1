@@ -19,7 +19,7 @@ import { joinProjectRoom, connectSocket, getSocket } from '../lib/socket';
 import { PrepareMediaModal } from '../components/PrepareMediaModal';
 import { PricingModal } from '../components/PricingModal';
 import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
-import { CaptionOverlay, findActiveCaption, type CaptionTemplate } from '../components/CaptionOverlay';
+import { CaptionOverlay, findActiveCaption } from '../components/CaptionOverlay';
 import KineticCaptionLayer from '../components/KineticCaptionLayer';
 import {
   isKineticTemplate,
@@ -38,7 +38,7 @@ import {
   resolveCaptionAnchor,
   type CaptionPosition,
 } from '../lib/captionPosition';
-import { matchTemplateKey, pickerTemplates } from '../lib/templateCatalog';
+import { pickerTemplates } from '../lib/templateCatalog';
 import { TemplateCard } from '../components/TemplateCard';
 import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
 import { TimelineBlocks } from '../components/TimelineBlocks';
@@ -48,10 +48,10 @@ import {
   evictOldExportsIfNeeded,
   getSourceFile,
   markExportDownloaded,
-  storeSourceFile,
 } from '../lib/media/localMedia';
 import { captionLanguageLabel } from '../lib/languageLabel';
-import { probeMediaFile } from '../lib/media/probe';
+import { locateOriginal } from '../lib/media/locateSource';
+import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
 import { uploadVideoToProject } from '../lib/export/serverUpload';
 import {
   authorizeDeviceExport,
@@ -71,38 +71,7 @@ import {
   type ExportRoute,
 } from '../lib/export/clientExport';
 
-interface StyleState {
-  template: CaptionTemplate;
-  fontFamily: string;
-  fontSize: number;
-  fontWeight: number;
-  color: string;
-  backgroundColor: string;
-  /** Accent color for hero words, karaoke highlight, marks. */
-  highlightColor: string;
-  /** Karaoke active-word pill fill (e.g. Viral Orange). Transparent = none. */
-  activeFill: string;
-  /** Optional whole-caption text transform from Antigravity presets. */
-  textTransform: 'none' | 'uppercase' | 'lowercase';
-  position: 'top' | 'center' | 'bottom';
-  /** Custom vertical position (% from top, caption center). null = use `position` preset. */
-  offsetY: number | null;
-  /** Custom horizontal position (% from left, caption center). null = centered. */
-  offsetX: number | null;
-  animation: string;
-  /** Preview/export canvas ratio (e.g. 9:16, 16:9). */
-  aspectRatio: string;
-  /** How captions appear on the video — derived client-side, no API calls. */
-  displayMode: DisplayMode;
-  /** Words per caption for phrase-based display templates. */
-  displayWords: number;
-  /** Blockbuster's knobs (glow / letter spacing / tilt / script size); missing = as authored. */
-  kinetic?: KineticParams;
-  /** Text behind person (kinetic templates): person composited over the captions. */
-  behindPerson?: boolean;
-  /** Picker card the style started from (lib/templateCatalog.ts); feeds the admin export log. */
-  templateKey?: string;
-}
+type StyleState = EditorStyle;
 
 /** Server-side state of the project's person matte (Project.masks). */
 interface MasksState {
@@ -146,32 +115,6 @@ const DISPLAY_TEMPLATES: Array<{
 const PHRASE_BASED: DisplayMode[] = ['karaoke', 'phrase', 'popOn', 'rolling', 'paintOn', 'typewriter'];
 */
 
-/**
- * Display mode forced by the multi-size ("stacked") templates, or null when
- * the template lets the user pick freely.
- *
- * These templates size each word differently, so karaoke/word modes would
- * flatten them. Hero Word additionally builds its phrase up word by word
- * (paintOn); Neon Glow / Hero Punch / Poetic Stack show the whole block.
- *
- * MUST stay in sync with stackedDisplayMode() in
- * server/src/services/export.service.ts — that pairing is what makes the
- * preview and the burned-in export identical.
- */
-function stackedDisplayMode(template?: string): DisplayMode | null {
-  if (template === 'heroWord') return 'paintOn';
-  if (
-    template === 'hero' ||
-    template === 'stack' ||
-    template === 'mixed' ||
-    template === 'mixed2'
-  )
-    return 'phrase';
-  // The kinetic templates lay out a whole caption's letters at once and stagger
-  // them internally, so karaoke/word would fight the engine's own timing.
-  if (isKineticTemplate(template)) return 'phrase';
-  return null;
-}
 
 const ASPECT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '9:16', label: '9:16 - Reels / TikTok' },
@@ -2086,32 +2029,16 @@ export function EditorPage() {
   }
 
   /** "Locate file" on an audio-only project: accept the original only if it matches, keep it on this device. */
-  async function locateOriginal(file: File) {
+  async function locateOriginalFile(file: File) {
     if (!id || !missingSource) return;
     setLocateBusy(true);
     setLocateError('');
     try {
-      const probe = await probeMediaFile(file);
-      if (!probe?.hasVideo) {
-        setLocateError('That file isn’t a video this browser can read.');
+      const located = await locateOriginal(id, missingSource, file);
+      if (!located.ok) {
+        setLocateError(located.error);
         return;
       }
-      const sizeOk =
-        !missingSource.size || Math.abs(file.size - missingSource.size) <= missingSource.size * 0.01;
-      const durationOk =
-        !missingSource.durations.length ||
-        missingSource.durations.some((d) => Math.abs(probe.duration - d) <= 0.5);
-      if (!sizeOk || !durationOk) {
-        const expected = [
-          missingSource.size ? formatBytes(missingSource.size) : '',
-          missingSource.durations.length ? formatSeconds(missingSource.durations[0]) : '',
-        ]
-          .filter(Boolean)
-          .join(', ');
-        setLocateError(`That doesn’t look like the original video${expected ? ` (expected ${expected})` : ''}.`);
-        return;
-      }
-      await storeSourceFile(id, file, probe);
       setMissingSource(null);
       setVideoSourceKey((k) => k + 1);
     } catch (err) {
@@ -2130,45 +2057,7 @@ export function EditorPage() {
     setDeviceResult(null);
     setExportWhere(null);
     try {
-      const live = styleRef.current;
-      const aspectForBurn =
-        live.aspectRatio && live.aspectRatio !== 'original'
-          ? live.aspectRatio
-          : DEFAULT_ASPECT;
-      // Explicit full snapshot — every field the burn-in needs.
-      const styleSnap: StyleState = {
-        template: live.template || 'classic',
-        fontFamily: live.fontFamily || 'Montserrat',
-        fontSize: Number(live.fontSize) || 48,
-        fontWeight: Number(live.fontWeight) || 700,
-        color: live.color || '#FFFFFF',
-        backgroundColor: live.backgroundColor || 'rgba(0,0,0,0)',
-        highlightColor: live.highlightColor || '#FFC43D',
-        activeFill: live.activeFill || 'transparent',
-        textTransform: live.textTransform || 'none',
-        position: live.position || 'bottom',
-        offsetX: typeof live.offsetX === 'number' ? live.offsetX : 50,
-        offsetY: typeof live.offsetY === 'number' ? live.offsetY : 72,
-        animation: live.animation || 'fade',
-        aspectRatio: aspectForBurn,
-        displayMode: live.displayMode || 'phrase',
-        displayWords: Number(live.displayWords) || 5,
-        kinetic: live.kinetic,
-        behindPerson: !!live.behindPerson,
-        // Older projects saved no key: match the look to a card ("" = custom look).
-        templateKey: matchTemplateKey(live) ?? '',
-      };
-      // Mirror live editor rules only — do NOT inflate fontSize/weight here
-      // (that made burn-in look different from the preview the user approved).
-      const forcedExportMode = stackedDisplayMode(styleSnap.template);
-      if (forcedExportMode) styleSnap.displayMode = forcedExportMode;
-      if (styleSnap.template === 'heroWord') {
-        if (!styleSnap.highlightColor || styleSnap.highlightColor === '#FFFFFF') {
-          styleSnap.highlightColor = '#FF2D9A';
-        }
-        styleSnap.fontWeight = styleSnap.fontWeight || 900;
-        styleSnap.fontFamily = 'Montserrat';
-      }
+      const styleSnap: StyleState = buildExportStyle(styleRef.current, { defaultAspect: DEFAULT_ASPECT });
       // Captions no longer live in Mongo — this is the export's SOLE caption
       // source (not an override of a DB read), so it must be the full shape.
       const captionsSnap = captions
@@ -2191,7 +2080,7 @@ export function EditorPage() {
           ownBlock: c.ownBlock,
         }));
       // Always persist + send concrete aspect (9:16 / 16:9) — never "original".
-      setStyle((s) => ({ ...s, aspectRatio: aspectForBurn }));
+      setStyle((s) => ({ ...s, aspectRatio: styleSnap.aspectRatio }));
       await api.patch(`/projects/${id}/style`, styleSnap);
 
       const route = await chooseExportRoute({
@@ -2873,7 +2762,7 @@ export function EditorPage() {
                     onChange={(e) => {
                       const picked = e.target.files?.[0];
                       e.target.value = '';
-                      if (picked) void locateOriginal(picked);
+                      if (picked) void locateOriginalFile(picked);
                     }}
                   />
                 </label>
