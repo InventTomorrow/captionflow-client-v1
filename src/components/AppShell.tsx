@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useMatch, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
 import { api } from '../lib/api';
 import { PricingModal } from './PricingModal';
+import { subscribeClipsEvents } from '../stores/clipsStore';
 
 function CrownIcon({ crossedOut }: { crossedOut?: boolean }) {
   return (
@@ -27,6 +28,18 @@ function InfoIcon() {
       <circle cx="12" cy="12" r="9.5" />
       <line x1="12" y1="11" x2="12" y2="16.5" />
       <circle cx="12" cy="7.5" r="0.25" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function NavClipsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="6" cy="6" r="3" />
+      <path d="M8.12 8.12 12 12" />
+      <path d="M20 4 8.12 15.88" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M14.8 14.8 20 20" />
     </svg>
   );
 }
@@ -261,11 +274,17 @@ export function AppShell() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const editorActive = useEditorChromeStore((s) => s.active);
+  const editorMatch = useMatch('/projects/:id/editor');
   const onExport = useEditorChromeStore((s) => s.onExport);
   const onDownloadSrt = useEditorChromeStore((s) => s.onDownloadSrt);
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
   const [pricingOpen, setPricingOpen] = useState(false);
+
+  // Clips progress arrives in the user's own socket room, on any page.
+  useEffect(() => {
+    if (flags.clipsEnabled) subscribeClipsEvents();
+  }, [flags.clipsEnabled]);
 
   async function signOut() {
     await logout();
@@ -290,6 +309,12 @@ export function AppShell() {
         {editorActive ? (
           <>
             <span className="topbar-divider" aria-hidden="true" />
+            {flags.clipsEnabled && editorMatch?.params.id && (
+              <Link to={`/clips/${editorMatch.params.id}`} className="btn ghost topbar-upload-btn">
+                <NavClipsIcon />
+                Find clips
+              </Link>
+            )}
             <Link to="/projects/upload" className="btn ghost topbar-upload-btn">
               <svg
                 width="14"
@@ -352,6 +377,12 @@ export function AppShell() {
                 <NavUploadIcon />
                 Upload
               </NavLink>
+              {flags.clipsEnabled && (
+                <NavLink to="/clips">
+                  <NavClipsIcon />
+                  Clips
+                </NavLink>
+              )}
               {(user?.role === 'admin' || user?.role === 'support') && (
                 <NavLink to="/admin">
                   <NavUserIcon />

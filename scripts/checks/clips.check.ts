@@ -5,7 +5,7 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { clipFrameTime, clipStyle, thumbKey, cropTrackFor } from '../../src/lib/clips/clipMath';
+import { clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 
 let passed = 0;
@@ -208,6 +208,15 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(st.offsetY === 40, 'keeps the project caption position');
   const keep = clipStyle(base, null);
   assert(keep.template === 'classic' && keep.color === '#00FF00' && keep.fontFamily === 'Inter', 'no template key → project look');
+}
+
+// ── expectedSource ("Locate file" must accept the real original) ─────────
+{
+  const e = expectedSource({ size: 1_200_000, originalSize: 11_884_111, duration: 91.96, originalDuration: 93.73 });
+  assert(e.size === 11_884_111, 'matches the original upload size, not the uploaded audio');
+  assert(e.durations.includes(93.73) && e.durations.includes(91.96), `both durations accepted, got ${e.durations}`);
+  const bare = expectedSource({ duration: 60 });
+  assert(bare.size === 0 && bare.durations.join() === '60', 'missing fields → unknown size');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

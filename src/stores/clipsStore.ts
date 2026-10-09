@@ -52,6 +52,8 @@ interface ClipsState {
   setFeedFilter(f: Partial<Pick<FeedState, 'sort' | 'rendered' | 'projectId'>>): void;
   loadFeed(reset?: boolean): Promise<void>;
   updateClip(id: string, patch: ClipPatch): Promise<Clip>;
+  /** Replace a clip already saved on the server (e.g. a freshly computed face track). */
+  setClipLocal(clip: Clip): void;
   removeClip(id: string): Promise<void>;
   enqueueRenders(jobs: Array<{ clip: Clip; ctx: ClipRenderContext; opts: ClipRenderOptions }>): void;
   cancelRender(clipId: string): void;
@@ -109,6 +111,11 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
 
   async updateClip(id, patch) {
     const clip = await apiPatchClip(id, patch);
+    get().setClipLocal(clip);
+    return clip;
+  },
+
+  setClipLocal(clip) {
     set((s) => {
       const pid = clip.projectId;
       const proj = s.byProject[pid];
@@ -117,7 +124,6 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
         feed: { ...s.feed, items: replaceClip(s.feed.items, clip) },
       };
     });
-    return clip;
   },
 
   async removeClip(id) {
@@ -167,7 +173,7 @@ async function pump() {
   if (!job) return;
   const started = performance.now();
   setRender(job.clip._id, { status: 'rendering', percent: 0, detail: 'Preparing…' });
-  const handle = renderClip(job.clip, job.ctx, job.opts, (p) =>
+  const handle = renderClip(job.clip, { ...job.ctx, onClipUpdated: (c) => useClipsStore.getState().setClipLocal(c) }, job.opts, (p) =>
     setRender(job.clip._id, { status: 'rendering', percent: p.percent, detail: describeDeviceProgress(p, started) }),
   );
   active = { clipId: job.clip._id, cancel: handle.cancel };

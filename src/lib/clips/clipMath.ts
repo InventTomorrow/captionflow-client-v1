@@ -53,3 +53,31 @@ export function clipStyle(projectStyle: Partial<EditorStyle>, templateKey: strin
   };
   return buildExportStyle(merged, { defaultAspect: '9:16' });
 }
+
+/**
+ * What "Locate file" checks a picked file against: the size of the video the
+ * user originally chose (not the audio that was uploaded) and every duration
+ * the server knows — container and audio lengths can differ by a second.
+ * Same rule as the editor's own Locate file.
+ */
+export function expectedSource(video: {
+  size?: number;
+  originalSize?: number;
+  duration?: number;
+  originalDuration?: number;
+}): { size: number; durations: number[] } {
+  return {
+    size: Number(video.originalSize) || 0,
+    durations: [video.originalDuration, video.duration].map(Number).filter((d) => d > 0),
+  };
+}
+
+/** m:ss for a clip length in seconds. */
+export function formatClipLength(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export function scoreTone(score: number): 'high' | 'mid' | 'low' {
+  return score >= 80 ? 'high' : score >= 60 ? 'mid' : 'low';
+}

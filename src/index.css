@@ -459,6 +459,26 @@ a.lp-brand:hover {
   }
 }
 
+/* Small phones: with the Clips tab the icon row needs a little less padding to fit. */
+@media (max-width: 420px) {
+  .shell:not(.shell-editor) .topbar {
+    gap: 0.35rem;
+    padding-inline: 0.5rem;
+  }
+
+  .shell:not(.shell-editor) .topbar .brand-logo {
+    height: 34px;
+  }
+
+  .topbar nav.topbar-nav a {
+    padding: 0 0.35rem;
+  }
+
+  .topbar-account .plan-badge {
+    padding: 0.4rem 0.5rem;
+  }
+}
+
 .topbar-editor-actions {
   display: flex;
   align-items: center;

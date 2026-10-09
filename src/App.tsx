@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
+import { useFlagsStore } from './stores/flagsStore';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -25,6 +26,26 @@ const EditorPage = lazy(() =>
   import('./pages/EditorPage').then((m) => ({ default: m.EditorPage })),
 );
 // Loaded on demand: it draws the editor's template cards (kinetic thumbnails).
+const ClipsGalleryPage = lazy(() =>
+  import('./pages/clips/ClipsGalleryPage').then((m) => ({ default: m.ClipsGalleryPage })),
+);
+const NewClipsPage = lazy(() => import('./pages/clips/NewClipsPage').then((m) => ({ default: m.NewClipsPage })));
+const ClipSetPage = lazy(() => import('./pages/clips/ClipSetPage').then((m) => ({ default: m.ClipSetPage })));
+const ClipEditorPage = lazy(() => import('./pages/clips/ClipEditorPage').then((m) => ({ default: m.ClipEditorPage })));
+
+/** Clips pages exist only while the admin flag is on; anything else goes to Upload. */
+function ClipsGate({ children }: { children: React.ReactNode }) {
+  const flags = useFlagsStore((s) => s.flags);
+  const loaded = useFlagsStore((s) => s.loaded);
+  const load = useFlagsStore((s) => s.load);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (!loaded) return null;
+  if (!flags.clipsEnabled) return <Navigate to="/projects/upload" replace />;
+  return <Suspense fallback={<div className="center">Loading…</div>}>{children}</Suspense>;
+}
+
 const AdminTemplatesPage = lazy(() =>
   import('./pages/admin/AdminTemplatesPage').then((m) => ({ default: m.AdminTemplatesPage })),
 );
@@ -183,6 +204,19 @@ export default function App() {
             </Suspense>
           }
         />
+      </Route>
+      <Route
+        path="/clips"
+        element={
+          <Private>
+            <AppShell />
+          </Private>
+        }
+      >
+        <Route index element={<ClipsGate><ClipsGalleryPage /></ClipsGate>} />
+        <Route path="new" element={<ClipsGate><NewClipsPage /></ClipsGate>} />
+        <Route path=":projectId" element={<ClipsGate><ClipSetPage /></ClipsGate>} />
+        <Route path=":projectId/:clipId" element={<ClipsGate><ClipEditorPage /></ClipsGate>} />
       </Route>
       <Route
         path="/admin"

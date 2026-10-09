@@ -12,7 +12,16 @@ export interface ClipProjectSummary {
   kind: 'captions' | 'clips';
   status: string;
   stage?: { current?: string; percent?: number; message?: string };
-  video?: { kind?: 'video' | 'audio'; width?: number; height?: number; duration?: number; rotation?: number; size?: number };
+  video?: {
+    kind?: 'video' | 'audio';
+    width?: number;
+    height?: number;
+    duration?: number;
+    rotation?: number;
+    size?: number;
+    originalSize?: number;
+    originalDuration?: number;
+  };
 }
 
 export interface Clip {

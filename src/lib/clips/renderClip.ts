@@ -25,6 +25,7 @@ import { probeMediaFile } from '../media/probe';
 import { exportFrameSize, type ExportFormat, type ExportQuality } from '../render/frame';
 import type { Caption } from '../../stores/captionStore';
 import { authorizeClipRender, completeClipRender, failClipRender, type Clip } from './api';
+import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
 import { clipStyle, cropTrackFor } from './clipMath';
 
 export interface ClipRenderContext {
@@ -32,6 +33,8 @@ export interface ClipRenderContext {
   projectName: string;
   /** The project's saved caption style (Project.style). */
   projectStyle: Partial<EditorStyle>;
+  /** Called when the render had to save something on the clip first (its face track). */
+  onClipUpdated?: (clip: Clip) => void;
 }
 
 export interface ClipRenderOptions {
@@ -49,7 +52,8 @@ export class ClipRenderError extends Error {
   }
 }
 
-async function projectCaptions(projectId: string): Promise<Caption[]> {
+/** The project's captions: this browser's copy, else the server's cache (then kept locally). */
+export async function projectCaptions(projectId: string): Promise<Caption[]> {
   const local = await getAllForProject(projectId).catch(() => [] as Caption[]);
   if (local.length) return local;
   // Another browser / cleared storage: the server keeps a copy for exactly this.
@@ -65,13 +69,14 @@ export interface ClipRenderHandle {
 }
 
 export function renderClip(
-  clip: Clip,
+  clipIn: Clip,
   ctx: ClipRenderContext,
   opts: ClipRenderOptions,
   onProgress: (p: DeviceExportProgress) => void,
 ): ClipRenderHandle {
   let cancelInner: (() => void) | null = null;
   let cancelled = false;
+  let clip = clipIn;
   const promise = (async () => {
     const blocker = deviceExportBlocker();
     if (blocker) throw new ClipRenderError('UNSUPPORTED', blocker);
@@ -95,6 +100,15 @@ export function renderClip(
     });
     if (cancelled) throw new ClipRenderError('CANCELLED', 'Cancelled');
     await evictOldExportsIfNeeded(80).catch(() => 0);
+    // Auto framing never renders a centre crop by accident: track the face first.
+    if (needsFaceTrack(clip)) {
+      onProgress({ stage: 'prepare', percent: 1 });
+      const tracked = await ensureFaceTrack(ctx.projectId, clip).catch(() => null);
+      if (tracked) {
+        clip = tracked;
+        ctx.onClipUpdated?.(tracked);
+      }
+    }
 
     const track = cropTrackFor(clip);
     const job = await buildDeviceExportJob({
