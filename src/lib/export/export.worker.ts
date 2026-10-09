@@ -42,6 +42,7 @@ import { fingerprintMismatches, loadKineticFontsForWorker } from './workerFonts'
 import { loadLayoutFonts } from './layout/layoutFonts';
 import { createLayoutPainter } from './layout/painter';
 import { isBehindAt } from './behindWindows';
+import { cropRect, cropXAt, integerCrop } from '../clips/cropTrack';
 // personMatte.ts (MediaPipe) is imported only by exports with text behind person.
 import type { PersonMatter } from './personMatte';
 
@@ -302,6 +303,12 @@ async function run(job: ExportJob): Promise<void> {
       );
     }
 
+    const sourceDuration = await input.computeDuration();
+    const trim = job.trim
+      ? { start: Math.max(0, job.trim.start), end: Math.min(job.trim.end, sourceDuration || job.trim.end) }
+      : undefined;
+    const outputDuration = trim ? Math.max(0, trim.end - trim.start) : sourceDuration;
+
     // Audio: copy the packets when the container can hold the codec (no
     // quality loss, no encoder needed — Safari's AAC encoder is broken and
     // Firefox/Linux have none). Otherwise re-encode to the container's codec.
@@ -309,7 +316,7 @@ async function run(job: ExportJob): Promise<void> {
       job.format === 'webm' ? new WebMOutputFormat() : new Mp4OutputFormat({
         // Small files get the index up front (streamable, like ffmpeg's
         // +faststart); long ones write it at the end so memory stays flat.
-        fastStart: W * H * (await input.computeDuration()) <= 1920 * 1080 * 90 ? 'in-memory' : false,
+        fastStart: W * H * outputDuration <= 1920 * 1080 * 90 ? 'in-memory' : false,
       });
     let audioMode: ExportResult['audio'] = 'none';
     let audioOptions: ConversionAudioOptions = { discard: true };
@@ -331,6 +338,13 @@ async function run(job: ExportJob): Promise<void> {
         }
         audioMode = 'transcoded';
         audioOptions = { codec: target };
+      }
+      // A trimmed copy may still need re-encoding at the cut points, and
+      // Mediabunny decides that on its own — make sure an AAC encoder exists
+      // so it never falls back to dropping the audio track.
+      if (trim && job.format !== 'webm' && !(await canEncodeAudio('aac'))) {
+        const { registerAacEncoder } = await import('@mediabunny/aac-encoder');
+        registerAacEncoder();
       }
     }
     checkCancelled(state);
@@ -362,6 +376,7 @@ async function run(job: ExportJob): Promise<void> {
     let processMs = 0;
     let overlayMs = 0;
     const tuning = job.tuning ?? {};
+    const framing = job.framing ?? { mode: 'contain' as const };
     let thumbnail: Promise<Blob | null> | null = null;
 
     const process = (sample: VideoSample) => {
@@ -370,8 +385,16 @@ async function run(job: ExportJob): Promise<void> {
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
-      // Letterbox on black, rotation applied — the server's scale+pad.
-      sample.drawWithFit(ctx, { fit: 'contain' });
+      if (framing.mode === 'cover') {
+        // Vertical reframe: the crop window follows the clip's crop track.
+        const sw = sample.displayWidth;
+        const sh = sample.displayHeight;
+        const crop = integerCrop(cropRect(sw, sh, W, H, cropXAt(framing.track, sample.timestamp)), sw, sh);
+        sample.drawWithFit(ctx, { fit: 'cover', crop });
+      } else {
+        // Letterbox on black, rotation applied — the server's scale+pad.
+        sample.drawWithFit(ctx, { fit: 'contain' });
+      }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const o0 = performance.now();
       if (!tuning.noOverlay) overlay.draw(ctx, sample.timestamp);
@@ -406,6 +429,8 @@ async function run(job: ExportJob): Promise<void> {
         frameRate,
       },
       audio: audioOptions,
+      // Trimmed samples arrive rebased to 0, matching the clip-relative captions.
+      trim,
     });
 
     const lostVideo = conversion.discardedTracks.find((d) => d.track.isVideoTrack());
@@ -435,7 +460,7 @@ async function run(job: ExportJob): Promise<void> {
 
     const file = await sink.file();
     const thumb = await (thumbnail ?? snapshotThumbnail(canvas));
-    const durationSec = await input.computeDuration().catch(() => 0);
+    const durationSec = outputDuration;
 
     const result: ExportResult = {
       outputPath: job.outputPath,

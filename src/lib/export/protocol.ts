@@ -40,6 +40,13 @@ export interface LayoutOverlaySpec {
 
 export type OverlaySpec = KineticOverlaySpec | LayoutOverlaySpec;
 
+/**
+ * 'contain' letterboxes the whole source (the editor export). 'cover' fills the
+ * frame with a crop window whose horizontal centre follows `track`
+ * ([clipTime, cx 0..1] keyframes — clips/cropTrack.ts).
+ */
+export type ExportFraming = { mode: 'contain' } | { mode: 'cover'; track: Array<[number, number]> };
+
 export interface ExportJob {
   jobId: string;
   /** The source video (an OPFS-backed File — posting it copies no bytes). */
@@ -58,8 +65,13 @@ export interface ExportJob {
   overlay: OverlaySpec;
   /** URL prefix the caption fonts are fetched from (client/public/fonts). */
   fontsBase: string;
-  /** Source time (seconds) at which to grab the thumbnail frame. */
+  /** Output time (seconds) at which to grab the thumbnail frame. */
   thumbnailAt: number;
+  /** Export only this source range (a clip). Output time starts at 0, and the
+   *  overlay's captions must already be rebased to it (sliceCaptionsToRange). */
+  trim?: { start: number; end: number };
+  /** How the source fills the output frame. Absent = 'contain' (letterbox). */
+  framing?: ExportFraming;
   /** Benchmark switches (dev page only) — omit in production. */
   tuning?: ExportTuning;
 }

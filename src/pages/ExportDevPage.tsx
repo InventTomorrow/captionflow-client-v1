@@ -97,6 +97,16 @@ function sampleCaptions(duration: number): Caption[] {
   return out;
 }
 
+function clipPreset(params: URLSearchParams) {
+  const m = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/.exec(params.get('clip') ?? '');
+  if (!m) return {};
+  const cx = Number(params.get('cx') ?? 0.5);
+  return {
+    trim: { start: Number(m[1]), end: Number(m[2]) },
+    framing: { mode: 'cover' as const, track: [[0, Number.isFinite(cx) ? cx : 0.5]] as Array<[number, number]> },
+  };
+}
+
 export function ExportDevPage() {
   const [params] = useSearchParams();
   const initialTemplate = params.get('template');
@@ -156,6 +166,8 @@ export function ExportDevPage() {
       style,
       captions,
       frameRate: params.get('fps') === 'original' ? 'original' : 'fast',
+      // Clip preset: ?clip=10-30&cx=0.5 → trim to 10–30 s, cover-crop centred at cx.
+      ...clipPreset(params),
     });
     job.tuning = {
       hardwareAcceleration: (params.get('hw') as NonNullable<typeof job.tuning>['hardwareAcceleration']) ?? undefined,

@@ -43,6 +43,7 @@ import {
 } from '../render/frame';
 import type {
   ExportErrorCode,
+  ExportFraming,
   ExportJob,
   ExportResult,
   ExportStage,
@@ -55,6 +56,7 @@ import type { DisplayMode } from '../displayCaptions';
 import { compileLayoutTrack } from './layout/compile';
 import { resolveFontSources } from './layout/fontSources';
 import { behindWindows } from './behindWindows';
+import { sliceCaptionsToRange } from '../clips/sliceCaptions';
 
 /** The style fields an export reads (a subset of the editor's StyleState). */
 export interface ExportStyle {
@@ -242,18 +244,28 @@ export async function buildDeviceExportJob(args: {
   captions: Caption[];
   /** 'fast' caps the output at 30 fps (60 fps sources render in half the time). */
   frameRate?: ExportFrameRate;
+  /** A clip: export only this source range, captions rebased to start at 0. */
+  trim?: { start: number; end: number };
+  framing?: ExportFraming;
   onPrepare?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }): Promise<ExportJob> {
+  const { trim } = args;
+  // Clips: captions cut at word level and rebased to the clip's 0. Text behind
+  // person stays off — its matte maps onto the letterboxed frame only.
+  const captions = trim
+    ? sliceCaptionsToRange(args.captions, trim.start, trim.end).map((c) => ({ ...c, behindPerson: false }))
+    : args.captions;
+  const style = trim ? { ...args.style, behindPerson: false } : args.style;
   let overlay: OverlaySpec;
   let firstStart: number | undefined;
-  if (isKineticTemplate(args.style.template)) {
-    const kinetic = buildKineticOverlay(args.captions, args.style);
+  if (isKineticTemplate(style.template)) {
+    const kinetic = buildKineticOverlay(captions, style);
     overlay = kinetic;
     firstStart = kinetic.captions[0]?.start;
   } else {
     const track = await compileLayoutTrack({
-      captions: args.captions,
+      captions,
       style: {
         template: args.style.template,
         fontFamily: args.style.fontFamily,
@@ -279,10 +291,14 @@ export async function buildDeviceExportJob(args: {
     overlay = { kind: 'layout', track, fonts: await resolveFontSources(track) };
     firstStart = track.captions[0]?.start;
   }
-  // Thumbnail once the first caption has settled (entry animations take ~1 s).
+  // Thumbnail once the first caption has settled (entry animations take ~1 s);
+  // a clip grabs its own early frame, in clip time.
   const wanted = firstStart !== undefined ? firstStart + 1.2 : 1;
-  const thumbnailAt =
-    args.durationSec > 0 ? Math.max(0, Math.min(wanted, args.durationSec * 0.9)) : wanted;
+  const thumbnailAt = trim
+    ? Math.min(1.2, Math.max(0, trim.end - trim.start) / 2)
+    : args.durationSec > 0
+      ? Math.max(0, Math.min(wanted, args.durationSec * 0.9))
+      : wanted;
   return {
     jobId: args.exportId,
     source: args.source,
@@ -296,6 +312,8 @@ export async function buildDeviceExportJob(args: {
     overlay,
     fontsBase: FONT_URL_BASE,
     thumbnailAt,
+    trim,
+    framing: args.framing,
   };
 }
 
