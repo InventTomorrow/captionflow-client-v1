@@ -10,7 +10,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
-import { clipEditorUrl } from '../../lib/clips/clipMode';
+import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { errorMessage } from '../../lib/api';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
@@ -34,6 +34,7 @@ export function ClipsGalleryPage() {
   const [styleBusy, setStyleBusy] = useState(false);
   const [styleError, setStyleError] = useState('');
   const sentinel = useRef<HTMLDivElement | null>(null);
+  const openEditor = useOpenInEditor();
 
   useEffect(() => {
     void loadFeed(true).catch((e) => setError(errorMessage(e, 'Couldn’t load your clips')));
@@ -190,7 +191,7 @@ export function ClipsGalleryPage() {
           selected={selected ?? undefined}
           onToggleSelect={(c) => toggleSelect(c._id)}
           onOpen={(c) => navigate(`/clips/${c.projectId}/${c._id}`)}
-          onEditCaptions={(c) => navigate(clipEditorUrl(c.projectId, c._id))}
+          onEditCaptions={(c) => openEditor.open(c.projectId, c)}
           onDownload={(c) => void download(c)}
           onDelete={(c) => void remove(c)}
         />
@@ -223,6 +224,7 @@ export function ClipsGalleryPage() {
       )}
       <div ref={sentinel} className="clips-sentinel" aria-hidden="true" />
       {feed.loading && <p className="clips-loading">Loading…</p>}
+      {openEditor.dialog}
     </div>
   );
 }

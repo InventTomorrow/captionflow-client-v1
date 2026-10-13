@@ -48,6 +48,10 @@ export interface Clip {
   style?: Partial<EditorStyle> | null;
   /** Output frame (absent on older clips = '9:16'). */
   aspect?: ClipAspect;
+  /** The clip's own editor project ("Open in editor"), once made. */
+  editProjectId?: string | null;
+  /** What that project was made from (clipProject.clipEditBasis). */
+  editBasisKey?: string | null;
   crop: { mode: ClipCropMode; x: number; track?: CropTrack };
   renders: number;
   lastRenderedAt?: string;
@@ -183,4 +187,22 @@ export async function completeClipRender(
 /** Analytics only — never throws (the render already failed; this must not mask why). */
 export async function failClipRender(id: string, body: { code: string; message?: string }): Promise<void> {
   await api.post(`/clips/${id}/render/failed`, body).catch(() => undefined);
+}
+
+/** "Open in editor": make (or get back) the clip's own editor project. */
+export async function openClipProject(
+  clipId: string,
+  body: {
+    style: Partial<EditorStyle>;
+    captions: unknown[];
+    video: { width: number; height: number; duration: number; size: number };
+    basisKey: string;
+    force?: boolean;
+  },
+): Promise<{ projectId: string; existing: boolean; basisKey?: string | null }> {
+  const { data } = await api.post<{ projectId: string; existing: boolean; basisKey?: string | null }>(
+    `/clips/${clipId}/editor-project`,
+    body,
+  );
+  return data;
 }

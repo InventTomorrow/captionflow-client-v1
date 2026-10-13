@@ -1189,89 +1189,7 @@
   }
 }
 
-/* --- clip mode in the captions editor ---------------------------------------- */
-
-.clip-mode-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  flex: 0 0 auto;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--cf-accent) 45%, var(--cf-border));
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--cf-accent) 7%, var(--cf-surface));
-  color: var(--cf-text);
-}
-
-.clip-mode-main,
-.clip-mode-side {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  min-width: 0;
-}
-
-.clip-mode-main {
-  flex: 1 1 22rem;
-}
-
-.clip-mode-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 36px;
-  padding: 0 0.7rem;
-  border: 1px solid var(--cf-border);
-  border-radius: 0.55rem;
-  background: var(--cf-input);
-  color: var(--cf-text);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.clip-mode-back:hover {
-  border-color: var(--cf-accent);
-}
-
-.clip-mode-back:focus-visible,
-.clip-icon-btn:focus-visible {
-  outline: 2px solid var(--cf-accent);
-  outline-offset: 2px;
-}
-
-.clip-mode-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  background: var(--cf-accent);
-  color: var(--cf-on-accent);
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.clip-mode-title {
-  min-width: 0;
-  max-width: 28rem;
-  overflow: hidden;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.clip-mode-range {
-  color: var(--cf-text-secondary);
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
+/* --- small shared controls ---------------------------------------------------- */
 
 .clip-mode-nav {
   display: inline-flex;
@@ -1296,75 +1214,63 @@
   color: var(--cf-accent);
 }
 
+.clip-icon-btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+
 .clip-icon-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.clip-mode-save {
-  display: inline-flex;
+/* --- a clip opened in the editor (its own project) ------------------------------ */
+
+.clip-project-strip {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem;
-  color: var(--cf-text-muted);
-  font-size: 0.8rem;
-}
-
-.clip-mode-save.is-saved {
-  color: var(--cf-success);
-}
-
-.clip-mode-save.is-error {
-  color: var(--cf-danger);
-}
-
-.clip-mode-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 36px;
-  padding: 0 0.75rem;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cf-accent) 45%, var(--cf-border));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cf-accent) 7%, var(--cf-surface));
+  color: var(--cf-text-secondary);
   font-size: 0.85rem;
 }
 
-.clip-mode-note {
-  flex: 1 0 100%;
+.clip-project-strip strong {
+  color: var(--cf-text);
+}
+
+.clip-project-back {
+  min-height: 36px;
+  font-size: 0.85rem;
+}
+
+.clip-project-note {
   margin: 0;
-  color: var(--cf-text-muted);
-  font-size: 0.78rem;
+  padding: 0.5rem 1rem 1rem;
+  line-height: 1.5;
 }
 
-.clip-mode-bar.is-missing .clip-mode-note {
-  flex: 1 1 auto;
+.clip-chip-editor {
+  align-self: flex-start;
+  margin-top: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--cf-accent) 55%, transparent);
+  border-radius: 999px;
+  color: var(--cf-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
-.clip-spin {
-  animation: clip-spin 0.9s linear infinite;
-}
-
-@keyframes clip-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .clip-spin {
-    animation: none;
-  }
-}
-
-/* The parts of the full video outside the clip, dimmed on the timeline. */
-.timeline-outside {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 3;
-  background: repeating-linear-gradient(
-    -45deg,
-    color-mix(in srgb, var(--cf-bg) 78%, transparent) 0 6px,
-    color-mix(in srgb, var(--cf-bg) 64%, transparent) 6px 12px
-  );
-  pointer-events: none;
+.clip-open-name {
+  margin: 0;
+  color: var(--cf-text);
+  font-weight: 600;
 }
 
 .clip-render-actions {
@@ -1484,9 +1390,3 @@
   font-weight: 600;
 }
 
-/* Clip mode: the Captions panel explains there is nothing to regenerate. */
-.clip-mode-captions-note {
-  margin: 0;
-  padding: 0.5rem 1rem 1rem;
-  line-height: 1.5;
-}

@@ -140,6 +140,7 @@ export function ClipCard({
           </p>
         )}
         {showProject && clip.project?.name && <p className="clip-card-project">{clip.project.name}</p>}
+        {clip.editProjectId && <span className="clip-chip-editor">Edited in editor</span>}
         {showReason && clip.reason && (
           <details className="clip-why clip-card-why">
             <summary>Why this clip</summary>

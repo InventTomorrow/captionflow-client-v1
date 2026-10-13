@@ -2,9 +2,9 @@
  * /clips/:projectId/:clipId — one clip, large: play it, move its in/out point
  * by sentences, pick a caption template and the framing (face-tracked on this
  * device the first time Auto is used), rename it, render it here and download.
- * "Open in editor" opens the captions editor on just this clip
- * (/projects/:id/editor?clip=…) with its captions loaded as they are — for word
- * fixes and a custom look; nothing is regenerated.
+ * "Open in editor" opens the clip as its own video in the captions editor
+ * (its own project: video cut on this device, captions and style copied) —
+ * nothing is re-transcribed or regenerated.
  */
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +17,7 @@ import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
 import type { ClipCropMode, ClipPatch } from '../../lib/clips/api';
 import { clipAspect, clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
-import { clipEditorUrl } from '../../lib/clips/clipMode';
+import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
@@ -46,6 +46,7 @@ export function ClipEditorPage() {
   const [title, setTitle] = useState('');
   const [quality, setQuality] = useState<ExportQuality>('1080p');
   const [reframeStatus, setReframeStatus] = useState('');
+  const openEditor = useOpenInEditor();
   const timeBar = useRef<HTMLSpanElement | null>(null);
   const timeText = useRef<HTMLSpanElement | null>(null);
 
@@ -187,10 +188,10 @@ export function ClipEditorPage() {
               <ChevronRight size={18} aria-hidden="true" />
             </button>
           </span>
-          <Link to={clipEditorUrl(projectId, clip._id)} className="btn primary clip-open-editor">
+          <button type="button" className="btn primary clip-open-editor" onClick={() => openEditor.open(projectId, clip)}>
             <Captions size={17} aria-hidden="true" />
             Open in editor
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -327,10 +328,10 @@ export function ClipEditorPage() {
           <div className="clip-side-card">
             <div className="clip-side-row">
               <h2 className="clip-side-h">Caption style</h2>
-              <Link to={clipEditorUrl(projectId, clip._id, 'templates')} className="clip-customize">
+              <button type="button" className="clip-customize" onClick={() => openEditor.open(projectId, clip)}>
                 <PenLine size={15} aria-hidden="true" />
                 Customize in editor
-              </Link>
+              </button>
             </div>
             <ClipTemplatePicker
               templateKey={clip.templateKey}
@@ -388,6 +389,7 @@ export function ClipEditorPage() {
           </div>
         </section>
       </div>
+      {openEditor.dialog}
     </div>
   );
 }

@@ -143,3 +143,14 @@ export function smoothTrack(samples: FaceSample[], opts: SmoothOptions = {}): Cr
     (p, i) => i === 0 || i === out.length - 1 || p[1] !== out[i - 1][1] || p[1] !== out[i + 1][1],
   );
 }
+
+/**
+ * CSS object-position that shows, with object-fit: cover, the same
+ * outW:outH window the render crops around centre `cx` (0..1 of the width).
+ */
+export function coverObjectPosition(videoW: number, videoH: number, outW: number, outH: number, cx: number): string {
+  const r = cropRect(videoW, videoH, outW, outH, cx);
+  const px = videoW > r.width ? r.left / (videoW - r.width) : 0.5;
+  const py = videoH > r.height ? r.top / (videoH - r.height) : 0.5;
+  return `${(px * 100).toFixed(2)}% ${(py * 100).toFixed(2)}%`;
+}

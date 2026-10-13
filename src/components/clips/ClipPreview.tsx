@@ -12,8 +12,7 @@ import { deriveDisplayCaptions } from '../../lib/displayCaptions';
 import { isKineticTemplate } from '../../lib/kinetic/engine';
 import { sliceCaptionsToRange } from '../../lib/clips/sliceCaptions';
 import { aspectDims, type ClipAspect } from '../../lib/clips/clipMath';
-import { coverObjectPosition } from '../../lib/clips/clipMode';
-import { cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
+import { coverObjectPosition, cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
 import type { EditorStyle } from '../../lib/export/styleSnapshot';
 import type { Caption } from '../../stores/captionStore';
 

@@ -13,7 +13,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
-import { clipEditorUrl } from '../../lib/clips/clipMode';
+import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { captionLanguageLabel } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
@@ -61,6 +61,7 @@ export function ClipSetPage() {
   const [starting, setStarting] = useState(false);
   const [locateBusy, setLocateBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const openEditor = useOpenInEditor();
 
   const project = data?.project;
   const source = useClipSource(projectId, project?.video?.kind);
@@ -373,7 +374,7 @@ export function ClipSetPage() {
           selected={selected ?? undefined}
           onToggleSelect={(c) => toggleSelect(c._id)}
           onOpen={(c) => navigate(`/clips/${projectId}/${c._id}`)}
-          onEditCaptions={(c) => navigate(clipEditorUrl(projectId, c._id))}
+          onEditCaptions={(c) => openEditor.open(projectId, c)}
           onRender={source.local ? (c) => renderJobs([c]) : undefined}
           onDownload={(c) => void download(c)}
           onDelete={(c) => void remove(c)}
@@ -398,6 +399,7 @@ export function ClipSetPage() {
           }}
         />
       )}
+      {openEditor.dialog}
     </div>
   );
 }

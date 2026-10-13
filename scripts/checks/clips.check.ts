@@ -6,10 +6,10 @@ import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
 import { aspectDims, chunks, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
-import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
+import { coverObjectPosition, cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
-import { captionWindow, clampToClip, clipEditorUrl, coverObjectPosition, loopedTime } from '../../src/lib/clips/clipMode';
+import { clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -253,41 +253,56 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(none.fontFamily === 'Inter', 'style null → project look');
 }
 
-// ── clip mode in the captions editor ──────────────────────────────────────
+// ── the clip preview frames like the render (object-position for a cover crop) ──
 {
-  const caps = [
-    { start: 0, end: 1 },
-    { start: 1, end: 2 },
-    { start: 2, end: 3 },
-    { start: 3, end: 4 },
-  ];
-  const w = captionWindow(caps, 1.5, 3.2);
-  assert(w[0] === 1 && w[1] === 4, `captions overlapping the clip, got ${w}`);
-  const touching = captionWindow(caps, 2, 3);
-  assert(touching[0] === 2 && touching[1] === 3, `a caption that only touches an edge stays out, got ${touching}`);
-  const outside = captionWindow(caps, 10, 12);
-  assert(outside[0] === outside[1], 'nothing in range → empty window');
-  const unsorted = captionWindow([caps[2], caps[0], caps[1]], 0.5, 1.5);
-  assert(unsorted[0] === 1 && unsorted[1] === 3, `window spans the overlapping ones in list order, got ${unsorted}`);
-
-  const range = { start: 10, end: 20 };
-  assert(clampToClip(0.5, range) === 10, 'a seek before the clip lands on its start');
-  assert(near(clampToClip(25, range), 19.95), 'a seek past the clip lands just before its end');
-  assert(clampToClip(15, range) === 15, 'a seek inside is kept');
-
-  assert(loopedTime(20, range) === 10, 'reaching the end loops to the start');
-  assert(loopedTime(9.5, range) === 10, 'drifting well before the start jumps in');
-  assert(loopedTime(9.9, range) === null, 'a hair before the start is left alone (seek jitter)');
-  assert(loopedTime(15, range) === null, 'inside: nothing to do');
-
   assert(coverObjectPosition(1920, 1080, 9, 16, 0.5) === '50.00% 50.00%', 'centred crop');
   assert(coverObjectPosition(1920, 1080, 9, 16, 0) === '0.00% 50.00%', 'left edge');
   assert(coverObjectPosition(1920, 1080, 9, 16, 1) === '100.00% 50.00%', 'right edge');
   assert(coverObjectPosition(1920, 1080, 9, 16, 0.1) === '0.00% 50.00%', 'a face near the edge clamps the window inside the frame');
   assert(coverObjectPosition(1080, 1920, 9, 16, 0.9) === '50.00% 50.00%', 'portrait source: nothing to move');
+}
 
-  assert(clipEditorUrl('p1', 'c1') === '/projects/p1/editor?clip=c1', 'clip mode url');
-  assert(clipEditorUrl('p1', 'c1', 'templates') === '/projects/p1/editor?clip=c1&panel=templates', 'clip mode url with a panel');
+// ── "Open in editor": the clip as its own project ─────────────────────────
+{
+  const clip = {
+    _id: 'c1',
+    start: 10,
+    end: 40,
+    aspect: '9:16' as const,
+    templateKey: 'hero-word',
+    style: null,
+    crop: { mode: 'auto' as const, x: 0.5, track: [[0, 0.4], [2, 0.45]] as Array<[number, number]> },
+  };
+  const key = clipEditBasis(clip);
+  assert(key === clipEditBasis({ ...clip }), 'the basis key is stable');
+  for (const [what, changed] of [
+    ['in-point', { ...clip, start: 11 }],
+    ['out-point', { ...clip, end: 41 }],
+    ['format', { ...clip, aspect: '16:9' as const }],
+    ['framing', { ...clip, crop: { ...clip.crop, mode: 'manual' as const, x: 0.7 } }],
+    ['face track', { ...clip, crop: { ...clip.crop, track: [[0, 0.6]] as Array<[number, number]> } }],
+    ['template', { ...clip, templateKey: 'word-blast' }],
+    ['custom look', { ...clip, style: { fontFamily: 'Anton' } }],
+  ] as const) {
+    assert(clipEditBasis(changed) !== key, `the basis key changes with the ${what}`);
+  }
+  assert(clipEditBasis(clip).length <= 300, 'fits the server limit');
+
+  let n = 0;
+  const caps = [
+    cap(1, [['Before', 8, 9.5], ['it.', 9.5, 9.9]]),
+    cap(2, [['Hello', 10.2, 10.6], ['there', 10.6, 11]], { emphasis: ['hero', 'small'], _id: 'orig-2' }),
+    cap(3, [['General', 39.5, 39.9], ['Kenobi.', 39.9, 41]], { _id: 'orig-3' }),
+  ];
+  const copy = clipProjectCaptions(caps, clip, () => `new-${++n}`);
+  assert(copy.length === 2, `the clip's captions only, got ${copy.length}`);
+  assert(copy[0].start >= 0 && Math.abs(copy[0].start - 0.2) < 1e-9, `moved to start at 0:00, got ${copy[0].start}`);
+  assert(copy.every((c) => c.end <= 30 + 1e-9), 'nothing past the clip');
+  assert(copy.map((c) => c._id).join() === 'new-1,new-2', 'fresh ids (the original captions are never touched)');
+  assert(copy.map((c) => c.sequence).join() === '1,2', 'renumbered');
+  assert(copy[0].text === 'Hello there' && copy[0].emphasis?.join() === 'hero,small', 'text and hero words kept');
+  assert(copy[1].text === 'General', `cut at the clip's end, got "${copy[1].text}"`);
+  assert(caps[1]._id === 'orig-2' && caps[1].start === 10.2, 'the source captions are unchanged');
 }
 
 // ── textInRange (the in/out sentence shown next to the trim buttons) ─────

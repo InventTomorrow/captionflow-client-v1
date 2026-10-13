@@ -276,7 +276,6 @@ export function AppShell() {
   const editorActive = useEditorChromeStore((s) => s.active);
   const editorMatch = useMatch('/projects/:id/editor');
   const onExport = useEditorChromeStore((s) => s.onExport);
-  const exportLabel = useEditorChromeStore((s) => s.exportLabel);
   const onDownloadSrt = useEditorChromeStore((s) => s.onDownloadSrt);
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
@@ -359,7 +358,7 @@ export function AppShell() {
                   >
                     <path d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
                   </svg>
-                  {exportLabel ?? 'Export'}
+                  Export
                 </button>
               </div>
             </div>
