@@ -110,7 +110,6 @@ export function ClipCard({
           ) : (
             <span className="clip-card-placeholder" aria-hidden="true">
               <Film size={26} />
-              {(thumb === null || !hasSource) && <span>No preview on this device</span>}
             </span>
           ))}
         <span className={`clip-score clip-score-${tone}`}>{clip.score}</span>
@@ -171,7 +170,7 @@ export function ClipCard({
                 onClick={onRender}
                 disabled={!hasSource || rendering}
                 aria-label={rendering ? `Rendering ${Math.round(render?.percent ?? 0)}%` : 'Render clip'}
-                title={hasSource ? 'Render clip' : 'Render needs the original video on this device'}
+                title="Render clip"
               >
                 {rendering ? <span className="clip-act-pct">{Math.round(render?.percent ?? 0)}%</span> : <Clapperboard size={18} aria-hidden="true" />}
               </button>

@@ -575,8 +575,6 @@ export function EditorPage() {
   const clipWindowRef = useRef<ClipWindow | null>(null);
   /** Which project's video plays: this one's, or (a clip project) its original's. */
   const [mediaProjectId, setMediaProjectId] = useState<string | null>(null);
-  /** A clip project whose original video isn't on this device (and isn't on the server either). */
-  const [clipOriginalMissing, setClipOriginalMissing] = useState(false);
   const clipCover = clipProject?.framing.mode === 'cover';
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateError, setLocateError] = useState('');
@@ -944,9 +942,6 @@ export function EditorPage() {
         setMediaProjectId(sourceId);
         // Projects from before clips played their original kept a cut copy here: free it.
         void deleteSource(id).catch(() => undefined);
-        void getSourceFile(sourceId)
-          .then((file) => setClipOriginalMissing(!file && src.videoKind === 'audio'))
-          .catch(() => undefined);
       } else {
         setMediaProjectId(id);
       }
@@ -2870,17 +2865,6 @@ export function EditorPage() {
             />
             {mediaProjectId && (
               <AuthenticatedVideo key={`${videoSourceKey}:${mediaProjectId}`} id={mediaProjectId} videoRef={videoRef} />
-            )}
-            {clipProject && clipOriginalMissing && (
-              <div className="warn-banner local-source-banner" role="status">
-                <span>
-                  This clip plays its original video, which isn’t on this device. Locate the original on the clips
-                  page to play and export the clip — its captions are loaded.
-                </span>
-                <Link to={`/clips/${clipProject.sourceId}`} className="btn">
-                  Go to clips
-                </Link>
-              </div>
             )}
             {missingSource && (
               <div className="warn-banner local-source-banner" role="status">

@@ -167,23 +167,7 @@
   }
 }
 
-.clips-locate {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
-  margin-bottom: 1.25rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid color-mix(in srgb, var(--cf-warning) 45%, transparent);
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--cf-warning) 10%, transparent);
-}
 
-.clips-locate p {
-  flex: 1 1 18rem;
-  margin: 0;
-  line-height: 1.5;
-}
 
 /* --- segmented control + fields ------------------------------------------ */
 

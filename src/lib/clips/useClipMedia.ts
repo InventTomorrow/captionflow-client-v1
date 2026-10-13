@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api, API_URL } from '../api';
-import { getSourceFile } from '../media/localMedia';
+import { getSourceFile, getSourceRecord } from '../media/localMedia';
 import type { Caption } from '../../stores/captionStore';
 import type { EditorStyle } from '../export/styleSnapshot';
 import { projectCaptions } from './renderClip';
@@ -80,4 +80,36 @@ export function useProjectStyle(projectId: string | undefined) {
     };
   }, [projectId]);
   return style;
+}
+
+/**
+ * Which projects' clips can be previewed on this device: the original is
+ * stored here, or the server streams it (a full-video upload). Clips of other
+ * projects are not shown — Clips is a preview of what this device can play.
+ * Missing key = not checked yet.
+ */
+export function usePreviewableProjects(clips: Array<{ projectId: string; project?: { video?: { kind?: string } } | null }>) {
+  const [known, setKnown] = useState<Record<string, boolean>>({});
+  const kinds = new Map(clips.map((c) => [c.projectId, c.project?.video?.kind]));
+  const key = [...kinds.keys()].sort().join(',');
+  useEffect(() => {
+    const todo = (key ? key.split(',') : []).filter((id) => !(id in known));
+    if (!todo.length) return;
+    let cancelled = false;
+    void Promise.all(
+      todo.map(async (id): Promise<[string, boolean]> => {
+        const kind = kinds.get(id);
+        if (kind && kind !== 'audio') return [id, true];
+        return [id, !!(await getSourceRecord(id).catch(() => null))];
+      }),
+    ).then((pairs) => {
+      if (!cancelled) setKnown((k) => ({ ...k, ...Object.fromEntries(pairs) }));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // `kinds` follows `key`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, known]);
+  return known;
 }

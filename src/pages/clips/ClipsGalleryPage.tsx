@@ -11,6 +11,7 @@ import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
 import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
+import { usePreviewableProjects } from '../../lib/clips/useClipMedia';
 import { errorMessage } from '../../lib/api';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
@@ -35,6 +36,9 @@ export function ClipsGalleryPage() {
   const [styleError, setStyleError] = useState('');
   const sentinel = useRef<HTMLDivElement | null>(null);
   const openEditor = useOpenInEditor();
+  // Only clips this device can preview (its original here, or streamed by the server).
+  const previewable = usePreviewableProjects(feed.items);
+  const items = feed.items.filter((c) => previewable[c.projectId]);
 
   useEffect(() => {
     void loadFeed(true).catch((e) => setError(errorMessage(e, 'Couldn’t load your clips')));
@@ -59,7 +63,7 @@ export function ClipsGalleryPage() {
   async function download(clip: Clip) {
     const rec = await latestExportForClip(clip.projectId, clip._id);
     if (!rec) {
-      setError('That render isn’t on this device — open the clip and render it here.');
+      setError('That render isn’t available here — open the clip and render it again.');
       return;
     }
     await downloadLocalFile(rec.opfsPath, exportFileName(clip.title || 'clip', rec.quality, rec.format));
@@ -69,11 +73,11 @@ export function ClipsGalleryPage() {
   useEffect(() => {
     setSelected((cur) => {
       if (!cur) return cur;
-      const live = new Set(feed.items.map((c) => c._id));
+      const live = new Set(items.map((c) => c._id));
       const next = new Set([...cur].filter((id) => live.has(id)));
       return next.size === cur.size ? cur : next;
     });
-  }, [feed.items]);
+  }, [items]);
 
   function toggleSelect(id: string) {
     setSelected((cur) => {
@@ -145,7 +149,7 @@ export function ClipsGalleryPage() {
           <input type="checkbox" checked={feed.rendered} onChange={(e) => setFeedFilter({ rendered: e.target.checked })} />
           Rendered only
         </label>
-        {feed.items.length > 0 && !selected && (
+        {items.length > 0 && !selected && (
           <button type="button" className="btn ghost clips-head-btn" onClick={() => setSelected(new Set())}>
             <ListChecks size={16} aria-hidden="true" />
             Select
@@ -155,10 +159,10 @@ export function ClipsGalleryPage() {
 
       {selected && (
         <ClipBulkBar
-          total={feed.items.length}
+          total={items.length}
           selectedCount={selected.size}
           onToggleAll={() =>
-            setSelected(selected.size === feed.items.length ? new Set() : new Set(feed.items.map((c) => c._id)))
+            setSelected(selected.size === items.length ? new Set() : new Set(items.map((c) => c._id)))
           }
           onStyle={() => setStyling(true)}
           onDelete={() => void deleteSelected()}
@@ -183,9 +187,9 @@ export function ClipsGalleryPage() {
         </div>
       )}
 
-      {feed.items.length > 0 ? (
+      {items.length > 0 ? (
         <ClipGrid
-          clips={feed.items}
+          clips={items}
           showProject
           renders={renders}
           selected={selected ?? undefined}

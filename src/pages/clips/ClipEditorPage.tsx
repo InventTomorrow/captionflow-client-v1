@@ -2,9 +2,9 @@
  * /clips/:projectId/:clipId — one clip, large: play it, move its in/out point
  * by sentences, pick a caption template and the framing (face-tracked on this
  * device the first time Auto is used), rename it, render it here and download.
- * "Open in editor" opens the clip as its own video in the captions editor
- * (its own project: video cut on this device, captions and style copied) —
- * nothing is re-transcribed or regenerated.
+ * "Open in editor" opens the clip on its own in the captions editor (its own
+ * project playing the original's range, captions and style copied) — nothing
+ * is cut, re-transcribed or regenerated.
  */
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -145,6 +145,17 @@ export function ClipEditorPage() {
     );
   }
 
+  if (source.missing) {
+    return (
+      <div className="clips-page">
+        <p>No clip to show.</p>
+        <Link to="/clips" className="btn ghost">
+          Back to clips
+        </Link>
+      </div>
+    );
+  }
+
   const rendering = render?.status === 'queued' || render?.status === 'rendering';
   const rendered = clip.status === 'rendered' || render?.status === 'done';
   const prev = clips[index - 1];
@@ -234,7 +245,7 @@ export function ClipEditorPage() {
               />
             ) : (
               <div className={`clip-preview is-large clip-preview-empty${landscape ? ' is-landscape' : ''}`}>
-                {source.missing ? 'The original video isn’t on this device.' : 'Loading…'}
+                Loading…
               </div>
             )}
             <div className="clip-stage-controls">
@@ -351,6 +362,7 @@ export function ClipEditorPage() {
             />
           </div>
 
+          {source.local && (
           <div className="clip-side-card">
             <h2 className="clip-side-h">Render</h2>
             <div className="clip-render-row">
@@ -390,13 +402,8 @@ export function ClipEditorPage() {
                 {render.error}
               </p>
             )}
-            {!source.local && !source.loading && (
-              <p className="clips-sub">
-                Rendering needs the original video on this device.{' '}
-                <Link to={`/clips/${projectId}`}>Locate the original file</Link>
-              </p>
-            )}
           </div>
+          )}
         </section>
       </div>
       {openEditor.dialog}
