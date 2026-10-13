@@ -154,7 +154,7 @@ export function ClipCard({
             <SquarePen size={18} aria-hidden="true" />
           </button>
           {onEditCaptions && (
-            <button type="button" className="clip-act" onClick={onEditCaptions} aria-label="Edit in captions editor" title="Edit in captions editor">
+            <button type="button" className="clip-act" onClick={onEditCaptions} aria-label="Open in editor" title="Open in editor">
               <Captions size={18} aria-hidden="true" />
             </button>
           )}

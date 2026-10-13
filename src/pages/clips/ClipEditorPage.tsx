@@ -2,8 +2,9 @@
  * /clips/:projectId/:clipId — one clip, large: play it, move its in/out point
  * by sentences, pick a caption template and the framing (face-tracked on this
  * device the first time Auto is used), rename it, render it here and download.
- * "Edit in captions editor" opens the full editor on just this clip
- * (/projects/:id/editor?clip=…) for word fixes and a custom look.
+ * "Open in editor" opens the captions editor on just this clip
+ * (/projects/:id/editor?clip=…) with its captions loaded as they are — for word
+ * fixes and a custom look; nothing is regenerated.
  */
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -188,7 +189,7 @@ export function ClipEditorPage() {
           </span>
           <Link to={clipEditorUrl(projectId, clip._id)} className="btn primary clip-open-editor">
             <Captions size={17} aria-hidden="true" />
-            Edit in captions editor
+            Open in editor
           </Link>
         </div>
       </header>
@@ -328,7 +329,7 @@ export function ClipEditorPage() {
               <h2 className="clip-side-h">Caption style</h2>
               <Link to={clipEditorUrl(projectId, clip._id, 'templates')} className="clip-customize">
                 <PenLine size={15} aria-hidden="true" />
-                Customize in captions editor
+                Customize in editor
               </Link>
             </div>
             <ClipTemplatePicker

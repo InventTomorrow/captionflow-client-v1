@@ -242,10 +242,7 @@ export function ClipSetPage() {
             </p>
           )}
           {project && !projectBusy && (
-            <p className="clips-sub clips-lang">
-              Captions: {captionLanguage ?? 'as spoken'} ·{' '}
-              <Link to={`/projects/${projectId}/editor?panel=captions`}>Change language or translate</Link>
-            </p>
+            <p className="clips-sub clips-lang">Captions: {captionLanguage ?? 'as spoken'}</p>
           )}
         </div>
         <div className="clips-head-actions">

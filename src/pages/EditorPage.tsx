@@ -2478,9 +2478,16 @@ export function EditorPage() {
             <>
               <div className="panel-header">
                 <h3>Captions</h3>
-                <span className="panel-count">{captions.length} items</span>
+                <span className="panel-count">{inClipMode ? listCaptions.length : captions.length} items</span>
               </div>
               <div className="captions-tools">
+              {inClipMode ? (
+                <p className="muted tiny clip-mode-captions-note">
+                  These are the video’s captions, loaded as they are — edit them here in the Phrases
+                  list or on the timeline. Nothing is regenerated; a fix also shows in the full video
+                  and its other clips.
+                </p>
+              ) : (
               <div className="panel-controls">
                 <label>
                   Language
@@ -2503,6 +2510,7 @@ export function EditorPage() {
                   Use after changing language or if captions are missing parts of the video.
                 </p>
               </div>
+              )}
               </div>
             </>
           )}

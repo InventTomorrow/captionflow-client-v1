@@ -1483,3 +1483,10 @@
   color: var(--cf-accent);
   font-weight: 600;
 }
+
+/* Clip mode: the Captions panel explains there is nothing to regenerate. */
+.clip-mode-captions-note {
+  margin: 0;
+  padding: 0.5rem 1rem 1rem;
+  line-height: 1.5;
+}
