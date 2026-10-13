@@ -8,13 +8,14 @@
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipPreview } from '../../components/clips/ClipPreview';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
 import { ReframeControl } from '../../components/clips/ReframeControl';
 import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
 import type { ClipCropMode, ClipPatch } from '../../lib/clips/api';
-import { clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
+import { clipAspect, clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
 import { clipEditorUrl } from '../../lib/clips/clipMode';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
@@ -137,6 +138,8 @@ export function ClipEditorPage() {
   const prev = clips[index - 1];
   const next = clips[index + 1];
   const length = clip.end - clip.start;
+  const aspect = clipAspect(clip);
+  const landscape = aspect === '16:9';
 
   return (
     <div className="clips-page clip-editor">
@@ -194,9 +197,9 @@ export function ClipEditorPage() {
         </div>
       )}
 
-      <div className="clip-editor-grid">
+      <div className={`clip-editor-grid${landscape ? ' is-landscape' : ''}`}>
         <section className="clip-editor-stage" aria-label="Preview">
-          <div className="clip-stage-frame">
+          <div className={`clip-stage-frame${landscape ? ' is-landscape' : ''}`}>
             {source.url && captions && style ? (
               <ClipPreview
                 src={source.url}
@@ -206,6 +209,7 @@ export function ClipEditorPage() {
                 captions={captions}
                 style={style}
                 track={cropTrackFor(clip)}
+                aspect={aspect}
                 playing={playing}
                 muted={muted}
                 className="is-large"
@@ -215,7 +219,7 @@ export function ClipEditorPage() {
                 }}
               />
             ) : (
-              <div className="clip-preview is-large clip-preview-empty">
+              <div className={`clip-preview is-large clip-preview-empty${landscape ? ' is-landscape' : ''}`}>
                 {source.missing ? 'The original video isn’t on this device.' : 'Loading…'}
               </div>
             )}
@@ -285,15 +289,27 @@ export function ClipEditorPage() {
           </div>
 
           <div className="clip-side-card">
-            <h2 className="clip-side-h">Framing</h2>
-            <ReframeControl
-              mode={clip.crop.mode}
-              x={clip.crop.x}
-              busy={saving}
-              status={reframeStatus}
-              onMode={setMode}
-              onX={(x) => void save({ crop: { mode: 'manual', x } })}
-            />
+            <h2 className="clip-side-h">Format</h2>
+            <ClipFormatToggle value={aspect} disabled={saving} onChange={(v) => v && v !== aspect && void save({ aspect: v })} />
+            <p className="clip-format-hint">
+              {landscape
+                ? 'The whole frame, as filmed — for YouTube, X or LinkedIn.'
+                : 'Vertical for Shorts, Reels and TikTok, cropped around the speaker.'}{' '}
+              Render it in both formats by switching and rendering again.
+            </p>
+            {!landscape && (
+              <>
+                <h3 className="clip-side-sub">Framing</h3>
+                <ReframeControl
+                  mode={clip.crop.mode}
+                  x={clip.crop.x}
+                  busy={saving}
+                  status={reframeStatus}
+                  onMode={setMode}
+                  onX={(x) => void save({ crop: { mode: 'manual', x } })}
+                />
+              </>
+            )}
           </div>
 
           <div className="clip-side-card">

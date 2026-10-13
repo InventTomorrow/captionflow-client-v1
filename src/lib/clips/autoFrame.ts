@@ -9,15 +9,14 @@
 import { getSourceFile, getSourceRecord } from '../media/localMedia';
 import { probeMediaFile } from '../media/probe';
 import { patchClip, type Clip } from './api';
+import { needsFaceTrack } from './clipMath';
 import type { CropTrack } from './cropTrack';
 import { computeFaceTrack, needsReframe } from './reframe';
 
+export { needsFaceTrack };
+
 const inflight = new Map<string, Promise<Clip | null>>();
 let chain: Promise<unknown> = Promise.resolve();
-
-export function needsFaceTrack(clip: Pick<Clip, 'crop'>): boolean {
-  return clip.crop.mode === 'auto' && !clip.crop.track?.length;
-}
 
 /**
  * The clip with a saved face track, or null when nothing was done (not auto,

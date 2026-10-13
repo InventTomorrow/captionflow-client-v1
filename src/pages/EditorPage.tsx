@@ -3048,7 +3048,7 @@ export function EditorPage() {
                 <select
                   className="aspect-select"
                   disabled={inClipMode}
-                  title={inClipMode ? 'Clips are always 9:16' : 'Aspect ratio of the preview and exported video'}
+                  title={inClipMode ? 'Set this clip’s format (9:16 or 16:9) on its clip page' : 'Aspect ratio of the preview and exported video'}
                   value={
                     style.aspectRatio && style.aspectRatio !== 'original'
                       ? style.aspectRatio

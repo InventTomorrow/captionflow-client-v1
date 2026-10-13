@@ -7,7 +7,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import { getSourceFile } from '../media/localMedia';
-import { clipFrameTime, cropTrackFor, thumbKey, type ClipFraming, type ClipTiming } from './clipMath';
+import { clipAspect, clipFrameTime, cropTrackFor, thumbKey, type ClipFraming, type ClipTiming } from './clipMath';
 import { cropRect, cropXAt, integerCrop } from './cropTrack';
 
 const THUMB_W = 270;
@@ -70,11 +70,13 @@ async function renderThumb(file: File, clip: ClipTiming & ClipFraming): Promise<
     const track = cropTrackFor(clip);
     const sw = video.displayWidth;
     const sh = video.displayHeight;
+    // Vertical posters for 9:16 clips, landscape ones for 16:9 clips.
+    const [w, h] = clipAspect(clip) === '16:9' ? [THUMB_H, THUMB_W] : [THUMB_W, THUMB_H];
     const sink = new CanvasSink(video, {
-      width: THUMB_W,
-      height: THUMB_H,
+      width: w,
+      height: h,
       ...(track
-        ? { fit: 'fill' as const, crop: integerCrop(cropRect(sw, sh, THUMB_W, THUMB_H, cropXAt(track, t - clip.start)), sw, sh) }
+        ? { fit: 'fill' as const, crop: integerCrop(cropRect(sw, sh, w, h, cropXAt(track, t - clip.start)), sw, sh) }
         : { fit: 'contain' as const }),
     });
     const frame = await sink.getCanvas(t);

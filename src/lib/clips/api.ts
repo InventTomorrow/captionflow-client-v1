@@ -1,5 +1,6 @@
 /** clips/api.ts — typed calls for the Clips REST API (server routes/clips.routes.ts). */
 import { api } from '../api';
+import type { ClipAspect } from './clipMath';
 import type { CropTrack } from './cropTrack';
 import type { EditorStyle } from '../export/styleSnapshot';
 
@@ -41,6 +42,8 @@ export interface Clip {
   templateKey: string | null;
   /** A look made for this clip in the captions editor (wins over templateKey). */
   style?: Partial<EditorStyle> | null;
+  /** Output frame (absent on older clips = '9:16'). */
+  aspect?: ClipAspect;
   crop: { mode: ClipCropMode; x: number; track?: CropTrack };
   renders: number;
   lastRenderedAt?: string;
@@ -60,6 +63,7 @@ export interface ClipSetStatus {
   /** The look new clips of this video start with ("Style all clips"). */
   templateKey?: string | null;
   style?: Partial<EditorStyle> | null;
+  aspect?: ClipAspect;
 }
 
 export interface ProjectClips {
@@ -112,6 +116,7 @@ export interface ClipPatch {
   title?: string;
   templateKey?: string | null;
   style?: Partial<EditorStyle> | null;
+  aspect?: ClipAspect;
   crop?: {
     mode?: ClipCropMode;
     x?: number;
@@ -130,8 +135,15 @@ export async function deleteClip(id: string): Promise<void> {
   await api.delete(`/clips/${id}`);
 }
 
-/** A caption look for many clips: a template card, or a look made in the captions editor. */
-export type ClipLookPatch = { templateKey: string | null } | { style: Partial<EditorStyle> };
+/**
+ * A look for many clips: a template card or a look made in the captions
+ * editor, and/or a format. What it leaves out stays as it was.
+ */
+export type ClipLookPatch = {
+  templateKey?: string | null;
+  style?: Partial<EditorStyle>;
+  aspect?: ClipAspect;
+};
 
 /** One look onto a selection of clips (all or nothing). */
 export async function styleClips(ids: string[], look: ClipLookPatch): Promise<Clip[]> {

@@ -38,7 +38,7 @@ export function ClipBulkBar({ total, selectedCount, busy, onToggleAll, onStyle, 
       <div className="clip-bulk-actions">
         <button type="button" className="btn primary clip-bulk-btn" onClick={onStyle} disabled={busy || none}>
           <Palette size={16} aria-hidden="true" />
-          Caption style
+          Style &amp; format
         </button>
         {onRender && (
           <button type="button" className="btn ghost clip-bulk-btn" onClick={onRender} disabled={busy || none}>

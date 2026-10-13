@@ -7,14 +7,17 @@
 import { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useNavigate } from 'react-router-dom';
+import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
+import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
+import { styleAllClips } from '../../lib/clips/api';
+import type { ClipAspect } from '../../lib/clips/clipMath';
 import { clipOptionsFrom, type LengthPresetId } from '../../lib/clips/clipOptions';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { api, errorMessage } from '../../lib/api';
 import { buildExportStyle } from '../../lib/export/styleSnapshot';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../../lib/planErrors';
-import { pickerTemplates, templateByKey } from '../../lib/templateCatalog';
-import { isDeviceExportTemplate } from '../../lib/export/clientExport';
+import { templateByKey } from '../../lib/templateCatalog';
 import { uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
 
@@ -56,8 +59,8 @@ export function NewClipsPage() {
   const [preset, setPreset] = useState<LengthPresetId>('standard');
   const [maxClips, setMaxClips] = useState(8);
   const [templateKey, setTemplateKey] = useState('hero-word');
+  const [aspect, setAspect] = useState<ClipAspect>('9:16');
   const abortRef = useRef<AbortController | null>(null);
-  const templates = pickerTemplates().filter((t) => isDeviceExportTemplate(t.preset.template));
 
   const onDrop = useCallback((files: File[]) => {
     const next = files[0];
@@ -97,6 +100,8 @@ export function NewClipsPage() {
           .patch(`/projects/${projectId}/style`, buildExportStyle({ ...card.preset, templateKey: card.key }, { defaultAspect: '9:16' }))
           .catch(() => undefined);
       }
+      // The format every clip starts in (vertical is the default; set before the clips exist).
+      if (aspect !== '9:16') await styleAllClips(projectId, { aspect }).catch(() => undefined);
       await api.post(`/projects/${projectId}/transcribe`, {
         purpose: 'clips',
         sourceLanguage: language,
@@ -198,16 +203,19 @@ export function NewClipsPage() {
             />
           </label>
           <ClipOptionsForm preset={preset} maxClips={maxClips} disabled={busy} onPreset={setPreset} onMaxClips={setMaxClips} />
-          <label className="clip-field">
+          <div className="clip-field">
+            <span>Format</span>
+            <ClipFormatToggle value={aspect} disabled={busy} onChange={(v) => v && setAspect(v)} />
+          </div>
+          <div className="clip-field">
             <span>Caption style</span>
-            <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={busy}>
-              {templates.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <ClipTemplatePicker
+              templateKey={templateKey}
+              allowVideoStyle={false}
+              disabled={busy}
+              onPick={(k) => k && setTemplateKey(k)}
+            />
+          </div>
           <button type="button" className="btn primary clips-cta" disabled={!file || busy} onClick={() => void start()}>
             {busy ? 'Uploading…' : 'Find clips'}
           </button>

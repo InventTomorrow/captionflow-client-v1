@@ -11,7 +11,9 @@ import KineticCaptionLayer from '../KineticCaptionLayer';
 import { deriveDisplayCaptions } from '../../lib/displayCaptions';
 import { isKineticTemplate } from '../../lib/kinetic/engine';
 import { sliceCaptionsToRange } from '../../lib/clips/sliceCaptions';
-import { cropRect, cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
+import { aspectDims, type ClipAspect } from '../../lib/clips/clipMath';
+import { coverObjectPosition } from '../../lib/clips/clipMode';
+import { cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
 import type { EditorStyle } from '../../lib/export/styleSnapshot';
 import type { Caption } from '../../stores/captionStore';
 
@@ -36,8 +38,10 @@ export interface ClipPreviewProps {
   end: number;
   captions: Caption[];
   style: EditorStyle;
-  /** null = letterbox the whole frame ('Fit'). */
+  /** null = letterbox the whole frame ('Fit', or a landscape clip). */
   track: CropTrack | null;
+  /** Output frame of the clip (default vertical). */
+  aspect?: ClipAspect;
   playing: boolean;
   muted?: boolean;
   className?: string;
@@ -54,6 +58,7 @@ export function ClipPreview({
   captions,
   style,
   track,
+  aspect = '9:16',
   playing,
   muted = true,
   className,
@@ -65,6 +70,8 @@ export function ClipPreview({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef(track);
   trackRef.current = track;
+  const dimsRef = useRef(aspectDims(aspect));
+  dimsRef.current = aspectDims(aspect);
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
 
@@ -87,10 +94,8 @@ export function ClipPreview({
       if (v.currentTime >= end || v.currentTime < start - 0.5) v.currentTime = start;
       const t = trackRef.current;
       if (t && v.videoWidth && v.videoHeight) {
-        const r = cropRect(v.videoWidth, v.videoHeight, 9, 16, cropXAt(t, v.currentTime - start));
-        const px = v.videoWidth > r.width ? r.left / (v.videoWidth - r.width) : 0.5;
-        const py = v.videoHeight > r.height ? r.top / (v.videoHeight - r.height) : 0.5;
-        v.style.objectPosition = `${(px * 100).toFixed(2)}% ${(py * 100).toFixed(2)}%`;
+        const [aw, ah] = dimsRef.current;
+        v.style.objectPosition = coverObjectPosition(v.videoWidth, v.videoHeight, aw, ah, cropXAt(t, v.currentTime - start));
       }
       onTimeRef.current?.(Math.max(0, v.currentTime - start));
       raf = requestAnimationFrame(tick);
@@ -111,7 +116,7 @@ export function ClipPreview({
 
   const template = style.template;
   return (
-    <div className={`clip-preview${className ? ` ${className}` : ''}`}>
+    <div className={`clip-preview${aspect === '16:9' ? ' is-landscape' : ''}${className ? ` ${className}` : ''}`}>
       <video
         ref={videoRef}
         src={src}

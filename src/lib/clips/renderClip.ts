@@ -26,7 +26,7 @@ import { exportFrameSize, type ExportFormat, type ExportQuality } from '../rende
 import type { Caption } from '../../stores/captionStore';
 import { authorizeClipRender, completeClipRender, failClipRender, type Clip } from './api';
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
-import { clipStyle, cropTrackFor } from './clipMath';
+import { clipAspect, clipStyle, cropTrackFor } from './clipMath';
 
 export interface ClipRenderContext {
   projectId: string;
@@ -90,7 +90,7 @@ export function renderClip(
     if (!captions.length) throw new ClipRenderError('NO_CAPTIONS', 'This video has no captions yet');
 
     const probe = (await getSourceRecord(ctx.projectId))?.probe ?? (await probeMediaFile(source));
-    const { width, height } = exportFrameSize(opts.quality, '9:16', probe?.width ?? 0, probe?.height ?? 0);
+    const { width, height } = exportFrameSize(opts.quality, clipAspect(clip), probe?.width ?? 0, probe?.height ?? 0);
     await authorizeClipRender(clip._id, {
       quality: opts.quality,
       format: opts.format,

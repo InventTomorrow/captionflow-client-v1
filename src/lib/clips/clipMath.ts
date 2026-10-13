@@ -15,6 +15,25 @@ export interface ClipTiming {
 }
 export interface ClipFraming {
   crop: { mode: 'auto' | 'manual' | 'none'; x: number; track?: CropTrack };
+  /** Output frame; absent on clips from before formats = vertical. */
+  aspect?: ClipAspect;
+}
+
+/** A clip's output frame: vertical (cropped around the speaker) or the landscape original. */
+export type ClipAspect = '9:16' | '16:9';
+
+export function clipAspect(clip: { aspect?: ClipAspect | null }): ClipAspect {
+  return clip.aspect === '16:9' ? '16:9' : '9:16';
+}
+
+/** [width, height] proportions of a format. */
+export function aspectDims(aspect: ClipAspect): [number, number] {
+  return aspect === '16:9' ? [16, 9] : [9, 16];
+}
+
+/** Auto framing of a vertical clip that has no face track yet (landscape keeps the whole frame). */
+export function needsFaceTrack(clip: ClipFraming): boolean {
+  return clipAspect(clip) === '9:16' && clip.crop.mode === 'auto' && !clip.crop.track?.length;
 }
 
 /** The poster frame: 1.5 s in (past the cut), or a third of the way through a very short clip. */
@@ -28,7 +47,7 @@ export function clipFrameTime(clip: Pick<ClipTiming, 'start' | 'end'>): number {
  * or null for 'none' = letterbox the whole frame.
  */
 export function cropTrackFor(clip: ClipFraming): CropTrack | null {
-  if (clip.crop.mode === 'none') return null;
+  if (clipAspect(clip) === '16:9' || clip.crop.mode === 'none') return null;
   if (clip.crop.mode === 'manual') return [[0, clip.crop.x]];
   return clip.crop.track?.length ? clip.crop.track : [[0, 0.5]];
 }
@@ -37,7 +56,7 @@ export function cropTrackFor(clip: ClipFraming): CropTrack | null {
 export function thumbKey(clip: ClipTiming & ClipFraming): string {
   const track = cropTrackFor(clip);
   const x = track ? cropXAt(track, clipFrameTime(clip) - clip.start).toFixed(3) : 'fit';
-  return `${clip._id}:${clip.start.toFixed(2)}:${clip.crop.mode}:${x}`;
+  return `${clip._id}:${clip.start.toFixed(2)}:${clipAspect(clip)}:${clip.crop.mode}:${x}`;
 }
 
 /** What a clip says about its captions' look (Clip.templateKey / Clip.style). */
@@ -45,6 +64,7 @@ export interface ClipLook {
   templateKey?: string | null;
   /** A look made for this clip in the captions editor — wins over the template. */
   style?: Partial<EditorStyle> | null;
+  aspect?: ClipAspect | null;
 }
 
 /**
@@ -58,10 +78,10 @@ export function clipStyle(projectStyle: Partial<EditorStyle>, look: ClipLook): E
     ...projectStyle,
     ...(card ? { ...card.preset, templateKey: card.key } : {}),
     ...(look.style ?? {}),
-    aspectRatio: '9:16',
+    aspectRatio: clipAspect(look),
     behindPerson: false,
   };
-  return buildExportStyle(merged, { defaultAspect: '9:16' });
+  return buildExportStyle(merged, { defaultAspect: clipAspect(look) });
 }
 
 /**

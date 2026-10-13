@@ -20,7 +20,7 @@ import { clipOptionsFrom, LENGTH_PRESETS, type LengthPresetId } from '../../lib/
 import { ClipProcessing } from '../../components/clips/ClipProcessing';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { errorMessage } from '../../lib/api';
-import { analyzeClips, type Clip } from '../../lib/clips/api';
+import { analyzeClips, type Clip, type ClipLookPatch } from '../../lib/clips/api';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { expectedSource } from '../../lib/clips/clipMath';
 import { forgetProjectAssets } from '../../lib/clips/projectAssets';
@@ -186,6 +186,7 @@ export function ClipSetPage() {
   const defaultLook = status?.style
     ? 'Custom look'
     : (templateByKey(status?.templateKey)?.name ?? 'Video’s style');
+  const defaultFormat = status?.aspect === '16:9' ? '16:9' : '9:16';
 
   function toggleSelect(id: string) {
     setSelected((cur) => {
@@ -196,12 +197,12 @@ export function ClipSetPage() {
     });
   }
 
-  async function applySheet(templateKey: string | null) {
+  async function applySheet(look: ClipLookPatch) {
     setSheetBusy(true);
     setSheetError('');
     try {
-      if (sheet === 'all') await styleAllClips(projectId, { templateKey });
-      else if (selected?.size) await styleClips([...selected], { templateKey });
+      if (sheet === 'all') await styleAllClips(projectId, look);
+      else if (selected?.size) await styleClips([...selected], look);
       setSheet(null);
     } catch (err) {
       setSheetError(errorMessage(err, 'Couldn’t apply that style'));
@@ -233,7 +234,7 @@ export function ClipSetPage() {
           <h1 className="clips-title">{project?.name ?? 'Loading…'}</h1>
           {runStatus === 'ready' && (
             <p className="clips-sub">
-              {clips.length} clips · best first{clips.length > 0 && ` · Caption style: ${defaultLook}`}
+              {clips.length} clips · best first{clips.length > 0 && ` · ${defaultFormat} · ${defaultLook}`}
             </p>
           )}
         </div>
@@ -247,7 +248,7 @@ export function ClipSetPage() {
           {clips.length > 0 && !working && (
             <button type="button" className="btn ghost clips-head-btn" onClick={() => setSheet('all')}>
               <Palette size={16} aria-hidden="true" />
-              Style all clips
+              Style &amp; format all
             </button>
           )}
           {clips.length > 0 && !selected && (
@@ -374,17 +375,16 @@ export function ClipSetPage() {
 
       {sheet && (
         <ClipStyleSheet
-          title={sheet === 'all' ? 'Style all clips' : `Style ${selected?.size ?? 0} clip${selected?.size === 1 ? '' : 's'}`}
+          title={sheet === 'all' ? 'Style & format all clips' : `Style & format ${selected?.size ?? 0} clip${selected?.size === 1 ? '' : 's'}`}
           note={
             sheet === 'all'
-              ? 'Every clip of this video gets this caption template, and so will the clips later runs find. You can still change one clip on its own page.'
-              : 'The selected clips get this caption template. You can still change one clip on its own page.'
+              ? `Every clip of this video gets what you pick, and so will the clips later runs find (now: ${defaultFormat}, ${defaultLook}). You can still change one clip on its own page.`
+              : 'The selected clips get what you pick. You can still change one clip on its own page.'
           }
-          initialKey={sheet === 'all' && !status?.style ? (status?.templateKey ?? null) : null}
-          applyLabel={sheet === 'all' ? `Apply to all ${clips.length} clips` : `Apply to ${selected?.size ?? 0} clips`}
+          count={sheet === 'all' ? clips.length : (selected?.size ?? 0)}
           busy={sheetBusy}
           error={sheetError}
-          onApply={(k) => void applySheet(k)}
+          onApply={(look) => void applySheet(look)}
           onClose={() => {
             setSheet(null);
             setSheetError('');

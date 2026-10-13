@@ -1366,3 +1366,101 @@
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+
+/* --- clip format (9:16 vertical / 16:9 landscape) ------------------------------ */
+
+.clip-format .clip-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.clip-format-hint {
+  margin: 0.5rem 0 0;
+  color: var(--cf-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.clip-side-sub {
+  margin: 1rem 0 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cf-text-muted);
+}
+
+.clip-preview.is-landscape {
+  aspect-ratio: 16 / 9;
+}
+
+/* A landscape clip inside a vertical card: centred, bars above and below. */
+.clip-card-media .clip-preview.is-landscape {
+  inset: auto 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.clip-card-media.is-landscape > img {
+  object-fit: contain;
+}
+
+.clip-format-chip {
+  position: absolute;
+  z-index: 2;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.5rem;
+  background: rgba(10, 16, 24, 0.82);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.clip-grid.is-selecting .clip-card-media.is-landscape .clip-length {
+  right: auto;
+  left: 3.2rem;
+}
+
+.clip-stage-frame.is-landscape,
+.clip-editor-grid.is-landscape .clip-time {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .clip-editor-grid.is-landscape {
+    grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 1fr);
+  }
+}
+
+.clip-sheet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.clip-sheet-label {
+  color: var(--cf-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.clip-sheet-keep {
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cf-accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clip-sheet-keep:hover {
+  text-decoration: underline;
+}

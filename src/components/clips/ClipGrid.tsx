@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
-import { clipStyle, cropTrackFor } from '../../lib/clips/clipMath';
+import { clipAspect, clipStyle, cropTrackFor } from '../../lib/clips/clipMath';
 import { loadProjectAssets, type ProjectAssets } from '../../lib/clips/projectAssets';
 import type { RenderState } from '../../stores/clipsStore';
 import { ClipCard } from './ClipCard';
@@ -81,6 +81,7 @@ export function ClipGrid({
               captions={a.captions}
               style={clipStyle(a.style, clip)}
               track={cropTrackFor(clip)}
+              aspect={clipAspect(clip)}
               playing
             />
           ) : undefined;

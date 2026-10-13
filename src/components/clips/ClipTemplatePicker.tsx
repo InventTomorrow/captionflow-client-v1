@@ -11,15 +11,17 @@ import { useFlagsStore } from '../../stores/flagsStore';
 import { TemplateCard } from '../TemplateCard';
 
 interface ClipTemplatePickerProps {
-  /** Selected card; null = the video's style. */
-  templateKey: string | null;
+  /** Selected card; null = the video's style; undefined = none chosen (keep what each clip has). */
+  templateKey: string | null | undefined;
   /** The clip has a look made in the captions editor (shown as the current choice). */
   custom?: boolean;
   disabled?: boolean;
+  /** Offer "Video's style" (not on New clips, where the template becomes the video's style). */
+  allowVideoStyle?: boolean;
   onPick(templateKey: string | null): void;
 }
 
-export function ClipTemplatePicker({ templateKey, custom, disabled, onPick }: ClipTemplatePickerProps) {
+export function ClipTemplatePicker({ templateKey, custom, disabled, allowVideoStyle = true, onPick }: ClipTemplatePickerProps) {
   const layout = useFlagsStore((s) => s.templateLayout);
   const templates = useMemo(
     () => pickerTemplates(layout).filter((t) => isDeviceExportTemplate(t.preset.template)),
@@ -36,12 +38,13 @@ export function ClipTemplatePicker({ templateKey, custom, disabled, onPick }: Cl
           <span className="clip-tpl-name">Made in the captions editor</span>
         </div>
       )}
+      {allowVideoStyle && (
       <button
         type="button"
-        className={`display-card clip-tpl-video${!custom && !templateKey ? ' active' : ''}`}
+        className={`display-card clip-tpl-video${!custom && templateKey === null ? ' active' : ''}`}
         onClick={() => onPick(null)}
         disabled={disabled}
-        aria-pressed={!custom && !templateKey}
+        aria-pressed={!custom && templateKey === null}
       >
         <span className="clip-tpl-plain">
           <Film size={20} aria-hidden="true" />
@@ -49,6 +52,7 @@ export function ClipTemplatePicker({ templateKey, custom, disabled, onPick }: Cl
         </span>
         <span className="clip-tpl-name">Same as the full video</span>
       </button>
+      )}
       {templates.map((t) => (
         <TemplateCard key={t.key} t={t} isActive={!custom && templateKey === t.key} onApply={() => !disabled && onPick(t.key)} />
       ))}

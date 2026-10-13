@@ -15,7 +15,7 @@ import { errorMessage } from '../../lib/api';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
 import { useClipsStore } from '../../stores/clipsStore';
-import type { Clip } from '../../lib/clips/api';
+import type { Clip, ClipLookPatch } from '../../lib/clips/api';
 
 export function ClipsGalleryPage() {
   const navigate = useNavigate();
@@ -83,12 +83,12 @@ export function ClipsGalleryPage() {
     });
   }
 
-  async function applyStyle(templateKey: string | null) {
+  async function applyStyle(look: ClipLookPatch) {
     if (!selected?.size) return;
     setStyleBusy(true);
     setStyleError('');
     try {
-      await styleClips([...selected], { templateKey });
+      await styleClips([...selected], look);
       setStyling(false);
     } catch (err) {
       setStyleError(errorMessage(err, 'Couldn’t apply that style'));
@@ -209,13 +209,12 @@ export function ClipsGalleryPage() {
       )}
       {styling && selected && (
         <ClipStyleSheet
-          title={`Style ${selected.size} clip${selected.size === 1 ? '' : 's'}`}
-          note="The selected clips get this caption template. You can still change one clip on its own page."
-          initialKey={null}
-          applyLabel={`Apply to ${selected.size} clip${selected.size === 1 ? '' : 's'}`}
+          title={`Style & format ${selected.size} clip${selected.size === 1 ? '' : 's'}`}
+          note="The selected clips get what you pick. You can still change one clip on its own page."
+          count={selected.size}
           busy={styleBusy}
           error={styleError}
-          onApply={(k) => void applyStyle(k)}
+          onApply={(look) => void applyStyle(look)}
           onClose={() => {
             setStyling(false);
             setStyleError('');

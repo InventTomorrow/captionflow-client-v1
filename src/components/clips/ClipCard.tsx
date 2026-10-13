@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getClipThumb } from '../../lib/clips/thumbs';
 import type { Clip } from '../../lib/clips/api';
 import type { RenderState } from '../../stores/clipsStore';
-import { formatClipLength, scoreTone } from '../../lib/clips/clipMath';
+import { clipAspect, formatClipLength, scoreTone } from '../../lib/clips/clipMath';
 
 interface ClipCardProps {
   clip: Clip;
@@ -81,6 +81,7 @@ export function ClipCard({
   const rendering = render?.status === 'rendering' || render?.status === 'queued';
   const rendered = clip.status === 'rendered' || render?.status === 'done';
   const name = clip.title || 'Untitled clip';
+  const landscape = clipAspect(clip) === '16:9';
 
   function onMediaClick() {
     if (selecting) onToggleSelect?.();
@@ -97,7 +98,7 @@ export function ClipCard({
     >
       <button
         type="button"
-        className="clip-card-media"
+        className={`clip-card-media${landscape ? ' is-landscape' : ''}`}
         onClick={onMediaClick}
         onFocus={() => hasSource && !selecting && onActivate(clip._id)}
         aria-pressed={selecting ? selected : undefined}
@@ -120,6 +121,7 @@ export function ClipCard({
           </span>
         )}
         {rendered && !rendering && <span className="clip-rendered">Rendered</span>}
+        {landscape && <span className="clip-format-chip">16:9</span>}
         {rendering && (
           <span className="clip-render-bar" role="progressbar" aria-valuenow={Math.round(render?.percent ?? 0)} aria-valuemin={0} aria-valuemax={100}>
             <span style={{ width: `${Math.max(3, render?.percent ?? 0)}%` }} />

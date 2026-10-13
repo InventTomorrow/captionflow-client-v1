@@ -178,10 +178,14 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
     set((s) => {
       const merged = mergeClips(s, saved);
       const proj = merged.byProject[projectId];
-      const status =
-        'style' in look
+      const status = {
+        ...(look.style
           ? { templateKey: (look.style.templateKey as string | undefined) || null, style: look.style }
-          : { templateKey: look.templateKey, style: null };
+          : look.templateKey !== undefined
+            ? { templateKey: look.templateKey, style: null }
+            : {}),
+        ...(look.aspect ? { aspect: look.aspect } : {}),
+      };
       return {
         ...merged,
         byProject: proj ? { ...merged.byProject, [projectId]: { ...proj, status: { ...proj.status, ...status } } } : merged.byProject,
