@@ -9,7 +9,15 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
-import { api, API_URL } from '../lib/api';
+import { api, API_URL, errorMessage } from '../lib/api';
+import { ClipModeBar } from '../components/clips/ClipModeBar';
+import { ClipRenderDialog } from '../components/clips/ClipRenderDialog';
+import { styleAllClips } from '../lib/clips/api';
+import { clipStyle, cropTrackFor } from '../lib/clips/clipMath';
+import { captionWindow, clampToClip, clipEditorUrl, coverObjectPosition, loopedTime, type ClipRange } from '../lib/clips/clipMode';
+import { cropXAt, type CropTrack } from '../lib/clips/cropTrack';
+import { clipLookSnapshot, useClipLookAutosave, useClipMode } from '../lib/clips/useClipMode';
+import { useClipsStore } from '../stores/clipsStore';
 import { useCaptionStore, type Caption, type WordRole, type WordStyle } from '../stores/captionStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
@@ -579,6 +587,48 @@ export function EditorPage() {
   // Mirror of `style` for pointer-up persistence (avoids stale closure values).
   const styleRef = useRef(style);
   styleRef.current = style;
+
+  // ── Clip mode: this editor working on one clip (/projects/:id/editor?clip=<id>) ──
+  const clipMode = useClipMode(id);
+  const modeClip = clipMode.clip;
+  const inClipMode = !!clipMode.clipId;
+  const inClipModeRef = useRef(inClipMode);
+  inClipModeRef.current = inClipMode;
+  const clipRange = useMemo<ClipRange | null>(
+    () => (modeClip ? { start: modeClip.start, end: modeClip.end } : null),
+    [modeClip],
+  );
+  const clipRangeRef = useRef(clipRange);
+  clipRangeRef.current = clipRange;
+  const clipTrack = useMemo<CropTrack | null>(() => (modeClip ? cropTrackFor(modeClip) : null), [modeClip]);
+  const clipTrackRef = useRef(clipTrack);
+  clipTrackRef.current = clipTrack;
+  /** Auto/Manual framing: the 9:16 preview fills the frame around the crop, like the clip's render. */
+  const clipCover = !!modeClip && !!clipTrack;
+  const clipLook = useClipLookAutosave(modeClip?._id ?? null, style);
+  const { baseline: baselineClipLook, flush: flushClipLook } = clipLook;
+  /** The video's own style as loaded — the base a clip's look is drawn over. */
+  const projectStyleRef = useRef<Partial<EditorStyle> | null>(null);
+  const [projectStyleReady, setProjectStyleReady] = useState(false);
+  const lookAppliedFor = useRef<string | null>(null);
+  const [showClipRender, setShowClipRender] = useState(false);
+  const [applyAllState, setApplyAllState] = useState<'idle' | 'busy' | 'done'>('idle');
+
+  // Show the clip's look (its template or editor-made style) instead of the video's, once per clip.
+  useEffect(() => {
+    if (!modeClip || !projectStyleReady || lookAppliedFor.current === modeClip._id) return;
+    lookAppliedFor.current = modeClip._id;
+    const look = clipStyle(projectStyleRef.current ?? {}, modeClip);
+    setStyle((s) => ({ ...s, ...look }));
+    baselineClipLook(modeClip._id, look);
+    setApplyAllState('idle');
+  }, [modeClip, projectStyleReady, baselineClipLook]);
+
+  // ?panel=templates (from "Customize this style in the editor") opens that side panel.
+  useEffect(() => {
+    const wanted = clipMode.panel;
+    if (wanted && RAIL_ITEMS.some((r) => r.id === wanted)) setPanel(wanted as PanelId);
+  }, [clipMode.panel]);
   const showExportRef = useRef(showExport);
   showExportRef.current = showExport;
 
@@ -960,15 +1010,18 @@ export function EditorPage() {
       // Stacked templates preview in the exact mode they burn in.
       const forcedMode = stackedDisplayMode(merged.template as string);
       if (forcedMode) merged.displayMode = forcedMode;
-      setStyle((s) => ({
-        ...s,
+      const hydrated = {
         ...merged,
         offsetX: anchor.offsetX,
         offsetY: anchor.offsetY,
         position: (matchPositionPreset(anchor) ||
           merged.position ||
           'center') as StyleState['position'],
-      }));
+      };
+      projectStyleRef.current = hydrated as Partial<EditorStyle>;
+      setProjectStyleReady(true);
+      // In clip mode the clip's own look is shown instead (applied once the clip loads).
+      if (!inClipModeRef.current) setStyle((s) => ({ ...s, ...hydrated }));
       // Persist hydrated anchors + default 9:16 when aspect was missing/original.
       const stylePatch: Record<string, unknown> = {};
       if (savedStyle.offsetX == null || savedStyle.offsetY == null) {
@@ -1072,6 +1125,11 @@ export function EditorPage() {
       const cw = wrap.clientWidth;
       const ch = wrap.clientHeight;
       if (!cw || !ch) return;
+      if (clipCover) {
+        // object-fit: cover — the video paints the whole box, so captions use all of it.
+        setContentBox({ left: 0, top: 0, w: cw, h: ch });
+        return;
+      }
 
       // Must match object-fit:contain math — use the element's intrinsic size
       // when available so the caption layer lines up with the painted frame.
@@ -1124,7 +1182,7 @@ export function EditorPage() {
       video?.removeEventListener('loadedmetadata', measure);
       video?.removeEventListener('loadeddata', measure);
     };
-  }, [wrapSize, videoDims]);
+  }, [wrapSize, videoDims, clipCover]);
 
   // Captions as they appear on the video for the chosen display template.
   // Derived locally from the canonical captions — switching templates is
@@ -1183,6 +1241,7 @@ export function EditorPage() {
     let lastTimelineActive = -2;
     let lastClock = '';
     let lastPx = -1;
+    let lastObjectPos = '';
     const tick = () => {
       // Schedule the next frame FIRST so an exception in a single frame can
       // never kill the loop (a dead loop = frozen playhead/clock/scrubber).
@@ -1191,6 +1250,24 @@ export function EditorPage() {
         const video = videoRef.current;
         const t = video?.currentTime ?? 0;
         const total = timelineDurationLive.current;
+
+        // Clip mode: playback stays inside the clip, framed the way it renders.
+        const range = clipRangeRef.current;
+        const track = clipTrackRef.current;
+        if (range && video && video.readyState >= 1) {
+          const jump = loopedTime(t, range);
+          if (jump !== null && !video.seeking) video.currentTime = jump;
+        }
+        if (range && track && video?.videoWidth && video.videoHeight) {
+          const pos = coverObjectPosition(video.videoWidth, video.videoHeight, 9, 16, cropXAt(track, t - range.start));
+          if (pos !== lastObjectPos) {
+            lastObjectPos = pos;
+            video.style.objectPosition = pos;
+          }
+        } else if (lastObjectPos && video) {
+          lastObjectPos = '';
+          video.style.objectPosition = '';
+        }
 
         const idx = findActiveCaption(captionsLive.current, t);
         if (idx !== lastActive) {
@@ -1240,8 +1317,15 @@ export function EditorPage() {
 
   const activeCaption = activeIndex >= 0 ? captions[activeIndex] : undefined;
 
+  /** The phrases list: every caption, or in clip mode only the clip's. */
+  const [listFrom, listTo] = useMemo<[number, number]>(
+    () => (clipRange ? captionWindow(captions, clipRange.start, clipRange.end) : [0, captions.length]),
+    [captions, clipRange],
+  );
+  const listCaptions = useMemo(() => captions.slice(listFrom, listTo), [captions, listFrom, listTo]);
+
   const virtualizer = useVirtualizer({
-    count: captions.length,
+    count: listCaptions.length,
     getScrollElement: () => listRef.current,
     // Rows auto-measure (word chips make them variable height).
     estimateSize: () => 96,
@@ -1258,7 +1342,9 @@ export function EditorPage() {
     // NOTE: 'auto' (instant) on purpose — TanStack Virtual does not support
     // smooth scrolling with dynamically measured rows and it can wedge the
     // page in a scroll-correction loop.
-    virtualizer.scrollToIndex(activeIndex, { align: 'center', behavior: 'auto' });
+    const row = activeIndex - listFrom;
+    if (row < 0 || row >= listCaptions.length) return;
+    virtualizer.scrollToIndex(row, { align: 'center', behavior: 'auto' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, playing]);
 
@@ -1271,8 +1357,17 @@ export function EditorPage() {
     return { step, marks };
   }, [timelineDuration, pps]);
 
+  // Clip mode: open the timeline on the clip.
+  useEffect(() => {
+    const el = timelineScrollRef.current;
+    if (!el || !clipRange) return;
+    el.scrollLeft = Math.max(0, clipRange.start * pps - 48);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipRange?.start, pps]);
+
   const seek = useCallback((seconds: number) => {
-    if (videoRef.current) videoRef.current.currentTime = seconds;
+    const range = clipRangeRef.current;
+    if (videoRef.current) videoRef.current.currentTime = range ? clampToClip(seconds, range) : seconds;
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -1594,7 +1689,8 @@ export function EditorPage() {
       next.fontFamily = 'Montserrat';
     }
     setStyle(next);
-    void api.patch(`/projects/${id}/style`, next).catch(() => undefined);
+    // Clip mode: the clip's look autosaves (useClipLookAutosave); the video's style stays as it is.
+    if (!inClipModeRef.current) void api.patch(`/projects/${id}/style`, next).catch(() => undefined);
   }
 
   /**
@@ -1655,6 +1751,10 @@ export function EditorPage() {
   }
 
   async function saveStyle() {
+    if (inClipModeRef.current) {
+      await flushClipLook();
+      return;
+    }
     await api.patch(`/projects/${id}/style`, style);
   }
 
@@ -1781,6 +1881,7 @@ export function EditorPage() {
       ? { ...KINETIC_PARAM_DEFAULTS, ...(styleRef.current.kinetic ?? {}), ...patch }
       : { ...KINETIC_PARAM_DEFAULTS };
     setStyle((s) => ({ ...s, kinetic }));
+    if (inClipModeRef.current) return; // the clip's look autosaves
     if (kineticSaveTimer.current) window.clearTimeout(kineticSaveTimer.current);
     kineticSaveTimer.current = window.setTimeout(() => {
       void api.patch(`/projects/${id}/style`, { kinetic }).catch((err) => {
@@ -1871,14 +1972,36 @@ export function EditorPage() {
     URL.revokeObjectURL(url);
   }, [id]);
 
+  const openClipRender = useCallback(() => setShowClipRender(true), []);
   useEffect(() => {
     useEditorChromeStore.getState().setChrome({
       active: true,
-      onExport: openExportModal,
+      onExport: inClipMode ? openClipRender : openExportModal,
+      exportLabel: inClipMode ? 'Render clip' : null,
       onDownloadSrt: downloadSrt,
     });
     return () => useEditorChromeStore.getState().clearChrome();
-  }, [openExportModal, downloadSrt]);
+  }, [openExportModal, downloadSrt, inClipMode, openClipRender]);
+
+  /** Leave (or switch) the clip after its pending look is saved. */
+  async function goFromClip(to: string) {
+    await flushClipLook().catch(() => undefined);
+    navigate(to);
+  }
+
+  async function applyLookToAllClips() {
+    if (!id || !modeClip) return;
+    setApplyAllState('busy');
+    try {
+      await flushClipLook();
+      await styleAllClips(id, { style: clipLookSnapshot(styleRef.current) });
+      await useClipsStore.getState().loadProject(id);
+      setApplyAllState('done');
+    } catch (err) {
+      setApplyAllState('idle');
+      setError(errorMessage(err, 'Couldn’t apply the style to every clip'));
+    }
+  }
 
   /**
    * Render on this device (WebCodecs worker). Returns 'done' or 'stop' when
@@ -2514,6 +2637,8 @@ export function EditorPage() {
                       <input
                         type="checkbox"
                         checked={!!style.behindPerson}
+                        disabled={inClipMode}
+                        title={inClipMode ? 'Not available on clips (the frame is cropped)' : undefined}
                         onChange={(e) => void toggleBehindPerson(e.target.checked)}
                       />
                     </label>
@@ -2694,6 +2819,43 @@ export function EditorPage() {
         </div>
 
         <div className="studio-main">
+        {inClipMode && id && modeClip && (
+          <ClipModeBar
+            clip={modeClip}
+            index={clipMode.index}
+            count={clipMode.clips.length}
+            saveState={clipLook.state}
+            applyingAll={applyAllState === 'busy'}
+            appliedAll={applyAllState === 'done'}
+            onPrev={
+              clipMode.index > 0
+                ? () => void goFromClip(clipEditorUrl(id, clipMode.clips[clipMode.index - 1]._id))
+                : undefined
+            }
+            onNext={
+              clipMode.index < clipMode.clips.length - 1
+                ? () => void goFromClip(clipEditorUrl(id, clipMode.clips[clipMode.index + 1]._id))
+                : undefined
+            }
+            onApplyAll={() => void applyLookToAllClips()}
+            onBack={() => void goFromClip(`/clips/${id}/${modeClip._id}`)}
+            onFullVideo={() => void goFromClip(`/projects/${id}/editor`)}
+          />
+        )}
+        {inClipMode && id && !modeClip && (
+          <div className="clip-mode-bar is-missing" role="status">
+            <p className="clip-mode-note">
+              {clipMode.loading
+                ? 'Loading the clip…'
+                : clipMode.error || 'This clip no longer exists — you are editing the full video.'}
+            </p>
+            {!clipMode.loading && (
+              <button type="button" className="btn ghost clip-mode-btn" onClick={() => navigate(`/clips/${id}`)}>
+                Back to clips
+              </button>
+            )}
+          </div>
+        )}
         <div className="studio-main-top">
         <main className="studio-stage" ref={stageRef}>
           <div className="stage-canvas" ref={stageCanvasRef}>
@@ -2724,6 +2886,7 @@ export function EditorPage() {
             <video
               ref={videoRef}
               playsInline
+              style={clipCover ? { objectFit: 'cover' } : undefined}
               // CORS-readable with the auth cookie, so the text-behind-person
               // preview can read its pixels (MediaPipe) without tainting the
               // canvas. The API already answers with credentialed CORS headers
@@ -2884,7 +3047,8 @@ export function EditorPage() {
               <div className="player-group">
                 <select
                   className="aspect-select"
-                  title="Aspect ratio of the preview and exported video"
+                  disabled={inClipMode}
+                  title={inClipMode ? 'Clips are always 9:16' : 'Aspect ratio of the preview and exported video'}
                   value={
                     style.aspectRatio && style.aspectRatio !== 'original'
                       ? style.aspectRatio
@@ -2939,12 +3103,12 @@ export function EditorPage() {
         <aside className="phrases-panel">
           <div className="panel-header">
             <h3>Phrases</h3>
-            <span className="panel-count">{captions.length} items</span>
+            <span className="panel-count">{listCaptions.length} items</span>
           </div>
           <div className="panel-list" ref={listRef}>
             <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
               {virtualizer.getVirtualItems().map((row) => {
-                const c = captions[row.index];
+                const c = listCaptions[row.index];
                 const words = c.text.split(/\s+/).filter(Boolean);
                 const isSelected = Boolean(selectedId && selectedId === c._id);
                 const wordSel = isSelected ? selectedWordIdx : null;
@@ -3251,6 +3415,16 @@ export function EditorPage() {
             ref={timelineRef}
             style={{ width: Math.ceil(timelineDuration * pps) }}
           >
+            {clipRange && (
+              <>
+                <div className="timeline-outside" style={{ left: 0, width: clipRange.start * pps }} aria-hidden="true" />
+                <div
+                  className="timeline-outside"
+                  style={{ left: clipRange.end * pps, width: Math.max(0, (timelineDuration - clipRange.end) * pps) }}
+                  aria-hidden="true"
+                />
+              </>
+            )}
             <div className="timeline-ruler" onClick={seekFromTimeline}>
               {ruler.marks.map((t) => (
                 <span key={t} className="ruler-mark" style={{ left: t * pps }}>
@@ -3296,6 +3470,16 @@ export function EditorPage() {
         />
       )}
 
+      {showClipRender && id && modeClip && (
+        <ClipRenderDialog
+          projectId={id}
+          projectName={projectName}
+          projectStyle={projectStyleRef.current ?? {}}
+          clipId={modeClip._id}
+          beforeRender={flushClipLook}
+          onClose={() => setShowClipRender(false)}
+        />
+      )}
       {showExport && (
         <div className="modal-backdrop" onClick={closeExportModal}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>

@@ -628,6 +628,60 @@
 
 /* --- clip editor ------------------------------------------------------------- */
 
+.clip-editor {
+  max-width: 68rem;
+}
+
+.clip-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.clip-editor-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.clip-editor-heading-text {
+  min-width: 0;
+}
+
+.clip-editor-kicker {
+  margin: 0;
+  color: var(--cf-text-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-editor-title {
+  margin: 0.1rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.clip-editor-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.clip-open-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+}
+
 .clip-editor-grid {
   display: grid;
   gap: 1.5rem;
@@ -636,8 +690,12 @@
 
 @media (min-width: 900px) {
   .clip-editor-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
     align-items: start;
+  }
+  .clip-editor-stage {
+    position: sticky;
+    top: 1rem;
   }
 }
 
@@ -645,6 +703,59 @@
   display: grid;
   gap: 0.6rem;
   justify-items: center;
+}
+
+.clip-stage-frame {
+  position: relative;
+  width: min(100%, 24rem);
+}
+
+.clip-stage-frame .clip-preview.is-large {
+  width: 100%;
+}
+
+.clip-stage-controls {
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cf-bg) 72%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.clip-stage-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cf-text);
+  cursor: pointer;
+}
+
+.clip-stage-btn:hover {
+  background: color-mix(in srgb, var(--cf-text) 14%, transparent);
+}
+
+.clip-stage-btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 1px;
+}
+
+.clip-stage-time {
+  color: var(--cf-text);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .clip-time {
@@ -663,36 +774,27 @@
   background: var(--cf-accent);
 }
 
-.clip-player-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  justify-content: center;
-}
-
-.clip-nav {
-  display: inline-flex;
-  gap: 0.4rem;
-}
-
 .clip-editor-side {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.clip-side-card {
+  min-width: 0;
   border: 1px solid var(--cf-border);
   border-radius: 0.9rem;
   background: color-mix(in srgb, var(--cf-card) 35%, transparent);
-  padding: 1.1rem 1.25rem;
+  padding: 1rem 1.1rem;
 }
 
-.clip-editor-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.9rem;
-  color: var(--cf-text-secondary);
-  font-variant-numeric: tabular-nums;
+.clip-side-card > .clip-field:last-child,
+.clip-side-card > .clip-reframe:last-child {
+  margin-bottom: 0;
 }
 
 .clip-side-h {
-  margin: 1.25rem 0 0.6rem;
+  margin: 0 0 0.7rem;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -700,26 +802,85 @@
   color: var(--cf-text-muted);
 }
 
+.clip-side-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+
+.clip-customize {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  color: var(--cf-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.clip-customize:hover {
+  text-decoration: underline;
+}
+
+.clip-why {
+  margin-top: 0.25rem;
+}
+
+.clip-why summary {
+  cursor: pointer;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  color: var(--cf-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.clip-why .clip-card-hook,
+.clip-why .clip-card-reason {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
 .clip-trim {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .clip-trim-row {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .clip-trim-name {
-  min-width: 3.5rem;
+  min-width: 3.25rem;
   color: var(--cf-text-secondary);
+  font-size: 0.9rem;
 }
 
 .clip-nudge {
+  display: inline-grid;
+  place-items: center;
   min-width: 44px;
   min-height: 44px;
   padding: 0;
+}
+
+.clip-trim-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0.35rem;
+  overflow: hidden;
+  color: var(--cf-text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .clip-trim-len {
@@ -761,6 +922,69 @@
   margin-bottom: 0.6rem;
 }
 
+.clip-render-row .clip-field {
+  margin: 0;
+}
+
+.clip-render-progress {
+  display: block;
+  height: 0.35rem;
+  margin-bottom: 0.4rem;
+  border-radius: 999px;
+  background: var(--cf-input);
+  overflow: hidden;
+}
+
+.clip-render-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--cf-accent);
+  transition: width 0.3s ease;
+}
+
+/* --- caption template picker (clip page + style sheet) ----------------------- */
+
+.clip-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.55rem;
+  max-height: 26rem;
+  overflow-y: auto;
+  padding: 0.15rem;
+  overscroll-behavior: contain;
+}
+
+.clip-tpl-grid.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.clip-tpl-grid .display-card {
+  min-width: 0;
+}
+
+.clip-tpl-plain {
+  display: grid;
+  place-items: center;
+  gap: 0.35rem;
+  min-height: 88px;
+  border: 1px dashed var(--cf-border);
+  border-radius: 10px;
+  color: var(--cf-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.clip-tpl-name {
+  color: var(--cf-text-muted);
+  font-size: 0.75rem;
+}
+
+.clip-tpl-custom {
+  cursor: default;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .clips-spinner {
     animation: none;
@@ -771,4 +995,188 @@
   .clip-seg-btn {
     transition: none;
   }
+}
+
+/* --- clip mode in the captions editor ---------------------------------------- */
+
+.clip-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex: 0 0 auto;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cf-accent) 45%, var(--cf-border));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cf-accent) 7%, var(--cf-surface));
+  color: var(--cf-text);
+}
+
+.clip-mode-main,
+.clip-mode-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.clip-mode-main {
+  flex: 1 1 22rem;
+}
+
+.clip-mode-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--cf-border);
+  border-radius: 0.55rem;
+  background: var(--cf-input);
+  color: var(--cf-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clip-mode-back:hover {
+  border-color: var(--cf-accent);
+}
+
+.clip-mode-back:focus-visible,
+.clip-icon-btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+
+.clip-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--cf-accent);
+  color: var(--cf-on-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.clip-mode-title {
+  min-width: 0;
+  max-width: 28rem;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clip-mode-range {
+  color: var(--cf-text-secondary);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.clip-mode-nav {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.clip-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--cf-border);
+  border-radius: 0.55rem;
+  background: var(--cf-input);
+  color: var(--cf-text);
+  cursor: pointer;
+}
+
+.clip-icon-btn:hover:not(:disabled) {
+  border-color: var(--cf-accent);
+  color: var(--cf-accent);
+}
+
+.clip-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.clip-mode-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--cf-text-muted);
+  font-size: 0.8rem;
+}
+
+.clip-mode-save.is-saved {
+  color: var(--cf-success);
+}
+
+.clip-mode-save.is-error {
+  color: var(--cf-danger);
+}
+
+.clip-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.clip-mode-note {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--cf-text-muted);
+  font-size: 0.78rem;
+}
+
+.clip-mode-bar.is-missing .clip-mode-note {
+  flex: 1 1 auto;
+}
+
+.clip-spin {
+  animation: clip-spin 0.9s linear infinite;
+}
+
+@keyframes clip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clip-spin {
+    animation: none;
+  }
+}
+
+/* The parts of the full video outside the clip, dimmed on the timeline. */
+.timeline-outside {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--cf-bg) 78%, transparent) 0 6px,
+    color-mix(in srgb, var(--cf-bg) 64%, transparent) 6px 12px
+  );
+  pointer-events: none;
+}
+
+.clip-render-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }

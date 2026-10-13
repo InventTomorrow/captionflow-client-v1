@@ -61,7 +61,7 @@ export function ClipGrid({ clips, project, showProject, showReason, renders, onO
               start={clip.start}
               end={clip.end}
               captions={a.captions}
-              style={clipStyle(a.style, clip.templateKey)}
+              style={clipStyle(a.style, clip)}
               track={cropTrackFor(clip)}
               playing
             />

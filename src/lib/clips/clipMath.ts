@@ -4,7 +4,9 @@
  */
 import { buildExportStyle, type EditorStyle } from '../export/styleSnapshot';
 import { templateByKey } from '../templateCatalog';
+import type { Caption } from '../../stores/captionStore';
 import { cropXAt, type CropTrack } from './cropTrack';
+import { sliceCaptionsToRange } from './sliceCaptions';
 
 export interface ClipTiming {
   _id: string;
@@ -38,16 +40,24 @@ export function thumbKey(clip: ClipTiming & ClipFraming): string {
   return `${clip._id}:${clip.start.toFixed(2)}:${clip.crop.mode}:${x}`;
 }
 
+/** What a clip says about its captions' look (Clip.templateKey / Clip.style). */
+export interface ClipLook {
+  templateKey?: string | null;
+  /** A look made for this clip in the captions editor — wins over the template. */
+  style?: Partial<EditorStyle> | null;
+}
+
 /**
- * A clip's caption style: the project's look, switched to the clip's own
- * template card when it has one, always 9:16 and never behind-person (the
- * matte maps onto letterboxed frames only).
+ * A clip's caption style: the project's look, switched to the clip's template
+ * card, or to the look made for it in the captions editor. Always 9:16 and
+ * never behind-person (the matte maps onto letterboxed frames only).
  */
-export function clipStyle(projectStyle: Partial<EditorStyle>, templateKey: string | null | undefined): EditorStyle {
-  const card = templateKey ? templateByKey(templateKey) : undefined;
+export function clipStyle(projectStyle: Partial<EditorStyle>, look: ClipLook): EditorStyle {
+  const card = !look.style && look.templateKey ? templateByKey(look.templateKey) : undefined;
   const merged: Partial<EditorStyle> = {
     ...projectStyle,
     ...(card ? { ...card.preset, templateKey: card.key } : {}),
+    ...(look.style ?? {}),
     aspectRatio: '9:16',
     behindPerson: false,
   };
@@ -80,4 +90,11 @@ export function formatClipLength(sec: number): string {
 
 export function scoreTone(score: number): 'high' | 'mid' | 'low' {
   return score >= 80 ? 'high' : score >= 60 ? 'mid' : 'low';
+}
+
+/** The words spoken in [start, end] (a sentence's text beside the trim buttons). */
+export function textInRange(captions: Caption[], start: number, end: number): string {
+  return sliceCaptionsToRange(captions, start, end)
+    .map((c) => c.text)
+    .join(' ');
 }

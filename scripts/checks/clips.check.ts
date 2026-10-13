@@ -5,9 +5,10 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource } from '../../src/lib/clips/clipMath';
+import { clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, textInRange } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
+import { captionWindow, clampToClip, clipEditorUrl, coverObjectPosition, loopedTime } from '../../src/lib/clips/clipMode';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -222,11 +223,11 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(JSON.stringify(cropTrackFor({ ...clip, crop: { mode: 'auto', x: 0.5, track: [] } })) === '[[0,0.5]]', 'auto without a track yet → centre');
 
   const base = { template: 'classic', fontFamily: 'Inter', color: '#00FF00', offsetY: 40, aspectRatio: '16:9', behindPerson: true };
-  const st = clipStyle(base, 'hero-word');
+  const st = clipStyle(base, { templateKey: 'hero-word' });
   assert(st.aspectRatio === '9:16' && st.behindPerson === false, 'clips are 9:16, never behind-person');
   assert(st.template === 'heroWord' && st.templateKey === 'hero-word', `template preset applied, got ${st.template}`);
   assert(st.offsetY === 40, 'keeps the project caption position');
-  const keep = clipStyle(base, null);
+  const keep = clipStyle(base, { templateKey: null });
   assert(keep.template === 'classic' && keep.color === '#00FF00' && keep.fontFamily === 'Inter', 'no template key → project look');
 }
 
@@ -237,6 +238,67 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(e.durations.includes(93.73) && e.durations.includes(91.96), `both durations accepted, got ${e.durations}`);
   const bare = expectedSource({ duration: 60 });
   assert(bare.size === 0 && bare.durations.join() === '60', 'missing fields → unknown size');
+}
+
+// ── clipStyle with a look made in the captions editor ────────────────────
+{
+  const base = { template: 'classic', fontFamily: 'Inter', color: '#00FF00', offsetY: 40, aspectRatio: '16:9' };
+  const look = { template: 'classic', templateKey: 'clean-phrase', fontFamily: 'Anton', color: '#FF0000', offsetY: 72, behindPerson: true };
+  const st = clipStyle(base, { templateKey: 'beat-karaoke', style: look });
+  assert(st.fontFamily === 'Anton' && st.color === '#FF0000' && st.offsetY === 72, 'the editor-made look wins over the template');
+  assert(st.template === 'classic', `keeps the look's renderer, got ${st.template}`);
+  assert(st.aspectRatio === '9:16' && st.behindPerson === false, 'still 9:16 and never behind-person');
+  const none = clipStyle(base, { templateKey: null, style: null });
+  assert(none.fontFamily === 'Inter', 'style null → project look');
+}
+
+// ── clip mode in the captions editor ──────────────────────────────────────
+{
+  const caps = [
+    { start: 0, end: 1 },
+    { start: 1, end: 2 },
+    { start: 2, end: 3 },
+    { start: 3, end: 4 },
+  ];
+  const w = captionWindow(caps, 1.5, 3.2);
+  assert(w[0] === 1 && w[1] === 4, `captions overlapping the clip, got ${w}`);
+  const touching = captionWindow(caps, 2, 3);
+  assert(touching[0] === 2 && touching[1] === 3, `a caption that only touches an edge stays out, got ${touching}`);
+  const outside = captionWindow(caps, 10, 12);
+  assert(outside[0] === outside[1], 'nothing in range → empty window');
+  const unsorted = captionWindow([caps[2], caps[0], caps[1]], 0.5, 1.5);
+  assert(unsorted[0] === 1 && unsorted[1] === 3, `window spans the overlapping ones in list order, got ${unsorted}`);
+
+  const range = { start: 10, end: 20 };
+  assert(clampToClip(0.5, range) === 10, 'a seek before the clip lands on its start');
+  assert(near(clampToClip(25, range), 19.95), 'a seek past the clip lands just before its end');
+  assert(clampToClip(15, range) === 15, 'a seek inside is kept');
+
+  assert(loopedTime(20, range) === 10, 'reaching the end loops to the start');
+  assert(loopedTime(9.5, range) === 10, 'drifting well before the start jumps in');
+  assert(loopedTime(9.9, range) === null, 'a hair before the start is left alone (seek jitter)');
+  assert(loopedTime(15, range) === null, 'inside: nothing to do');
+
+  assert(coverObjectPosition(1920, 1080, 9, 16, 0.5) === '50.00% 50.00%', 'centred crop');
+  assert(coverObjectPosition(1920, 1080, 9, 16, 0) === '0.00% 50.00%', 'left edge');
+  assert(coverObjectPosition(1920, 1080, 9, 16, 1) === '100.00% 50.00%', 'right edge');
+  assert(coverObjectPosition(1920, 1080, 9, 16, 0.1) === '0.00% 50.00%', 'a face near the edge clamps the window inside the frame');
+  assert(coverObjectPosition(1080, 1920, 9, 16, 0.9) === '50.00% 50.00%', 'portrait source: nothing to move');
+
+  assert(clipEditorUrl('p1', 'c1') === '/projects/p1/editor?clip=c1', 'clip mode url');
+  assert(clipEditorUrl('p1', 'c1', 'templates') === '/projects/p1/editor?clip=c1&panel=templates', 'clip mode url with a panel');
+}
+
+// ── textInRange (the in/out sentence shown next to the trim buttons) ─────
+{
+  const caps = [
+    cap(1, [['Hello', 0, 0.5], ['world.', 0.5, 1]]),
+    cap(2, [['How', 1.2, 1.5], ['are', 1.5, 1.8], ['you?', 1.8, 2.1]]),
+  ];
+  assert(textInRange(caps, 1.1, 2.2) === 'How are you?', `one sentence, got ${textInRange(caps, 1.1, 2.2)}`);
+  assert(textInRange(caps, 0, 2.1) === 'Hello world. How are you?', 'spans captions');
+  assert(textInRange(caps, 1.4, 1.9) === 'are', `only words mostly inside, got ${textInRange(caps, 1.4, 1.9)}`);
+  assert(textInRange(caps, 5, 6) === '', 'nothing spoken → empty');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

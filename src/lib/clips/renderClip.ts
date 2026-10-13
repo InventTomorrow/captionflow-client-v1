@@ -82,7 +82,7 @@ export function renderClip(
     if (blocker) throw new ClipRenderError('UNSUPPORTED', blocker);
     const source = await getSourceFile(ctx.projectId);
     if (!source) throw new ClipRenderError('NO_SOURCE', 'The original video isn’t on this device');
-    const style = clipStyle(ctx.projectStyle, clip.templateKey);
+    const style = clipStyle(ctx.projectStyle, clip);
     if (!isDeviceExportTemplate(style.template)) {
       throw new ClipRenderError('UNSUPPORTED', 'This caption style can’t be rendered on this device yet — pick another');
     }

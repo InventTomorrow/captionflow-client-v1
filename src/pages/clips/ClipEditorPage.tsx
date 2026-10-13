@@ -1,22 +1,26 @@
 /**
  * /clips/:projectId/:clipId — one clip, large: play it, move its in/out point
- * by sentences, pick a caption style and the framing (face-tracked on this
+ * by sentences, pick a caption template and the framing (face-tracked on this
  * device the first time Auto is used), rename it, render it here and download.
+ * "Edit in captions editor" opens the full editor on just this clip
+ * (/projects/:id/editor?clip=…) for word fixes and a custom look.
  */
+import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipPreview } from '../../components/clips/ClipPreview';
+import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
 import { ReframeControl } from '../../components/clips/ReframeControl';
 import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
 import type { ClipCropMode, ClipPatch } from '../../lib/clips/api';
-import { clipStyle, cropTrackFor, formatClipLength, scoreTone } from '../../lib/clips/clipMath';
+import { clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
+import { clipEditorUrl } from '../../lib/clips/clipMode';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
-import { downloadLocalFile, exportFileName, isDeviceExportTemplate } from '../../lib/export/clientExport';
+import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
 import type { ExportQuality } from '../../lib/render/frame';
-import { pickerTemplates } from '../../lib/templateCatalog';
 import { useAuthStore } from '../../stores/authStore';
 import { useClipsStore } from '../../stores/clipsStore';
 
@@ -41,10 +45,12 @@ export function ClipEditorPage() {
   const [quality, setQuality] = useState<ExportQuality>('1080p');
   const [reframeStatus, setReframeStatus] = useState('');
   const timeBar = useRef<HTMLSpanElement | null>(null);
+  const timeText = useRef<HTMLSpanElement | null>(null);
 
+  // Always fetch on open: the captions editor may have changed this clip's look.
   useEffect(() => {
-    if (!data) void loadProject(projectId).catch((e) => setError(errorMessage(e, 'Couldn’t load this clip')));
-  }, [data, projectId, loadProject]);
+    void loadProject(projectId).catch((e) => setError(errorMessage(e, 'Couldn’t load this clip')));
+  }, [projectId, loadProject]);
 
   const clips = data?.clips ?? [];
   const index = clips.findIndex((c) => c._id === clipId);
@@ -53,9 +59,17 @@ export function ClipEditorPage() {
   const source = useClipSource(projectId, project?.video?.kind);
   const captions = useProjectCaptions(projectId, !!project);
   const projectStyle = useProjectStyle(projectId);
-  const style = useMemo(() => (projectStyle ? clipStyle(projectStyle, clip?.templateKey) : null), [projectStyle, clip?.templateKey]);
-  const templates = useMemo(() => pickerTemplates().filter((t) => isDeviceExportTemplate(t.preset.template)), []);
+  const style = useMemo(() => (projectStyle && clip ? clipStyle(projectStyle, clip) : null), [projectStyle, clip]);
   const allowedQualities = QUALITIES.slice(0, QUALITIES.indexOf(maxQuality as ExportQuality) + 1);
+  const sentences = data?.sentences;
+  const startText = useMemo(() => {
+    const s = clip && sentences?.[clip.startIdx];
+    return s && captions ? textInRange(captions, s[0], s[1]) : '';
+  }, [clip, sentences, captions]);
+  const endText = useMemo(() => {
+    const s = clip && sentences?.[clip.endIdx];
+    return s && captions ? textInRange(captions, s[0], s[1]) : '';
+  }, [clip, sentences, captions]);
 
   useEffect(() => setTitle(clip?.title ?? ''), [clip?._id, clip?.title]);
 
@@ -122,6 +136,7 @@ export function ClipEditorPage() {
   const rendered = clip.status === 'rendered' || render?.status === 'done';
   const prev = clips[index - 1];
   const next = clips[index + 1];
+  const length = clip.end - clip.start;
 
   return (
     <div className="clips-page clip-editor">
@@ -133,6 +148,46 @@ export function ClipEditorPage() {
         <span>{clip.title || 'Clip'}</span>
       </nav>
 
+      <header className="clip-editor-head">
+        <div className="clip-editor-heading">
+          <span className={`clip-score clip-score-${scoreTone(clip.score)} is-static`} title="AI score">
+            {clip.score}
+          </span>
+          <div className="clip-editor-heading-text">
+            <p className="clip-editor-kicker">
+              Clip {index + 1} of {clips.length} · {formatClipLength(length)}
+            </p>
+            <h1 className="clip-editor-title">{clip.title || 'Untitled clip'}</h1>
+          </div>
+        </div>
+        <div className="clip-editor-head-actions">
+          <span className="clip-mode-nav">
+            <button
+              type="button"
+              className="clip-icon-btn"
+              disabled={!prev}
+              onClick={() => prev && navigate(`/clips/${projectId}/${prev._id}`)}
+              aria-label="Previous clip"
+            >
+              <ChevronLeft size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="clip-icon-btn"
+              disabled={!next}
+              onClick={() => next && navigate(`/clips/${projectId}/${next._id}`)}
+              aria-label="Next clip"
+            >
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+          </span>
+          <Link to={clipEditorUrl(projectId, clip._id)} className="btn primary clip-open-editor">
+            <Captions size={17} aria-hidden="true" />
+            Edit in captions editor
+          </Link>
+        </div>
+      </header>
+
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -141,139 +196,168 @@ export function ClipEditorPage() {
 
       <div className="clip-editor-grid">
         <section className="clip-editor-stage" aria-label="Preview">
-          {source.url && captions && style ? (
-            <ClipPreview
-              src={source.url}
-              credentials={!source.local}
-              start={clip.start}
-              end={clip.end}
-              captions={captions}
-              style={style}
-              track={cropTrackFor(clip)}
-              playing={playing}
-              muted={muted}
-              className="is-large"
-              onTime={(t) => {
-                if (timeBar.current) timeBar.current.style.width = `${Math.min(100, (100 * t) / (clip.end - clip.start))}%`;
-              }}
-            />
-          ) : (
-            <div className="clip-preview is-large clip-preview-empty">
-              {source.missing ? 'The original video isn’t on this device.' : 'Loading…'}
+          <div className="clip-stage-frame">
+            {source.url && captions && style ? (
+              <ClipPreview
+                src={source.url}
+                credentials={!source.local}
+                start={clip.start}
+                end={clip.end}
+                captions={captions}
+                style={style}
+                track={cropTrackFor(clip)}
+                playing={playing}
+                muted={muted}
+                className="is-large"
+                onTime={(t) => {
+                  if (timeBar.current) timeBar.current.style.width = `${Math.min(100, (100 * t) / length)}%`;
+                  if (timeText.current) timeText.current.textContent = formatClipLength(t);
+                }}
+              />
+            ) : (
+              <div className="clip-preview is-large clip-preview-empty">
+                {source.missing ? 'The original video isn’t on this device.' : 'Loading…'}
+              </div>
+            )}
+            <div className="clip-stage-controls">
+              <button
+                type="button"
+                className="clip-stage-btn"
+                onClick={() => setPlaying((p) => !p)}
+                aria-label={playing ? 'Pause' : 'Play'}
+              >
+                {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+              </button>
+              <span className="clip-stage-time">
+                <span ref={timeText}>0:00</span> / {formatClipLength(length)}
+              </span>
+              <button
+                type="button"
+                className="clip-stage-btn"
+                onClick={() => setMuted((m) => !m)}
+                aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+                aria-pressed={!muted}
+              >
+                {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+              </button>
             </div>
-          )}
+          </div>
           <span className="clip-time" aria-hidden="true">
             <span ref={timeBar} />
           </span>
-          <div className="clip-player-bar">
-            <button type="button" className="btn ghost clip-btn" onClick={() => setPlaying((p) => !p)}>
-              {playing ? 'Pause' : 'Play'}
-            </button>
-            <button type="button" className="btn ghost clip-btn" onClick={() => setMuted((m) => !m)} aria-pressed={!muted}>
-              {muted ? 'Sound off' : 'Sound on'}
-            </button>
-            <span className="clip-nav">
-              <button type="button" className="btn ghost clip-btn" disabled={!prev} onClick={() => prev && navigate(`/clips/${projectId}/${prev._id}`)}>
-                ◀ Prev
-              </button>
-              <button type="button" className="btn ghost clip-btn" disabled={!next} onClick={() => next && navigate(`/clips/${projectId}/${next._id}`)}>
-                Next ▶
-              </button>
-            </span>
-          </div>
         </section>
 
         <section className="clip-editor-side" aria-label="Clip settings">
-          <div className="clip-editor-meta">
-            <span className={`clip-score clip-score-${scoreTone(clip.score)} is-static`}>{clip.score}</span>
-            <span>{formatClipLength(clip.end - clip.start)}</span>
-          </div>
-          <label className="clip-field">
-            <span>Title</span>
-            <input
-              type="text"
-              value={title}
-              maxLength={60}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={() => title.trim() && title !== clip.title && void save({ title: title.trim() })}
-            />
-          </label>
-          {clip.hook && <p className="clip-card-hook">“{clip.hook}”</p>}
-          {clip.reason && <p className="clip-card-reason">{clip.reason}</p>}
-
-          <h2 className="clip-side-h">Trim</h2>
-          <TrimNudger
-            startIdx={clip.startIdx}
-            endIdx={clip.endIdx}
-            sentences={data.sentences}
-            busy={saving}
-            onChange={(startIdx, endIdx) => {
-              // The server clears an Auto face track when the range moves; it is recomputed here.
-              void save({ startIdx, endIdx });
-            }}
-          />
-
-          <h2 className="clip-side-h">Framing</h2>
-          <ReframeControl
-            mode={clip.crop.mode}
-            x={clip.crop.x}
-            busy={saving}
-            status={reframeStatus}
-            onMode={setMode}
-            onX={(x) => void save({ crop: { mode: 'manual', x } })}
-          />
-
-          <label className="clip-field">
-            <span>Caption style</span>
-            <select value={clip.templateKey ?? ''} onChange={(e) => void save({ templateKey: e.target.value || null })} disabled={saving}>
-              <option value="">Same as the video</option>
-              {templates.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <h2 className="clip-side-h">Render</h2>
-          <div className="clip-render-row">
-            <label className="clip-field clip-field-inline">
-              <span>Quality</span>
-              <select value={quality} onChange={(e) => setQuality(e.target.value as ExportQuality)} disabled={rendering}>
-                {allowedQualities.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
+          <div className="clip-side-card">
+            <label className="clip-field">
+              <span>Title</span>
+              <input
+                type="text"
+                value={title}
+                maxLength={60}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => title.trim() && title !== clip.title && void save({ title: title.trim() })}
+              />
             </label>
-            {rendering ? (
-              <button type="button" className="btn ghost" onClick={() => cancelRender(clip._id)}>
-                Cancel {Math.round(render?.percent ?? 0)}%
-              </button>
-            ) : (
-              <button type="button" className="btn primary" disabled={!source.local || !projectStyle} onClick={() => void startRender()}>
-                {rendered ? 'Render again' : 'Render clip'}
-              </button>
+            {(clip.hook || clip.reason) && (
+              <details className="clip-why">
+                <summary>Why this clip</summary>
+                {clip.hook && <p className="clip-card-hook">“{clip.hook}”</p>}
+                {clip.reason && <p className="clip-card-reason">{clip.reason}</p>}
+              </details>
             )}
           </div>
-          {rendering && <p className="clips-sub">{render?.detail}</p>}
-          {render?.status === 'error' && (
-            <p className="clip-card-error" role="alert">
-              {render.error}
-            </p>
-          )}
-          {rendered && !rendering && (
-            <button type="button" className="btn ghost" onClick={() => void download()}>
-              Download MP4
-            </button>
-          )}
-          {!source.local && !source.loading && (
-            <p className="clips-sub">
-              Rendering needs the original video on this device.{' '}
-              <Link to={`/clips/${projectId}`}>Locate the original file</Link>
-            </p>
-          )}
+
+          <div className="clip-side-card">
+            <h2 className="clip-side-h">Trim</h2>
+            <TrimNudger
+              startIdx={clip.startIdx}
+              endIdx={clip.endIdx}
+              sentences={data.sentences}
+              busy={saving}
+              startText={startText}
+              endText={endText}
+              onChange={(startIdx, endIdx) => {
+                // The server clears an Auto face track when the range moves; it is recomputed here.
+                void save({ startIdx, endIdx });
+              }}
+            />
+          </div>
+
+          <div className="clip-side-card">
+            <h2 className="clip-side-h">Framing</h2>
+            <ReframeControl
+              mode={clip.crop.mode}
+              x={clip.crop.x}
+              busy={saving}
+              status={reframeStatus}
+              onMode={setMode}
+              onX={(x) => void save({ crop: { mode: 'manual', x } })}
+            />
+          </div>
+
+          <div className="clip-side-card">
+            <div className="clip-side-row">
+              <h2 className="clip-side-h">Caption style</h2>
+              <Link to={clipEditorUrl(projectId, clip._id, 'templates')} className="clip-customize">
+                <PenLine size={15} aria-hidden="true" />
+                Customize in captions editor
+              </Link>
+            </div>
+            <ClipTemplatePicker
+              templateKey={clip.templateKey}
+              custom={!!clip.style}
+              disabled={saving}
+              onPick={(templateKey) => void save({ templateKey })}
+            />
+          </div>
+
+          <div className="clip-side-card">
+            <h2 className="clip-side-h">Render</h2>
+            <div className="clip-render-row">
+              <label className="clip-field clip-field-inline">
+                <span>Quality</span>
+                <select value={quality} onChange={(e) => setQuality(e.target.value as ExportQuality)} disabled={rendering}>
+                  {allowedQualities.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {rendering ? (
+                <button type="button" className="btn ghost" onClick={() => cancelRender(clip._id)}>
+                  Cancel {Math.round(render?.percent ?? 0)}%
+                </button>
+              ) : (
+                <button type="button" className="btn primary" disabled={!source.local || !projectStyle} onClick={() => void startRender()}>
+                  {rendered ? 'Render again' : 'Render clip'}
+                </button>
+              )}
+              {rendered && !rendering && (
+                <button type="button" className="btn ghost" onClick={() => void download()}>
+                  Download MP4
+                </button>
+              )}
+            </div>
+            {rendering && (
+              <div className="clip-render-progress" role="progressbar" aria-valuenow={Math.round(render?.percent ?? 0)} aria-valuemin={0} aria-valuemax={100}>
+                <span style={{ width: `${Math.max(2, render?.percent ?? 0)}%` }} />
+              </div>
+            )}
+            {rendering && <p className="clips-sub">{render?.detail}</p>}
+            {render?.status === 'error' && (
+              <p className="clip-card-error" role="alert">
+                {render.error}
+              </p>
+            )}
+            {!source.local && !source.loading && (
+              <p className="clips-sub">
+                Rendering needs the original video on this device.{' '}
+                <Link to={`/clips/${projectId}`}>Locate the original file</Link>
+              </p>
+            )}
+          </div>
         </section>
       </div>
     </div>

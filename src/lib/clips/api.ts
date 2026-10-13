@@ -1,6 +1,7 @@
 /** clips/api.ts — typed calls for the Clips REST API (server routes/clips.routes.ts). */
 import { api } from '../api';
 import type { CropTrack } from './cropTrack';
+import type { EditorStyle } from '../export/styleSnapshot';
 
 export type ClipStatus = 'suggested' | 'edited' | 'rendered' | 'deleted';
 export type ClipCropMode = 'auto' | 'manual' | 'none';
@@ -38,6 +39,8 @@ export interface Clip {
   score: number;
   status: ClipStatus;
   templateKey: string | null;
+  /** A look made for this clip in the captions editor (wins over templateKey). */
+  style?: Partial<EditorStyle> | null;
   crop: { mode: ClipCropMode; x: number; track?: CropTrack };
   renders: number;
   lastRenderedAt?: string;
@@ -54,6 +57,9 @@ export interface ClipSetStatus {
   requestedAt?: string;
   finishedAt?: string;
   options?: { maxClips?: number; minSec?: number; maxSec?: number };
+  /** The look new clips of this video start with ("Style all clips"). */
+  templateKey?: string | null;
+  style?: Partial<EditorStyle> | null;
 }
 
 export interface ProjectClips {
@@ -105,6 +111,7 @@ export interface ClipPatch {
   endIdx?: number;
   title?: string;
   templateKey?: string | null;
+  style?: Partial<EditorStyle> | null;
   crop?: {
     mode?: ClipCropMode;
     x?: number;
@@ -121,6 +128,26 @@ export async function patchClip(id: string, patch: ClipPatch): Promise<Clip> {
 
 export async function deleteClip(id: string): Promise<void> {
   await api.delete(`/clips/${id}`);
+}
+
+/** A caption look for many clips: a template card, or a look made in the captions editor. */
+export type ClipLookPatch = { templateKey: string | null } | { style: Partial<EditorStyle> };
+
+/** One look onto a selection of clips (all or nothing). */
+export async function styleClips(ids: string[], look: ClipLookPatch): Promise<Clip[]> {
+  const { data } = await api.post<{ clips: Clip[] }>('/clips/bulk', { op: 'style', ids, ...look });
+  return data.clips;
+}
+
+/** Delete a selection of clips (all or nothing). */
+export async function deleteClips(ids: string[]): Promise<void> {
+  await api.post('/clips/bulk', { op: 'delete', ids });
+}
+
+/** "Style all clips": every clip of the video, and the look later runs start from. */
+export async function styleAllClips(projectId: string, look: ClipLookPatch): Promise<Clip[]> {
+  const { data } = await api.post<{ clips: Clip[] }>(`/projects/${projectId}/clips/style`, look);
+  return data.clips;
 }
 
 export async function authorizeClipRender(
