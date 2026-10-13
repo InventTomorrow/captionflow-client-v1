@@ -1,7 +1,7 @@
 /**
  * OpenInEditorDialog — "Open in editor" for one clip: makes (or reopens) the
- * clip's own editor project with a progress line, asks first when the clip
- * changed after its editor copy was made, then goes to the editor.
+ * clip's own editor project with a progress line — applying any change made to
+ * the clip since — then goes to the editor.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -29,30 +29,22 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
   const [stage, setStage] = useState<OpenStage>('opening');
   const [percent, setPercent] = useState<number | undefined>(undefined);
   const [error, setError] = useState('');
-  const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(true);
   const started = useRef(false);
 
   const run = useCallback(
-    async (opts: { startOver?: boolean; keepEdited?: boolean }) => {
+    async () => {
       setBusy(true);
       setError('');
-      setStale(false);
       setStage('opening');
       try {
         const r = await openClipInEditor(projectId, clip, {
-          ...opts,
           onProgress: (s, p) => {
             setStage(s);
             setPercent(p);
           },
           onClipUpdated: setClipLocal,
         });
-        if (r.kind === 'stale') {
-          setStale(true);
-          setBusy(false);
-          return;
-        }
         navigate(`/projects/${r.projectId}/editor`);
       } catch (e) {
         setError(errorMessage(e, 'Couldn’t open this clip in the editor'));
@@ -66,7 +58,7 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void run({});
+    void run();
   }, [run]);
 
   return (
@@ -93,30 +85,13 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
               </span>
             </div>
           )}
-          {!busy && !stale && !error && <p className="muted tiny">Opening…</p>}
-          {stale && (
-            <>
-              <p className="muted tiny">
-                You changed this clip (trim, format, framing or template) after opening it in the editor. Keep the
-                version you edited there, or start over from the clip as it is now?
-              </p>
-              <div className="clip-render-actions">
-                <button type="button" className="btn primary" onClick={() => void run({ keepEdited: true })}>
-                  Open my edited version
-                </button>
-                <button type="button" className="btn ghost" onClick={() => void run({ startOver: true })}>
-                  Start over from the clip
-                </button>
-              </div>
-            </>
-          )}
           {error && (
             <>
               <p className="clip-card-error" role="alert">
                 {error}
               </p>
               <div className="clip-render-actions">
-                <button type="button" className="btn ghost" onClick={() => void run({})}>
+                <button type="button" className="btn ghost" onClick={() => void run()}>
                   Try again
                 </button>
               </div>

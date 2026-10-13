@@ -39,7 +39,8 @@ export function clipEditBasis(clip: ClipBasis): string {
         ? 'fit'
         : `a${hash(JSON.stringify(clip.crop.track ?? []))}`;
   const look = clip.style ? `s${hash(JSON.stringify(clip.style))}` : `t${clip.templateKey ?? '-'}`;
-  return [clip.start.toFixed(2), clip.end.toFixed(2), clipAspect(clip), framing, look].join(':');
+  // '|' between parts: the format itself ('9:16') has a colon in it.
+  return [clip.start.toFixed(2), clip.end.toFixed(2), clipAspect(clip), framing, look].join('|');
 }
 
 /**
@@ -58,4 +59,17 @@ export function clipProjectCaptions(
     sequence: i + 1,
     behindPerson: false,
   }));
+}
+
+/**
+ * What changed on a clip since its editor project was made (both are
+ * clipEditBasis keys): range → new captions and a new cut; format or framing →
+ * a new cut (captions kept); look → the new look. No old key → everything.
+ */
+export function clipChanges(was: string | null | undefined, now: string): { range: boolean; frame: boolean; look: boolean } {
+  if (!was) return { range: true, frame: true, look: true };
+  const [s0, e0, a0, f0, l0] = was.split('|');
+  const [s1, e1, a1, f1, l1] = now.split('|');
+  const range = s0 !== s1 || e0 !== e1;
+  return { range, frame: range || a0 !== a1 || f0 !== f1, look: l0 !== l1 };
 }

@@ -9,7 +9,7 @@ import { aspectDims, chunks, clipAspect, clipFrameTime, clipStyle, thumbKey, cro
 import { coverObjectPosition, cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
-import { clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
+import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -303,6 +303,31 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(copy[0].text === 'Hello there' && copy[0].emphasis?.join() === 'hero,small', 'text and hero words kept');
   assert(copy[1].text === 'General', `cut at the clip's end, got "${copy[1].text}"`);
   assert(caps[1]._id === 'orig-2' && caps[1].start === 10.2, 'the source captions are unchanged');
+}
+
+// ── a changed clip is applied to its editor project automatically ────────
+{
+  const clip = {
+    start: 10,
+    end: 40,
+    aspect: '9:16' as const,
+    templateKey: 'hero-word',
+    style: null,
+    crop: { mode: 'auto' as const, x: 0.5, track: [[0, 0.4]] as Array<[number, number]> },
+  };
+  const was = clipEditBasis(clip);
+  const none = clipChanges(was, clipEditBasis(clip));
+  assert(!none.range && !none.frame && !none.look, 'unchanged → nothing to apply');
+  const trim = clipChanges(was, clipEditBasis({ ...clip, end: 42 }));
+  assert(trim.range && trim.frame && !trim.look, 'trim → new captions and a new cut');
+  const format = clipChanges(was, clipEditBasis({ ...clip, aspect: '16:9' }));
+  assert(!format.range && format.frame && !format.look, 'format → a new cut, captions kept');
+  const framing = clipChanges(was, clipEditBasis({ ...clip, crop: { ...clip.crop, mode: 'manual', x: 0.3 } }));
+  assert(!framing.range && framing.frame && !framing.look, 'framing → a new cut, captions kept');
+  const look = clipChanges(was, clipEditBasis({ ...clip, templateKey: 'word-blast' }));
+  assert(!look.range && !look.frame && look.look, 'template → the new look only');
+  const unknown = clipChanges(null, was);
+  assert(unknown.range && unknown.frame && unknown.look, 'no record → apply everything');
 }
 
 // ── textInRange (the in/out sentence shown next to the trim buttons) ─────

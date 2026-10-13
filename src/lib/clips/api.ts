@@ -197,10 +197,11 @@ export async function openClipProject(
     captions: unknown[];
     video: { width: number; height: number; duration: number; size: number };
     basisKey: string;
-    force?: boolean;
+    /** The clip changed since: apply this to its existing editor project. */
+    refresh?: boolean;
   },
-): Promise<{ projectId: string; existing: boolean; basisKey?: string | null }> {
-  const { data } = await api.post<{ projectId: string; existing: boolean; basisKey?: string | null }>(
+): Promise<{ projectId: string; existing: boolean; refreshed?: boolean; basisKey?: string | null }> {
+  const { data } = await api.post<{ projectId: string; existing: boolean; refreshed?: boolean; basisKey?: string | null }>(
     `/clips/${clipId}/editor-project`,
     body,
   );

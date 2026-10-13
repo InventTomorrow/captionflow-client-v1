@@ -9,24 +9,25 @@
  * transcribed, translated or regenerated anywhere on the way.
  */
 import { api } from '../api';
-import { replaceAllForProject } from '../captionDb';
+import { getAllForProject, replaceAllForProject } from '../captionDb';
 import { buildDeviceExportJob, deviceExportBlocker, startDeviceExport, type ExportStyle } from '../export/clientExport';
 import type { EditorStyle } from '../export/styleSnapshot';
-import { deleteSource, getExportFile, getSourceFile, getSourceRecord, removeLocalFile, storeSourceFile } from '../media/localMedia';
+import { getExportFile, getSourceFile, getSourceRecord, removeLocalFile, storeSourceFile } from '../media/localMedia';
 import { probeMediaFile } from '../media/probe';
 import { exportFrameSize } from '../render/frame';
 import { openClipProject, type Clip } from './api';
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
 import { clipAspect, clipStyle, cropTrackFor, type ClipAspect } from './clipMath';
-import { clipEditBasis, clipProjectCaptions } from './clipProject';
+import { clipChanges, clipEditBasis, clipProjectCaptions } from './clipProject';
 import type { CropTrack } from './cropTrack';
+import type { Caption } from '../../stores/captionStore';
 import { projectCaptions } from './renderClip';
 
 export type OpenStage = 'framing' | 'cutting' | 'saving' | 'opening';
 export type OpenProgress = (stage: OpenStage, percent?: number) => void;
 
-/** opened: go to the editor. stale: the clip changed since its editor copy was made — ask first. */
-export type OpenResult = { kind: 'opened'; projectId: string } | { kind: 'stale'; projectId: string };
+/** The clip's editor project, ready to open. */
+export type OpenResult = { projectId: string };
 
 export class OpenInEditorError extends Error {}
 
@@ -108,34 +109,21 @@ export async function canRecutClipProject(sourceProjectId: string): Promise<bool
 }
 
 /**
- * Open a clip in the editor: reopen its project, or make it. `startOver`
- * replaces an existing copy (after the user chose to); `keepEdited` reopens a
- * copy made before the clip changed.
+ * Open a clip in the editor: make its project the first time, reopen it after
+ * that. A clip changed on the clips page since (trim, format, framing,
+ * template) is applied to that project on the way, without asking: a new trim
+ * brings the clip's captions again and a new cut; a new format or framing a
+ * new cut (caption edits kept); a new template the new look.
  */
 export async function openClipInEditor(
   projectId: string,
   clipIn: Clip,
-  opts: { startOver?: boolean; keepEdited?: boolean; onProgress?: OpenProgress; onClipUpdated?: (c: Clip) => void } = {},
+  opts: { onProgress?: OpenProgress; onClipUpdated?: (c: Clip) => void } = {},
 ): Promise<OpenResult> {
   const { onProgress } = opts;
   let clip = clipIn;
 
-  // Reopen the clip's project.
-  if (clip.editProjectId && !opts.startOver) {
-    if (!opts.keepEdited && clip.editBasisKey && clip.editBasisKey !== clipEditBasis(clip)) {
-      return { kind: 'stale', projectId: clip.editProjectId };
-    }
-    const exists = await api
-      .get(`/projects/${clip.editProjectId}`)
-      .then(() => true)
-      .catch((e) => (e?.response?.status === 404 ? false : Promise.reject(e)));
-    if (exists) {
-      if (!(await getSourceFile(clip.editProjectId).catch(() => null))) await recutClipProject(clip.editProjectId, onProgress);
-      return { kind: 'opened', projectId: clip.editProjectId };
-    }
-  }
-
-  // Make it: frame on the speaker first (never a centre crop by accident), then cut.
+  // Frame on the speaker first (never a centre crop by accident).
   if (needsFaceTrack(clip)) {
     onProgress?.('framing');
     const tracked = await ensureFaceTrack(projectId, clip).catch(() => null);
@@ -144,41 +132,74 @@ export async function openClipInEditor(
       opts.onClipUpdated?.(tracked);
     }
   }
-  const [captions, projectStyle] = await Promise.all([
-    projectCaptions(projectId),
-    api.get(`/projects/${projectId}`).then((r) => (r.data?.project?.style ?? {}) as Partial<EditorStyle>),
-  ]);
-  onProgress?.('cutting', 0);
-  const cut = await cutClipVideo(
-    {
-      sourceProjectId: projectId,
-      start: clip.start,
-      end: clip.end,
-      aspect: clipAspect(clip),
-      crop: clip.crop,
-      name: clip.title || 'clip',
-    },
-    (p) => onProgress?.('cutting', p),
-  );
+  const basisKey = clipEditBasis(clip);
+  const sourceStyle = () =>
+    api.get(`/projects/${projectId}`).then((r) => (r.data?.project?.style ?? {}) as Partial<EditorStyle>);
+  const cutNow = () => {
+    onProgress?.('cutting', 0);
+    return cutClipVideo(
+      { sourceProjectId: projectId, start: clip.start, end: clip.end, aspect: clipAspect(clip), crop: clip.crop, name: clip.title || 'clip' },
+      (p) => onProgress?.('cutting', p),
+    );
+  };
+
+  // Reopen the clip's project, applying what changed on the clip since.
+  const editId = clip.editProjectId;
+  const editProject = editId
+    ? await api
+        .get(`/projects/${editId}`)
+        .then((r) => r.data?.project as { style?: Partial<EditorStyle>; video?: { width: number; height: number; duration: number; size?: number } })
+        .catch((e) => (e?.response?.status === 404 ? null : Promise.reject(e)))
+    : null;
+  if (editId && editProject) {
+    const changed = clipChanges(clip.editBasisKey, basisKey);
+    const haveVideo = !!(await getSourceFile(editId).catch(() => null));
+    if (!changed.range && !changed.frame && !changed.look) {
+      if (!haveVideo) await recutClipProject(editId, onProgress);
+      return { projectId: editId };
+    }
+    const cut = changed.frame || !haveVideo ? await cutNow() : null;
+    onProgress?.('saving');
+    let captions: Caption[];
+    if (changed.range) {
+      captions = clipProjectCaptions(await projectCaptions(projectId), clip);
+    } else {
+      captions = await getAllForProject(editId);
+      if (!captions.length) captions = await projectCaptions(editId);
+    }
+    const style = changed.look
+      ? clipStyle(await sourceStyle(), clip)
+      : { ...(editProject.style ?? {}), aspectRatio: clipAspect(clip) };
+    const video = cut
+      ? { width: cut.width, height: cut.height, duration: cut.duration, size: cut.file.size }
+      : {
+          width: editProject.video?.width ?? 0,
+          height: editProject.video?.height ?? 0,
+          duration: editProject.video?.duration ?? clip.end - clip.start,
+          size: editProject.video?.size ?? 0,
+        };
+    await openClipProject(clip._id, { style, captions, video, basisKey, refresh: true });
+    if (cut) await storeCut(editId, cut);
+    if (changed.range) await replaceAllForProject(editId, captions);
+    opts.onClipUpdated?.({ ...clip, editBasisKey: basisKey });
+    onProgress?.('opening');
+    return { projectId: editId };
+  }
+
+  // Make it.
+  const [captions, projectStyle] = await Promise.all([projectCaptions(projectId), sourceStyle()]);
+  const cut = await cutNow();
   onProgress?.('saving');
   const copy = clipProjectCaptions(captions, clip);
-  const basisKey = clipEditBasis(clip);
   const res = await openClipProject(clip._id, {
     style: clipStyle(projectStyle, clip),
     captions: copy,
     video: { width: cut.width, height: cut.height, duration: cut.duration, size: cut.file.size },
     basisKey,
-    ...(opts.startOver ? { force: true } : {}),
   });
-  const newId = res.projectId;
-  await storeCut(newId, cut);
-  if (!res.existing) await replaceAllForProject(newId, copy);
-  // Starting over: the old copy's video and captions on this device go too.
-  if (opts.startOver && clip.editProjectId && clip.editProjectId !== newId) {
-    await deleteSource(clip.editProjectId).catch(() => undefined);
-    await replaceAllForProject(clip.editProjectId, []).catch(() => undefined);
-  }
-  opts.onClipUpdated?.({ ...clip, editProjectId: newId, editBasisKey: res.existing ? (res.basisKey ?? basisKey) : basisKey });
+  await storeCut(res.projectId, cut);
+  if (!res.existing) await replaceAllForProject(res.projectId, copy);
+  opts.onClipUpdated?.({ ...clip, editProjectId: res.projectId, editBasisKey: res.existing ? (res.basisKey ?? basisKey) : basisKey });
   onProgress?.('opening');
-  return { kind: 'opened', projectId: newId };
+  return { projectId: res.projectId };
 }

@@ -8,7 +8,7 @@
  */
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipPreview } from '../../components/clips/ClipPreview';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
@@ -47,6 +47,7 @@ export function ClipEditorPage() {
   const [quality, setQuality] = useState<ExportQuality>('1080p');
   const [reframeStatus, setReframeStatus] = useState('');
   const openEditor = useOpenInEditor();
+  const [params, setParams] = useSearchParams();
   const timeBar = useRef<HTMLSpanElement | null>(null);
   const timeText = useRef<HTMLSpanElement | null>(null);
 
@@ -75,6 +76,15 @@ export function ClipEditorPage() {
   }, [clip, sentences, captions]);
 
   useEffect(() => setTitle(clip?.title ?? ''), [clip?._id, clip?.title]);
+
+  // ?open=editor (an old link into the clip's editor): open it right away.
+  const openNow = params.get('open') === 'editor';
+  const { open: openInEditor } = openEditor;
+  useEffect(() => {
+    if (!openNow || !clip) return;
+    setParams({}, { replace: true });
+    openInEditor(projectId, clip);
+  }, [openNow, clip, projectId, openInEditor, setParams]);
 
   async function save(patch: ClipPatch) {
     if (!clip) return;
