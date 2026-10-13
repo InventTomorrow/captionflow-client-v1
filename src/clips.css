@@ -1470,3 +1470,16 @@
 .clip-sheet-keep:hover {
   text-decoration: underline;
 }
+
+/* --- caption language ----------------------------------------------------------- */
+
+.clip-field-hint {
+  color: var(--cf-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.clips-lang a {
+  color: var(--cf-accent);
+  font-weight: 600;
+}

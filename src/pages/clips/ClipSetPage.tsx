@@ -14,6 +14,7 @@ import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
 import { clipEditorUrl } from '../../lib/clips/clipMode';
+import { captionLanguageLabel } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
 import { clipOptionsFrom, LENGTH_PRESETS, type LengthPresetId } from '../../lib/clips/clipOptions';
@@ -187,6 +188,9 @@ export function ClipSetPage() {
     ? 'Custom look'
     : (templateByKey(status?.templateKey)?.name ?? 'Video’s style');
   const defaultFormat = status?.aspect === '16:9' ? '16:9' : '9:16';
+  const captionLanguage = project
+    ? captionLanguageLabel(project.sourceLanguage, project.detectedLanguage, project.outputLanguage)
+    : undefined;
 
   function toggleSelect(id: string) {
     setSelected((cur) => {
@@ -235,6 +239,12 @@ export function ClipSetPage() {
           {runStatus === 'ready' && (
             <p className="clips-sub">
               {clips.length} clips · best first{clips.length > 0 && ` · ${defaultFormat} · ${defaultLook}`}
+            </p>
+          )}
+          {project && !projectBusy && (
+            <p className="clips-sub clips-lang">
+              Captions: {captionLanguage ?? 'as spoken'} ·{' '}
+              <Link to={`/projects/${projectId}/editor?panel=captions`}>Change language or translate</Link>
             </p>
           )}
         </div>

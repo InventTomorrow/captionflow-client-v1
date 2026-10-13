@@ -14,6 +14,10 @@ export interface ClipProjectSummary {
   kind: 'captions' | 'clips';
   status: string;
   stage?: { current?: string; percent?: number; message?: string };
+  /** Clip set summary only: the caption pipeline's language settings. */
+  sourceLanguage?: string;
+  outputLanguage?: string;
+  detectedLanguage?: string;
   video?: {
     kind?: 'video' | 'audio';
     width?: number;

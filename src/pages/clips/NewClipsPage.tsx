@@ -17,29 +17,10 @@ import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { api, errorMessage } from '../../lib/api';
 import { buildExportStyle } from '../../lib/export/styleSnapshot';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../../lib/planErrors';
+import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
 import { uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
-
-const LANGUAGES: Array<[string, string]> = [
-  ['auto', 'Auto (detect language)'],
-  ['ur', 'Urdu (with English)'],
-  ['pa', 'Punjabi (with English)'],
-  ['en', 'English'],
-  ['hi', 'Hindi'],
-  ['ar', 'Arabic'],
-  ['de', 'German'],
-  ['es', 'Spanish'],
-  ['fr', 'French'],
-  ['tr', 'Turkish'],
-];
-
-const SCRIPTS: Array<[string, string]> = [
-  ['keep_original', 'As spoken'],
-  ['roman_urdu', 'Roman Urdu'],
-  ['roman_punjabi', 'Roman Punjabi'],
-  ['english', 'Translate to English'],
-];
 
 function formatSize(bytes: number) {
   return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${(bytes / 1e6).toFixed(1)} MB`;
@@ -175,22 +156,25 @@ export function NewClipsPage() {
           <label className="clip-field">
             <span>Spoken language</span>
             <select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={busy}>
-              {LANGUAGES.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
+              {SPOKEN_LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
           </label>
           <label className="clip-field">
-            <span>Caption script</span>
+            <span>Caption language</span>
             <select value={script} onChange={(e) => setScript(e.target.value)} disabled={busy}>
-              {SCRIPTS.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
+              {CAPTION_LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
+            <small className="clip-field-hint">
+              Captions and clip titles use this language — translated by the same agent as the editor.
+            </small>
           </label>
           <label className="clip-field">
             <span>Names and special words (optional)</span>

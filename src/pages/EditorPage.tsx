@@ -57,7 +57,7 @@ import {
   getSourceFile,
   markExportDownloaded,
 } from '../lib/media/localMedia';
-import { captionLanguageLabel } from '../lib/languageLabel';
+import { CAPTION_LANGUAGE_OPTIONS, captionLanguageLabel } from '../lib/languageLabel';
 import { locateOriginal } from '../lib/media/locateSource';
 import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
 import { uploadVideoToProject } from '../lib/export/serverUpload';
@@ -2468,17 +2468,11 @@ export function EditorPage() {
                 <label>
                   Language
                   <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
-                    <option value="keep_original">Keep original</option>
-                    <option value="roman_urdu">Urdish</option>
-                    <option value="roman_punjabi">Roman Punjabi</option>
-                    <option value="english">English</option>
-                    <option value="urdu">Urdu (اردو)</option>
-                    <option value="hindi">Hindi</option>
-                    <option value="arabic">Arabic</option>
-                    <option value="german">German</option>
-                    <option value="spanish">Spanish</option>
-                    <option value="french">French</option>
-                    <option value="turkish">Turkish</option>
+                    {CAPTION_LANGUAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.short}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button type="button" className="btn primary full" disabled={!!busy} onClick={() => void rebuild()}>

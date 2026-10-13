@@ -5,9 +5,10 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, textInRange } from '../../src/lib/clips/clipMath';
+import { aspectDims, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
+import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
 import { captionWindow, clampToClip, clipEditorUrl, coverObjectPosition, loopedTime } from '../../src/lib/clips/clipMode';
 
 let passed = 0;
@@ -299,6 +300,35 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(textInRange(caps, 0, 2.1) === 'Hello world. How are you?', 'spans captions');
   assert(textInRange(caps, 1.4, 1.9) === 'are', `only words mostly inside, got ${textInRange(caps, 1.4, 1.9)}`);
   assert(textInRange(caps, 5, 6) === '', 'nothing spoken → empty');
+}
+
+// ── clip format: 9:16 vertical (cropped) or 16:9 landscape (whole frame) ──
+{
+  const v = { _id: 'c9', start: 0, end: 10, crop: { mode: 'auto' as const, x: 0.5, track: [[0, 0.3]] as Array<[number, number]> }, aspect: '9:16' as const };
+  const l = { ...v, aspect: '16:9' as const };
+  assert(JSON.stringify(cropTrackFor(v)) === '[[0,0.3]]', 'vertical follows the face track');
+  assert(cropTrackFor(l) === null, 'landscape keeps the whole frame');
+  assert(thumbKey(v) !== thumbKey(l), 'the poster changes with the format');
+  assert(clipAspect({}) === '9:16' && clipAspect(l) === '16:9', 'older clips are vertical');
+  assert(aspectDims('16:9').join() === '16,9' && aspectDims('9:16').join() === '9,16', 'format dims');
+  const st = clipStyle({ template: 'classic' }, { templateKey: null, aspect: '16:9' });
+  assert(st.aspectRatio === '16:9', `landscape style, got ${st.aspectRatio}`);
+  assert(clipStyle({ template: 'classic' }, { templateKey: null }).aspectRatio === '9:16', 'vertical by default');
+  const untracked = { crop: { mode: 'auto' as const, x: 0.5, track: [] as Array<[number, number]> } };
+  assert(needsFaceTrack(untracked) && !needsFaceTrack({ ...untracked, aspect: '16:9' }), 'no face tracking for landscape');
+}
+
+// ── one list of languages for the upload modal, the editor and New clips ──
+{
+  // Same values, same order as the server's translation agent (CAPTION_LANGUAGE_VALUES).
+  assert(
+    CAPTION_LANGUAGE_OPTIONS.map((o) => o.value).join() ===
+      'keep_original,roman_urdu,roman_punjabi,english,urdu,hindi,arabic,german,spanish,french,turkish',
+    'caption languages match the translation agent',
+  );
+  assert(CAPTION_LANGUAGE_OPTIONS.filter((o) => o.translate).length === 8, 'eight translation targets');
+  assert(CAPTION_LANGUAGE_OPTIONS.every((o) => o.label && o.short), 'every caption language has a label and a short label');
+  assert(SPOKEN_LANGUAGE_OPTIONS.map((o) => o.value).join() === 'auto,ur,pa,en,hi,ar,de,es,fr,tr', 'spoken languages');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

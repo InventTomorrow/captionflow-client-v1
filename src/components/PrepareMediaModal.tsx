@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, API_URL } from '../lib/api';
 import { getSourceFile } from '../lib/media/localMedia';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../lib/planErrors';
+import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../lib/languageLabel';
 import { UpgradeBanner } from './UpgradeBanner';
 
 /**
@@ -189,16 +190,11 @@ export function PrepareMediaModal({
             <span>What language is spoken?</span>
             <div className="prepare-select-wrap">
               <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)}>
-                <option value="auto">Auto (detect language)</option>
-                <option value="ur">Urdu (with English)</option>
-                <option value="pa">Punjabi (with English)</option>
-                <option value="en">English</option>
-                <option value="hi">Hindi</option>
-                <option value="ar">Arabic</option>
-                <option value="de">German</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="tr">Turkish</option>
+                {SPOKEN_LANGUAGE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
               <ChevronIcon />
             </div>
@@ -207,17 +203,11 @@ export function PrepareMediaModal({
             <span>Script style</span>
             <div className="prepare-select-wrap">
               <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
-                <option value="keep_original">Original</option>
-                <option value="roman_urdu">Urdish (Urdu + English in English letters)</option>
-                <option value="roman_punjabi">Roman Punjabi (Punjabi + English in English letters)</option>
-                <option value="english">English (translate)</option>
-                <option value="urdu">Urdu - اردو (translate)</option>
-                <option value="hindi">Hindi (translate)</option>
-                <option value="arabic">Arabic (translate)</option>
-                <option value="german">German (translate)</option>
-                <option value="spanish">Spanish (translate)</option>
-                <option value="french">French (translate)</option>
-                <option value="turkish">Turkish (translate)</option>
+                {CAPTION_LANGUAGE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
               <ChevronIcon />
             </div>
