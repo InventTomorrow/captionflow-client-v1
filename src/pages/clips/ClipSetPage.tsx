@@ -3,11 +3,18 @@
  * the AI is reading it, a stepper shows where it is (live over the socket);
  * then the clips, best first, each with the AI's reason. Also the entry point
  * for "Find clips" on an existing captioned video, re-runs, Render all, and
- * "Locate file" when this device doesn't have the original.
+ * "Locate file" when this device doesn't have the original. "Style all clips"
+ * puts one caption template on every clip (and on later runs); Select picks
+ * some clips for one template, a render or a delete.
  */
+import { Captions, ListChecks, Palette } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
+import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
+import { clipEditorUrl } from '../../lib/clips/clipMode';
+import { templateByKey } from '../../lib/templateCatalog';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
 import { clipOptionsFrom, LENGTH_PRESETS, type LengthPresetId } from '../../lib/clips/clipOptions';
 import { ClipProcessing } from '../../components/clips/ClipProcessing';
@@ -36,7 +43,15 @@ export function ClipSetPage() {
   const loadProject = useClipsStore((s) => s.loadProject);
   const removeClip = useClipsStore((s) => s.removeClip);
   const enqueueRenders = useClipsStore((s) => s.enqueueRenders);
+  const styleClips = useClipsStore((s) => s.styleClips);
+  const styleAllClips = useClipsStore((s) => s.styleAllClips);
+  const removeClips = useClipsStore((s) => s.removeClips);
   const [error, setError] = useState('');
+  /** Selection mode: the picked clip ids; null = not selecting. */
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [sheet, setSheet] = useState<'all' | 'selected' | null>(null);
+  const [sheetBusy, setSheetBusy] = useState(false);
+  const [sheetError, setSheetError] = useState('');
   const [planError, setPlanError] = useState<PlanErrorInfo | null>(null);
   const [stage, setStage] = useState<{ percent?: number; message?: string }>({});
   const [showOptions, setShowOptions] = useState(false);
@@ -157,6 +172,55 @@ export function ClipSetPage() {
 
   const unrendered = clips.filter((c) => c.status !== 'rendered' && renders[c._id]?.status !== 'done');
 
+  // Selection only holds clips that still exist.
+  useEffect(() => {
+    setSelected((cur) => {
+      if (!cur) return cur;
+      const live = new Set(clips.map((c) => c._id));
+      const next = new Set([...cur].filter((id) => live.has(id)));
+      return next.size === cur.size ? cur : next;
+    });
+  }, [clips]);
+
+  const status = data?.status;
+  const defaultLook = status?.style
+    ? 'Custom look'
+    : (templateByKey(status?.templateKey)?.name ?? 'Video’s style');
+
+  function toggleSelect(id: string) {
+    setSelected((cur) => {
+      const next = new Set(cur ?? []);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function applySheet(templateKey: string | null) {
+    setSheetBusy(true);
+    setSheetError('');
+    try {
+      if (sheet === 'all') await styleAllClips(projectId, { templateKey });
+      else if (selected?.size) await styleClips([...selected], { templateKey });
+      setSheet(null);
+    } catch (err) {
+      setSheetError(errorMessage(err, 'Couldn’t apply that style'));
+    } finally {
+      setSheetBusy(false);
+    }
+  }
+
+  async function deleteSelected() {
+    if (!selected?.size) return;
+    if (!window.confirm(`Delete ${selected.size} clip${selected.size === 1 ? '' : 's'}?`)) return;
+    try {
+      await removeClips([...selected]);
+      setSelected(new Set());
+    } catch (err) {
+      setError(errorMessage(err, 'Couldn’t delete those clips'));
+    }
+  }
+
   return (
     <div className="clips-page">
       <nav className="clips-crumbs" aria-label="Breadcrumb">
@@ -167,13 +231,30 @@ export function ClipSetPage() {
       <header className="clips-head">
         <div>
           <h1 className="clips-title">{project?.name ?? 'Loading…'}</h1>
-          {runStatus === 'ready' && <p className="clips-sub">{clips.length} clips · best first</p>}
+          {runStatus === 'ready' && (
+            <p className="clips-sub">
+              {clips.length} clips · best first{clips.length > 0 && ` · Caption style: ${defaultLook}`}
+            </p>
+          )}
         </div>
         <div className="clips-head-actions">
-          {project && project.kind !== 'clips' && (
-            <Link to={`/projects/${projectId}/editor`} className="btn ghost">
-              Open in editor
+          {project && (
+            <Link to={`/projects/${projectId}/editor`} className="btn ghost clips-head-btn">
+              <Captions size={16} aria-hidden="true" />
+              Full video in editor
             </Link>
+          )}
+          {clips.length > 0 && !working && (
+            <button type="button" className="btn ghost clips-head-btn" onClick={() => setSheet('all')}>
+              <Palette size={16} aria-hidden="true" />
+              Style all clips
+            </button>
+          )}
+          {clips.length > 0 && !selected && (
+            <button type="button" className="btn ghost clips-head-btn" onClick={() => setSelected(new Set())}>
+              <ListChecks size={16} aria-hidden="true" />
+              Select
+            </button>
           )}
           {canAnalyze && !working && (
             <button type="button" className="btn ghost" onClick={() => setShowOptions((v) => !v)} aria-expanded={showOptions}>
@@ -261,16 +342,53 @@ export function ClipSetPage() {
         </div>
       )}
 
+      {selected && (
+        <ClipBulkBar
+          total={clips.length}
+          selectedCount={selected.size}
+          onToggleAll={() => setSelected(selected.size === clips.length ? new Set() : new Set(clips.map((c) => c._id)))}
+          onStyle={() => setSheet('selected')}
+          onRender={
+            source.local && projectStyle ? () => renderJobs(clips.filter((c) => selected.has(c._id))) : undefined
+          }
+          onDelete={() => void deleteSelected()}
+          onDone={() => setSelected(null)}
+        />
+      )}
+
       {clips.length > 0 && project && (
         <ClipGrid
           clips={clips}
           project={project}
           showReason
           renders={renders}
+          selected={selected ?? undefined}
+          onToggleSelect={(c) => toggleSelect(c._id)}
           onOpen={(c) => navigate(`/clips/${projectId}/${c._id}`)}
+          onEditCaptions={(c) => navigate(clipEditorUrl(projectId, c._id))}
           onRender={source.local ? (c) => renderJobs([c]) : undefined}
           onDownload={(c) => void download(c)}
           onDelete={(c) => void remove(c)}
+        />
+      )}
+
+      {sheet && (
+        <ClipStyleSheet
+          title={sheet === 'all' ? 'Style all clips' : `Style ${selected?.size ?? 0} clip${selected?.size === 1 ? '' : 's'}`}
+          note={
+            sheet === 'all'
+              ? 'Every clip of this video gets this caption template, and so will the clips later runs find. You can still change one clip on its own page.'
+              : 'The selected clips get this caption template. You can still change one clip on its own page.'
+          }
+          initialKey={sheet === 'all' && !status?.style ? (status?.templateKey ?? null) : null}
+          applyLabel={sheet === 'all' ? `Apply to all ${clips.length} clips` : `Apply to ${selected?.size ?? 0} clips`}
+          busy={sheetBusy}
+          error={sheetError}
+          onApply={(k) => void applySheet(k)}
+          onClose={() => {
+            setSheet(null);
+            setSheetError('');
+          }}
         />
       )}
     </div>

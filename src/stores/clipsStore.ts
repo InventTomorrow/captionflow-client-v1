@@ -10,7 +10,11 @@ import {
   listClips,
   patchClip as apiPatchClip,
   deleteClip as apiDeleteClip,
+  deleteClips as apiDeleteClips,
+  styleClips as apiStyleClips,
+  styleAllClips as apiStyleAllClips,
   type Clip,
+  type ClipLookPatch,
   type ClipPatch,
   type ClipRunStatus,
   type ProjectClips,
@@ -59,6 +63,11 @@ interface ClipsState {
   /** Replace a clip already saved on the server (e.g. a freshly computed face track). */
   setClipLocal(clip: Clip): void;
   removeClip(id: string): Promise<void>;
+  /** One look onto a selection of clips (a template card, or an editor-made style). */
+  styleClips(ids: string[], look: ClipLookPatch): Promise<void>;
+  /** "Style all clips" of a video — also the look its later runs start from. */
+  styleAllClips(projectId: string, look: ClipLookPatch): Promise<void>;
+  removeClips(ids: string[]): Promise<void>;
   enqueueRenders(jobs: Array<{ clip: Clip; ctx: ClipRenderContext; opts: ClipRenderOptions }>): void;
   cancelRender(clipId: string): void;
 }
@@ -67,6 +76,25 @@ const FEED_PAGE = 30;
 
 function replaceClip(list: Clip[], clip: Clip) {
   return list.map((c) => (c._id === clip._id ? { ...c, ...clip, project: c.project } : c));
+}
+
+/** Clips just saved on the server, merged into every list that shows them. */
+function mergeClips(s: Pick<ClipsState, 'byProject' | 'feed'>, saved: Clip[]) {
+  const byId = new Map(saved.map((c) => [c._id, c]));
+  const merge = (list: Clip[]) => list.map((c) => (byId.has(c._id) ? { ...c, ...byId.get(c._id)!, project: c.project } : c));
+  return {
+    byProject: Object.fromEntries(Object.entries(s.byProject).map(([k, v]) => [k, v ? { ...v, clips: merge(v.clips) } : v])),
+    feed: { ...s.feed, items: merge(s.feed.items) },
+  };
+}
+
+function dropClips(s: Pick<ClipsState, 'byProject' | 'feed'>, ids: Set<string>) {
+  return {
+    byProject: Object.fromEntries(
+      Object.entries(s.byProject).map(([k, v]) => [k, v ? { ...v, clips: v.clips.filter((c) => !ids.has(c._id)) } : v]),
+    ),
+    feed: { ...s.feed, items: s.feed.items.filter((c) => !ids.has(c._id)) },
+  };
 }
 
 export const useClipsStore = create<ClipsState>((set, get) => ({
@@ -137,12 +165,33 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
 
   async removeClip(id) {
     await apiDeleteClip(id);
-    set((s) => ({
-      byProject: Object.fromEntries(
-        Object.entries(s.byProject).map(([k, v]) => [k, v ? { ...v, clips: v.clips.filter((c) => c._id !== id) } : v]),
-      ),
-      feed: { ...s.feed, items: s.feed.items.filter((c) => c._id !== id) },
-    }));
+    set((s) => dropClips(s, new Set([id])));
+  },
+
+  async styleClips(ids, look) {
+    const saved = await apiStyleClips(ids, look);
+    set((s) => mergeClips(s, saved));
+  },
+
+  async styleAllClips(projectId, look) {
+    const saved = await apiStyleAllClips(projectId, look);
+    set((s) => {
+      const merged = mergeClips(s, saved);
+      const proj = merged.byProject[projectId];
+      const status =
+        'style' in look
+          ? { templateKey: (look.style.templateKey as string | undefined) || null, style: look.style }
+          : { templateKey: look.templateKey, style: null };
+      return {
+        ...merged,
+        byProject: proj ? { ...merged.byProject, [projectId]: { ...proj, status: { ...proj.status, ...status } } } : merged.byProject,
+      };
+    });
+  },
+
+  async removeClips(ids) {
+    await apiDeleteClips(ids);
+    set((s) => dropClips(s, new Set(ids)));
   },
 
   enqueueRenders(jobs) {

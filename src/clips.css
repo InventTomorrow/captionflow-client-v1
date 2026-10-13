@@ -336,6 +336,11 @@
   border-color: color-mix(in srgb, var(--cf-accent) 45%, transparent);
 }
 
+.clip-card.is-selected {
+  border-color: var(--cf-accent);
+  box-shadow: 0 0 0 1px var(--cf-accent);
+}
+
 .clip-card-media {
   position: relative;
   display: block;
@@ -365,13 +370,47 @@
 .clip-card-placeholder {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   padding: 1rem;
   color: var(--cf-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
   text-align: center;
   background: linear-gradient(160deg, var(--cf-card), var(--cf-bg));
+}
+
+.clip-card-placeholder > svg {
+  opacity: 0.55;
+}
+
+/* Selection checkbox on the poster (selection mode). */
+.clip-check {
+  position: absolute;
+  z-index: 3;
+  top: 0.45rem;
+  right: 0.45rem;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2px solid #fff;
+  border-radius: 0.4rem;
+  background: rgba(10, 16, 24, 0.55);
+  color: var(--cf-on-accent);
+}
+
+.clip-check.is-on {
+  border-color: var(--cf-accent);
+  background: var(--cf-accent);
+}
+
+.clip-grid.is-selecting .clip-length {
+  top: auto;
+  bottom: 0.45rem;
 }
 
 .clip-score,
@@ -442,8 +481,37 @@
 }
 
 .clip-card-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   padding: 0.55rem 0.2rem 0.1rem;
   min-width: 0;
+}
+
+.clip-card-title-btn {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.clip-card-title-btn:hover {
+  text-decoration: underline;
+}
+
+.clip-card-title-btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.clip-card-why summary {
+  min-height: 28px;
+  font-size: 0.8rem;
 }
 
 .clip-card-title {
@@ -482,11 +550,129 @@
   color: var(--cf-danger);
 }
 
+/* One even row of icon actions at the bottom of every card — never wraps. */
 .clip-card-actions {
   display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+}
+
+.clip-act {
+  display: inline-grid;
+  flex: 1 1 0;
+  place-items: center;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--cf-border);
+  border-radius: 0.55rem;
+  background: var(--cf-input);
+  color: var(--cf-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.clip-act:hover:not(:disabled) {
+  border-color: var(--cf-accent);
+  color: var(--cf-text);
+}
+
+.clip-act:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 1px;
+}
+
+.clip-act:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.clip-act-danger:hover:not(:disabled) {
+  border-color: var(--cf-danger);
+  color: var(--cf-danger);
+}
+
+.clip-act-pct {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.clips-head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+}
+
+/* --- selection bar ------------------------------------------------------------ */
+
+.clip-bulk-bar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 20;
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--cf-accent);
+  border-radius: 0.8rem;
+  background: var(--cf-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.clip-bulk-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clip-bulk-all input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--cf-accent);
+}
+
+.clip-bulk-count {
+  color: var(--cf-text-secondary);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.clip-bulk-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 0.35rem;
-  margin-top: 0.6rem;
+  min-height: 40px;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* --- caption style sheet ------------------------------------------------------- */
+
+.modal-card.clip-style-sheet {
+  width: min(880px, calc(100vw - 2rem));
+}
+
+.clip-style-sheet .clip-tpl-grid {
+  max-height: min(60vh, 34rem);
 }
 
 .clip-btn {
