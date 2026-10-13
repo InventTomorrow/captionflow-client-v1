@@ -9,8 +9,9 @@
  *   preview with CSS, at export by the render worker).
  * - shiftCaptions: the clip's captions (0:00-based) placed back on the
  *   original's timeline for the export worker's trim.
- * - clipFontFactor: caption size for a frame filled by a crop, so a template
- *   keeps the proportion it has in the main editor (sized against a 16:9 strip).
+ * - clipFontFactor: caption size for a frame filled by a crop, measured
+ *   against the frame's shorter side so a template keeps its size and its
+ *   single line on a tall frame.
  */
 import type { Caption } from '../../stores/captionStore';
 import type { CropTrack } from './cropTrack';
@@ -67,14 +68,15 @@ export function parseAspect(aspect: string | undefined | null): [number, number]
 }
 
 /**
- * Caption size factor for a clip frame. Caption size is authored against the
- * frame height; a crop that fills a tall frame would make every template ~3×
- * wider than in the main editor (where a landscape video sits in a 16:9 strip)
- * and break single-line templates. Scaling by (frame ratio ÷ 16:9) keeps the
- * same proportion. Fit (no crop) and landscape frames keep the authored size.
+ * Caption size factor for a clip frame. Caption size is authored in pixels of
+ * a 1080 frame and scaled by the frame's height; on a tall frame filled by a
+ * crop (1080×1920) that grows every template 1.78× against the width and
+ * breaks single-line templates. Measuring against the shorter side instead
+ * keeps the authored size on the 1080-wide frame: factor = width ÷ height for
+ * portrait frames. Square, landscape and Fit (no crop) keep the authored size.
  */
 export function clipFontFactor(aspect: string | undefined | null, cover: boolean): number {
   const a = parseAspect(aspect);
   if (!cover || !a) return 1;
-  return Math.min(1, a[0] / a[1] / (16 / 9));
+  return Math.min(1, a[0] / a[1]);
 }
