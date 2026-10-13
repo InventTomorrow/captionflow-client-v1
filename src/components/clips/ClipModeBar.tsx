@@ -49,7 +49,7 @@ export function ClipModeBar({
           <Captions size={14} aria-hidden="true" />
           Clip {index + 1} of {count}
         </span>
-        <span className="clip-mode-title" title={clip.title}>
+        <span className="clip-mode-title" title={clip.title} dir="auto">
           {clip.title || 'Untitled clip'}
         </span>
         <span className="clip-mode-range">

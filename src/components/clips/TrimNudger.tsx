@@ -51,13 +51,21 @@ export function TrimNudger({
         <span className="clip-trim-name">Start</span>
         {nudge('Start earlier (add the previous sentence)', <ChevronLeft size={18} aria-hidden="true" />, startIdx - 1, endIdx)}
         {nudge('Start later (drop the first sentence)', <ChevronRight size={18} aria-hidden="true" />, startIdx + 1, endIdx)}
-        {startText && <q className="clip-trim-text">{startText}</q>}
+        {startText && (
+          <q className="clip-trim-text" dir="auto">
+            {startText}
+          </q>
+        )}
       </div>
       <div className="clip-trim-row">
         <span className="clip-trim-name">End</span>
         {nudge('End earlier (drop the last sentence)', <ChevronLeft size={18} aria-hidden="true" />, startIdx, endIdx - 1)}
         {nudge('End later (add the next sentence)', <ChevronRight size={18} aria-hidden="true" />, startIdx, endIdx + 1)}
-        {endText && <q className="clip-trim-text">{endText}</q>}
+        {endText && (
+          <q className="clip-trim-text" dir="auto">
+            {endText}
+          </q>
+        )}
       </div>
       <p className="clip-trim-len">Length {formatClipLength(len(startIdx, endIdx))}</p>
     </div>

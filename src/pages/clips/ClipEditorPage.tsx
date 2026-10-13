@@ -160,7 +160,9 @@ export function ClipEditorPage() {
             <p className="clip-editor-kicker">
               Clip {index + 1} of {clips.length} · {formatClipLength(length)}
             </p>
-            <h1 className="clip-editor-title">{clip.title || 'Untitled clip'}</h1>
+            <h1 className="clip-editor-title" dir="auto">
+              {clip.title || 'Untitled clip'}
+            </h1>
           </div>
         </div>
         <div className="clip-editor-head-actions">
@@ -257,6 +259,7 @@ export function ClipEditorPage() {
               <span>Title</span>
               <input
                 type="text"
+                dir="auto"
                 value={title}
                 maxLength={60}
                 onChange={(e) => setTitle(e.target.value)}
@@ -266,8 +269,16 @@ export function ClipEditorPage() {
             {(clip.hook || clip.reason) && (
               <details className="clip-why">
                 <summary>Why this clip</summary>
-                {clip.hook && <p className="clip-card-hook">“{clip.hook}”</p>}
-                {clip.reason && <p className="clip-card-reason">{clip.reason}</p>}
+                {clip.hook && (
+                  <p className="clip-card-hook" dir="auto">
+                    “{clip.hook}”
+                  </p>
+                )}
+                {clip.reason && (
+                  <p className="clip-card-reason" dir="auto">
+                    {clip.reason}
+                  </p>
+                )}
               </details>
             )}
           </div>

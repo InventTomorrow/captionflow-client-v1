@@ -130,16 +130,22 @@ export function ClipCard({
       </button>
       <div className="clip-card-body">
         <h3 className="clip-card-title" title={clip.title}>
-          <button type="button" className="clip-card-title-btn" onClick={onOpen}>
+          <button type="button" className="clip-card-title-btn" onClick={onOpen} dir="auto">
             {name}
           </button>
         </h3>
-        {clip.hook && <p className="clip-card-hook">“{clip.hook}”</p>}
+        {clip.hook && (
+          <p className="clip-card-hook" dir="auto">
+            “{clip.hook}”
+          </p>
+        )}
         {showProject && clip.project?.name && <p className="clip-card-project">{clip.project.name}</p>}
         {showReason && clip.reason && (
           <details className="clip-why clip-card-why">
             <summary>Why this clip</summary>
-            <p className="clip-card-reason">{clip.reason}</p>
+            <p className="clip-card-reason" dir="auto">
+              {clip.reason}
+            </p>
           </details>
         )}
         {render?.status === 'error' && <p className="clip-card-error" role="alert">{render.error}</p>}
