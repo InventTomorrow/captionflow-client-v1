@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { useFlagsStore } from './stores/flagsStore';
 import { LandingPage } from './pages/LandingPage';
@@ -56,6 +56,18 @@ const PARITY_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_PARITY
 const ParityPage = PARITY_ENABLED
   ? lazy(() => import('./pages/ParityPage').then((m) => ({ default: m.ParityPage })))
   : null;
+
+/**
+ * The editor starts fresh when it switches between the full video and a clip
+ * (?clip=…): the two hold different styles (the video's vs the clip's look),
+ * so nothing of one may carry into the other. Moving between clips keeps the
+ * editor mounted (it swaps the clip's look itself).
+ */
+function EditorRoute() {
+  const [params] = useSearchParams();
+  const { id } = useParams();
+  return <EditorPage key={`${id}:${params.get('clip') ? 'clip' : 'video'}`} />;
+}
 
 // Dev-only: every template picker card on one page, drawn by the editor's own
 // card component — what server/scripts/template-bg/shoot.mjs screenshots.
@@ -200,7 +212,7 @@ export default function App() {
           path=":id/editor"
           element={
             <Suspense fallback={<div className="center">Loading editor…</div>}>
-              <EditorPage />
+              <EditorRoute />
             </Suspense>
           }
         />

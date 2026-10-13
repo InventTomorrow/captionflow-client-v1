@@ -6,7 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
 import { api, API_URL, errorMessage } from '../lib/api';
@@ -623,6 +623,23 @@ export function EditorPage() {
     baselineClipLook(modeClip._id, look);
     setApplyAllState('idle');
   }, [modeClip, projectStyleReady, baselineClipLook]);
+
+  // A ?clip= this video doesn't have (deleted, or the clips failed to load): back to the
+  // full video — a fresh editor, with the video's own style — and say why.
+  useEffect(() => {
+    if (!id || (!clipMode.missing && !clipMode.error)) return;
+    navigate(`/projects/${id}/editor`, {
+      replace: true,
+      state: { notice: clipMode.missing ? 'That clip no longer exists — showing the full video.' : `${clipMode.error} — showing the full video.` },
+    });
+  }, [id, clipMode.missing, clipMode.error, navigate]);
+  const location = useLocation();
+  useEffect(() => {
+    const notice = (location.state as { notice?: string } | null)?.notice;
+    if (notice) setError(notice);
+    // Shown once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ?panel=templates (from "Customize this style in the editor") opens that side panel.
   useEffect(() => {

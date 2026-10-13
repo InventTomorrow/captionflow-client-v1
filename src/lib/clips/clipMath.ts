@@ -118,3 +118,10 @@ export function textInRange(captions: Caption[], start: number, end: number): st
     .map((c) => c.text)
     .join(' ');
 }
+
+/** A list cut into runs of at most `size` (bulk requests: the server takes ≤ 200 clips at a time). */
+export function chunks<T>(list: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}

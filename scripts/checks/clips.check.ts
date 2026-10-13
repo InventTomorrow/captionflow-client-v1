@@ -5,7 +5,7 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { aspectDims, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
+import { aspectDims, chunks, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
 import { cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
@@ -329,6 +329,15 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(CAPTION_LANGUAGE_OPTIONS.filter((o) => o.translate).length === 8, 'eight translation targets');
   assert(CAPTION_LANGUAGE_OPTIONS.every((o) => o.label && o.short), 'every caption language has a label and a short label');
   assert(SPOKEN_LANGUAGE_OPTIONS.map((o) => o.value).join() === 'auto,ur,pa,en,hi,ar,de,es,fr,tr', 'spoken languages');
+}
+
+// ── bulk actions go out in server-sized batches (≤ 200 ids per request) ──
+{
+  const ids = Array.from({ length: 450 }, (_, i) => `c${i}`);
+  const parts = chunks(ids, 200);
+  assert(parts.map((p) => p.length).join() === '200,200,50', `450 → 200,200,50, got ${parts.map((p) => p.length)}`);
+  assert(parts.flat().join() === ids.join(), 'order kept, nothing lost');
+  assert(chunks([], 200).length === 0, 'nothing → no requests');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

@@ -22,6 +22,10 @@ import {
 import { renderClip, type ClipRenderContext, type ClipRenderOptions } from '../lib/clips/renderClip';
 import { describeDeviceProgress } from '../lib/export/clientExport';
 import { createLatestGate } from '../lib/clips/latestGate';
+import { chunks } from '../lib/clips/clipMath';
+
+/** Most clips the server takes in one bulk request (BULK_MAX). */
+const BULK_BATCH = 200;
 
 /** Only the newest feed request may write the list (a filter change mid-load must win). */
 const feedGate = createLatestGate();
@@ -169,8 +173,10 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
   },
 
   async styleClips(ids, look) {
-    const saved = await apiStyleClips(ids, look);
-    set((s) => mergeClips(s, saved));
+    for (const part of chunks(ids, BULK_BATCH)) {
+      const saved = await apiStyleClips(part, look);
+      set((s) => mergeClips(s, saved));
+    }
   },
 
   async styleAllClips(projectId, look) {
@@ -194,8 +200,10 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
   },
 
   async removeClips(ids) {
-    await apiDeleteClips(ids);
-    set((s) => dropClips(s, new Set(ids)));
+    for (const part of chunks(ids, BULK_BATCH)) {
+      await apiDeleteClips(part);
+      set((s) => dropClips(s, new Set(part)));
+    }
   },
 
   enqueueRenders(jobs) {

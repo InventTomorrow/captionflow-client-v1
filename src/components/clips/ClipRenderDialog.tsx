@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
+import { clipAspect } from '../../lib/clips/clipMath';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import type { EditorStyle } from '../../lib/export/styleSnapshot';
 import { latestExportForClip } from '../../lib/media/localMedia';
@@ -35,6 +36,7 @@ export function ClipRenderDialog({ projectId, projectName, projectStyle, clipId,
   const [starting, setStarting] = useState(false);
 
   const rendering = render?.status === 'queued' || render?.status === 'rendering';
+  const aspect = clipAspect(useClipsStore.getState().byProject[projectId]?.clips.find((c) => c._id === clipId) ?? {});
   const done = render?.status === 'done';
 
   async function start() {
@@ -70,7 +72,7 @@ export function ClipRenderDialog({ projectId, projectName, projectStyle, clipId,
         </div>
         <div className="modal-body">
           <p className="muted tiny">
-            Renders this clip on this device: 9:16, framed and trimmed as on the clip page, with the style you set here.
+            Renders this clip on this device: {aspect}, framed and trimmed as on the clip page, with the style you set here.
           </p>
           <label className="props-field">
             Resolution
