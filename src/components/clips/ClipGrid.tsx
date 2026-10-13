@@ -8,8 +8,9 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
-import { clipAspect, clipStyle, cropTrackFor } from '../../lib/clips/clipMath';
+import { clipAspect, clipStyle, cropTrackFor, deferredIn } from '../../lib/clips/clipMath';
 import { loadProjectAssets, type ProjectAssets } from '../../lib/clips/projectAssets';
+import { projectCaptions } from '../../lib/clips/renderClip';
 import type { RenderState } from '../../stores/clipsStore';
 import { ClipCard } from './ClipCard';
 import { ClipPreview } from './ClipPreview';
@@ -54,9 +55,16 @@ export function ClipGrid({
     (id: string | null) => {
       setActive(id);
       const clip = id ? clips.find((c) => c._id === id) : undefined;
-      if (!clip || assets[clip.projectId]) return;
-      void loadProjectAssets(clip.projectId, kindOf(clip))
-        .then((a) => setAssets((s) => ({ ...s, [clip.projectId]: a })))
+      const have = clip && assets[clip.projectId];
+      if (!clip || (have && !deferredIn(have.captions, [clip]))) return;
+      void (have ? Promise.resolve(have) : loadProjectAssets(clip.projectId, kindOf(clip)))
+        .then(async (a) => {
+          // A clip trimmed since its captions were loaded may reach captions not translated yet.
+          const captions = deferredIn(a.captions, [clip])
+            ? await projectCaptions(clip.projectId, [clip]).catch(() => a.captions)
+            : a.captions;
+          setAssets((s) => ({ ...s, [clip.projectId]: { ...a, captions } }));
+        })
         .catch(() => undefined);
     },
     [clips, assets, kindOf],

@@ -132,3 +132,12 @@ export function chunks<T>(list: T[], size: number): T[][] {
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
 }
+
+export type TimeRange = { start: number; end: number };
+
+/** A caption the ranges reach still waits for translation and hero words (New Clips; see projectCaptions). */
+export function deferredIn(captions: Caption[], ranges: TimeRange[] | 'all'): boolean {
+  return captions.some(
+    (c) => c.deferred && (ranges === 'all' || ranges.some((r) => c.end > r.start && c.start < r.end)),
+  );
+}

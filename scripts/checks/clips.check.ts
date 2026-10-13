@@ -5,7 +5,7 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { aspectDims, chunks, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
+import { aspectDims, chunks, clipAspect, deferredIn, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
 import { coverObjectPosition, cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
 import { forgetsProject } from '../../src/lib/media/retentionRules';
@@ -439,6 +439,21 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(parts.map((p) => p.length).join() === '200,200,50', `450 → 200,200,50, got ${parts.map((p) => p.length)}`);
   assert(parts.flat().join() === ids.join(), 'order kept, nothing lost');
   assert(chunks([], 200).length === 0, 'nothing → no requests');
+}
+
+// ── New Clips captions are finished (translated, hero words) only where needed ──
+{
+  const caps = [
+    { sequence: 1, start: 0, end: 2, text: 'a b', deferred: true },
+    { sequence: 2, start: 2, end: 4, text: 'c d' },
+    { sequence: 3, start: 4, end: 6, text: 'e f', deferred: true },
+  ] as Caption[];
+  assert(deferredIn(caps, [{ start: 1, end: 3 }]), 'a range touching a deferred caption needs finishing');
+  assert(!deferredIn(caps, [{ start: 2.5, end: 3.5 }]), 'a finished range needs nothing');
+  assert(!deferredIn(caps, [{ start: 2, end: 4 }]), 'ranges that only touch a deferred caption’s edge need nothing');
+  assert(deferredIn(caps, [{ start: 2.5, end: 3 }, { start: 5, end: 9 }]), 'any of several ranges');
+  assert(!deferredIn(caps, []), 'no range → nothing to finish');
+  assert(deferredIn(caps, 'all') && !deferredIn([caps[1]], 'all'), 'all');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

@@ -61,7 +61,7 @@ export function ClipEditorPage() {
   const clip = index >= 0 ? clips[index] : undefined;
   const project = data?.project;
   const source = useClipSource(projectId, project?.video?.kind);
-  const captions = useProjectCaptions(projectId, !!project);
+  const captions = useProjectCaptions(projectId, !!project, clip);
   const projectStyle = useProjectStyle(projectId);
   const style = useMemo(() => (projectStyle && clip ? clipStyle(projectStyle, clip) : null), [projectStyle, clip]);
   const allowedQualities = QUALITIES.slice(0, QUALITIES.indexOf(maxQuality as ExportQuality) + 1);

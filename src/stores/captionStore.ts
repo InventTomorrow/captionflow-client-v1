@@ -16,6 +16,10 @@ export interface Caption {
   end: number;
   text: string;
   originalText?: string;
+  /** New Clips: the spoken text only — not translated yet, no hero words. The
+   *  server finishes captions where they are needed (its clips first, then any
+   *  other range on demand: POST /projects/:id/captions/finish). */
+  deferred?: boolean;
   words?: Array<{ word: string; start: number; end: number }>;
   /** Per-word display role aligned with text.split(whitespace). Empty = all auto. */
   emphasis?: WordRole[];

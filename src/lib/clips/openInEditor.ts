@@ -83,7 +83,7 @@ export async function openClipInEditor(
     onProgress?.('saving');
     let captions: Caption[];
     if (changed.range) {
-      captions = clipProjectCaptions(await projectCaptions(projectId), clip);
+      captions = clipProjectCaptions(await projectCaptions(projectId, [clip]), clip);
     } else {
       captions = await getAllForProject(editId);
       if (!captions.length) captions = await projectCaptions(editId);
@@ -102,7 +102,7 @@ export async function openClipInEditor(
 
   // Make it.
   onProgress?.('saving');
-  const [captions, src] = await Promise.all([projectCaptions(projectId), source()]);
+  const [captions, src] = await Promise.all([projectCaptions(projectId, [clip]), source()]);
   const copy = clipProjectCaptions(captions, clip);
   if (!copy.length) throw new OpenInEditorError(NO_CAPTIONS);
   const res = await openClipProject(clip._id, {

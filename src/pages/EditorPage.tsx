@@ -47,6 +47,8 @@ import { captionsToSrt } from '../lib/srt';
 import { deleteSource, getSourceFile, markExportDownloaded, evictOldExportsIfNeeded } from '../lib/media/localMedia';
 import { CAPTION_LANGUAGE_OPTIONS, captionLanguageLabel } from '../lib/languageLabel';
 import { clipClock, clipFontFactor, clipFraming, parseAspect, shiftCaptions, type ClipWindow } from '../lib/clips/clipClock';
+import { finishCaptions } from '../lib/clips/api';
+import { deferredIn } from '../lib/clips/clipMath';
 import { coverObjectPosition, cropXAt } from '../lib/clips/cropTrack';
 import { locateOriginal } from '../lib/media/locateSource';
 import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
@@ -703,6 +705,17 @@ export function EditorPage() {
               /* fall through to the "no captions" error below */
             }
           }
+          if (deferredIn(caps, 'all')) {
+            // A New Clips video translated (and picked hero words for) only its
+            // clips; the full video needs the rest — done once, on the server.
+            setBusy('rebuild');
+            try {
+              caps = await finishCaptions(id, 'all');
+              await replaceAllForProject(id, caps);
+            } catch {
+              setError('Some captions aren’t translated yet — reopen the video to try again.');
+            }
+          }
           setCaptions(caps);
           setComplete(caps.length, caps.length === 0);
           setBusy('');
@@ -1046,9 +1059,10 @@ export function EditorPage() {
         beginGeneration();
         setProcessing(true);
         if (r.data.project.stage) setPipelineStage(r.data.project.stage);
-      } else if (caps.length === 0 && ['ready', 'done', 'partial_error'].includes(status)) {
+      } else if ((caps.length === 0 || deferredIn(caps, 'all')) && ['ready', 'done', 'partial_error'].includes(status)) {
         // Finished while this page was closed (the one-shot captions:complete
-        // event was missed): load the server's copy of the captions.
+        // event was missed): load the server's copy of the captions. A New
+        // Clips video translated only its clips: this finishes the rest.
         void reloadFinalCaptions();
       } else {
         setCaptions(caps);

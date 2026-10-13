@@ -1,6 +1,7 @@
 /** clips/api.ts — typed calls for the Clips REST API (server routes/clips.routes.ts). */
 import { api } from '../api';
-import type { ClipAspect } from './clipMath';
+import type { Caption } from '../../stores/captionStore';
+import type { ClipAspect, TimeRange } from './clipMath';
 import type { CropTrack } from './cropTrack';
 import type { EditorStyle } from '../export/styleSnapshot';
 
@@ -207,3 +208,24 @@ export async function openClipProject(
   );
   return data;
 }
+
+/**
+ * Translate and pick hero words for captions a New Clips video left for later,
+ * in `ranges` (≤ 200) or all of them; each caption is finished once. Returns
+ * the project's whole caption list.
+ */
+export function finishCaptions(projectId: string, ranges: TimeRange[] | 'all'): Promise<Caption[]> {
+  const body = ranges === 'all' ? { all: true } : { ranges: ranges.slice(0, 200).map((r) => ({ start: r.start, end: r.end })) };
+  // The editor can ask from several load paths at once: one request serves them all.
+  const key = `${projectId}|${JSON.stringify(body)}`;
+  let p = finishing.get(key);
+  if (!p) {
+    p = api
+      .post<{ captions: Caption[] }>(`/projects/${projectId}/captions/finish`, body)
+      .then(({ data }) => data.captions ?? [])
+      .finally(() => finishing.delete(key));
+    finishing.set(key, p);
+  }
+  return p;
+}
+const finishing = new Map<string, Promise<Caption[]>>();

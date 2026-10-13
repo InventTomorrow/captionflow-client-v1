@@ -24,9 +24,9 @@ import { evictOldExportsIfNeeded, getSourceFile, getSourceRecord, type LocalExpo
 import { probeMediaFile } from '../media/probe';
 import { exportFrameSize, type ExportFormat, type ExportQuality } from '../render/frame';
 import type { Caption } from '../../stores/captionStore';
-import { authorizeClipRender, completeClipRender, failClipRender, type Clip } from './api';
+import { authorizeClipRender, completeClipRender, failClipRender, finishCaptions, type Clip } from './api';
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
-import { clipAspect, clipStyle, cropTrackFor } from './clipMath';
+import { clipAspect, clipStyle, cropTrackFor, deferredIn, type TimeRange } from './clipMath';
 
 export interface ClipRenderContext {
   projectId: string;
@@ -52,13 +52,20 @@ export class ClipRenderError extends Error {
   }
 }
 
-/** The project's captions: this browser's copy, else the server's cache (then kept locally). */
-export async function projectCaptions(projectId: string): Promise<Caption[]> {
-  const local = await getAllForProject(projectId).catch(() => [] as Caption[]);
-  if (local.length) return local;
-  // Another browser / cleared storage: the server keeps a copy for exactly this.
+/**
+ * The project's captions: this browser's copy, else the server's cache (then
+ * kept locally). A New Clips video translates captions only where they are
+ * needed, so captions still waiting inside `ranges` are finished first (on
+ * the server, once) — a clip trimmed longer shows its new sentences finished.
+ */
+export async function projectCaptions(projectId: string, ranges: TimeRange[] = []): Promise<Caption[]> {
+  let caps = await getAllForProject(projectId).catch(() => [] as Caption[]);
+  if (caps.length && !deferredIn(caps, ranges)) return caps;
+  // Another browser / cleared storage, or a copy older than the finished one:
+  // the server keeps a copy for exactly this.
   const { data } = await api.get<{ captions: Caption[] }>(`/projects/${projectId}/captions-cache`);
-  const caps = data?.captions ?? [];
+  caps = data?.captions ?? [];
+  if (deferredIn(caps, ranges)) caps = await finishCaptions(projectId, ranges);
   if (caps.length) await replaceAllForProject(projectId, caps).catch(() => undefined);
   return caps;
 }
@@ -86,7 +93,7 @@ export function renderClip(
     if (!isDeviceExportTemplate(style.template)) {
       throw new ClipRenderError('UNSUPPORTED', 'This caption style can’t be rendered on this device yet — pick another');
     }
-    const captions = await projectCaptions(ctx.projectId);
+    const captions = await projectCaptions(ctx.projectId, [clip]);
     if (!captions.length) throw new ClipRenderError('NO_CAPTIONS', 'This video has no captions yet');
 
     const probe = (await getSourceRecord(ctx.projectId))?.probe ?? (await probeMediaFile(source));

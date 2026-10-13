@@ -8,6 +8,7 @@ import { api, API_URL } from '../api';
 import { getSourceFile, getSourceRecord } from '../media/localMedia';
 import type { Caption } from '../../stores/captionStore';
 import type { EditorStyle } from '../export/styleSnapshot';
+import type { TimeRange } from './clipMath';
 import { projectCaptions } from './renderClip';
 
 export interface ClipSource {
@@ -51,18 +52,21 @@ export function useClipSource(projectId: string | undefined, videoKind: string |
   return { ...state, reload };
 }
 
-export function useProjectCaptions(projectId: string | undefined, ready: boolean) {
+/** The project's captions, with `range` (the clip on show) finished — again after each trim. */
+export function useProjectCaptions(projectId: string | undefined, ready: boolean, range?: TimeRange) {
   const [captions, setCaptions] = useState<Caption[] | null>(null);
+  const start = range?.start;
+  const end = range?.end;
   useEffect(() => {
     if (!projectId || !ready) return;
     let cancelled = false;
-    void projectCaptions(projectId)
+    void projectCaptions(projectId, start !== undefined && end !== undefined ? [{ start, end }] : [])
       .then((c) => !cancelled && setCaptions(c))
-      .catch(() => !cancelled && setCaptions([]));
+      .catch(() => !cancelled && setCaptions((c) => c ?? []));
     return () => {
       cancelled = true;
     };
-  }, [projectId, ready]);
+  }, [projectId, ready, start, end]);
   return captions;
 }
 
