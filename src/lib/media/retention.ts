@@ -11,6 +11,7 @@
 import { api } from '../api';
 import { deleteAllForProject } from '../captionDb';
 import { deleteExport, deleteSource, listExports, listSources, type LocalExportRecord } from './localMedia';
+import { forgetsProject } from './retentionRules';
 
 export const LOCAL_RETENTION_DAYS = 30;
 
@@ -34,7 +35,7 @@ export async function isLastVideoOfProject(item: LocalExportRecord): Promise<boo
 export async function deleteVideo(item: LocalExportRecord): Promise<void> {
   const last = await isLastVideoOfProject(item);
   await deleteExport(item.id);
-  if (last) await forgetProject(item.projectId, true);
+  if (forgetsProject(item, last)) await forgetProject(item.projectId, true);
 }
 
 /**

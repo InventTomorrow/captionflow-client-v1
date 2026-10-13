@@ -5,6 +5,7 @@
 import { buildExportStyle, type EditorStyle } from '../export/styleSnapshot';
 import { templateByKey } from '../templateCatalog';
 import type { Caption } from '../../stores/captionStore';
+import { clipFontFactor } from './clipClock';
 import { cropXAt, type CropTrack } from './cropTrack';
 import { sliceCaptionsToRange } from './sliceCaptions';
 
@@ -65,6 +66,8 @@ export interface ClipLook {
   /** A look made for this clip in the captions editor — wins over the template. */
   style?: Partial<EditorStyle> | null;
   aspect?: ClipAspect | null;
+  /** 'none' (Fit) shows the whole frame: captions keep their authored size. */
+  crop?: { mode?: 'auto' | 'manual' | 'none' } | null;
 }
 
 /**
@@ -81,7 +84,11 @@ export function clipStyle(projectStyle: Partial<EditorStyle>, look: ClipLook): E
     aspectRatio: clipAspect(look),
     behindPerson: false,
   };
-  return buildExportStyle(merged, { defaultAspect: clipAspect(look) });
+  const style = buildExportStyle(merged, { defaultAspect: clipAspect(look) });
+  // A crop fills the clip's frame: size captions so templates fit as in the main editor.
+  const factor = clipFontFactor(style.aspectRatio, look.crop?.mode !== 'none');
+  if (factor !== 1) style.fontSize = Math.max(12, Math.round(style.fontSize * factor * 100) / 100);
+  return style;
 }
 
 /**

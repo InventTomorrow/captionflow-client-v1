@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listExports, markExportDownloaded, type LocalExportRecord } from '../lib/media/localMedia';
 import { deleteVideo, expireOldLocalMedia, isLastVideoOfProject } from '../lib/media/retention';
+import { forgetsProject } from '../lib/media/retentionRules';
 import { downloadLocalFile, exportFileName } from '../lib/export/clientExport';
 
 const PREVIEW_COUNT = 8;
@@ -220,7 +221,7 @@ export function RecentVideos() {
   }
 
   async function remove(item: LocalExportRecord) {
-    const last = await isLastVideoOfProject(item).catch(() => false);
+    const last = forgetsProject(item, await isLastVideoOfProject(item).catch(() => false));
     const question = last
       ? `Delete “${displayTitle(item.title)}” (${item.quality})? Its captions will be deleted too.`
       : `Delete “${displayTitle(item.title)}” (${item.quality})?`;

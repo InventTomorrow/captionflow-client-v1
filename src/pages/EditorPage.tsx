@@ -44,13 +44,10 @@ import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captio
 import { TimelineBlocks } from '../components/TimelineBlocks';
 import { applyBlockMoves, findFreeSlot, inTimelineOrder, newCaption } from '../lib/timelineEdit';
 import { captionsToSrt } from '../lib/srt';
-import {
-  evictOldExportsIfNeeded,
-  getSourceFile,
-  markExportDownloaded,
-} from '../lib/media/localMedia';
+import { deleteSource, getSourceFile, markExportDownloaded, evictOldExportsIfNeeded } from '../lib/media/localMedia';
 import { CAPTION_LANGUAGE_OPTIONS, captionLanguageLabel } from '../lib/languageLabel';
-import { canRecutClipProject, recutClipProject } from '../lib/clips/openInEditor';
+import { clipClock, clipFontFactor, clipFraming, parseAspect, shiftCaptions, type ClipWindow } from '../lib/clips/clipClock';
+import { coverObjectPosition, cropXAt } from '../lib/clips/cropTrack';
 import { locateOriginal } from '../lib/media/locateSource';
 import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
 import { uploadVideoToProject } from '../lib/export/serverUpload';
@@ -562,11 +559,25 @@ export function EditorPage() {
    * with copied captions and the clip's video cut on the device. It is edited,
    * never transcribed or regenerated.
    */
-  const [clipProject, setClipProject] = useState<{ sourceId: string; sourceName: string; clipId: string } | null>(null);
+  const [clipProject, setClipProject] = useState<{
+    sourceId: string;
+    sourceName: string;
+    clipId: string;
+    framing: ReturnType<typeof clipFraming>;
+  } | null>(null);
   const isClipProjectRef = useRef(false);
-  /** The clip's cut video isn't on this device: whether the original is here to cut it again. */
-  const [clipVideoMissing, setClipVideoMissing] = useState<{ canRecut: boolean } | null>(null);
-  const [recutPercent, setRecutPercent] = useState<number | null>(null);
+  /**
+   * A clip project has no video of its own: it plays the original between the
+   * clip's in and out points (clipClock), cropped live, and the export trims
+   * and crops. `videoRef` is the clip-clocked view; this is the real element.
+   */
+  const realVideoRef = useRef<HTMLVideoElement | null>(null);
+  const clipWindowRef = useRef<ClipWindow | null>(null);
+  /** Which project's video plays: this one's, or (a clip project) its original's. */
+  const [mediaProjectId, setMediaProjectId] = useState<string | null>(null);
+  /** A clip project whose original video isn't on this device (and isn't on the server either). */
+  const [clipOriginalMissing, setClipOriginalMissing] = useState(false);
+  const clipCover = clipProject?.framing.mode === 'cover';
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateError, setLocateError] = useState('');
   /** Bumped once the original is located, so AuthenticatedVideo re-reads the local copy. */
@@ -920,12 +931,27 @@ export function EditorPage() {
       const src = r.data.project.kind === 'clip' ? r.data.project.clipSource : null;
       isClipProjectRef.current = !!src;
       if (src) {
-        setClipProject({ sourceId: String(src.projectId), sourceName: src.projectName || 'the video', clipId: String(src.clipId) });
-        void getSourceFile(id)
-          .then(async (file) =>
-            setClipVideoMissing(file ? null : { canRecut: await canRecutClipProject(String(src.projectId)) }),
-          )
+        const sourceId = String(src.projectId);
+        const win = { start: Number(src.start) || 0, end: Number(src.end) || 0 };
+        clipWindowRef.current = win;
+        if (realVideoRef.current) videoRef.current = clipClock(realVideoRef.current, win);
+        setClipProject({
+          sourceId,
+          sourceName: src.projectName || 'the video',
+          clipId: String(src.clipId),
+          framing: clipFraming({ mode: src.crop?.mode ?? 'none', x: src.crop?.x ?? 0.5, track: src.crop?.track ?? [] }),
+        });
+        setMediaProjectId(sourceId);
+        // Projects from before clips played their original kept a cut copy here: free it.
+        void deleteSource(id).catch(() => undefined);
+        void getSourceFile(sourceId)
+          .then((file) => setClipOriginalMissing(!file && src.videoKind === 'audio'))
           .catch(() => undefined);
+      } else {
+        setMediaProjectId(id);
+      }
+      if (src) {
+        // (handled above)
       } else if (serverVideo?.kind === 'audio') {
         void getSourceFile(id)
           .then((file) =>
@@ -1092,6 +1118,11 @@ export function EditorPage() {
       const cw = wrap.clientWidth;
       const ch = wrap.clientHeight;
       if (!cw || !ch) return;
+      if (clipCover) {
+        // A cropped clip fills the frame (object-fit: cover): captions use all of it, like its export.
+        setContentBox({ left: 0, top: 0, w: cw, h: ch });
+        return;
+      }
 
       // Must match object-fit:contain math — use the element's intrinsic size
       // when available so the caption layer lines up with the painted frame.
@@ -1144,7 +1175,7 @@ export function EditorPage() {
       video?.removeEventListener('loadedmetadata', measure);
       video?.removeEventListener('loadeddata', measure);
     };
-  }, [wrapSize, videoDims]);
+  }, [wrapSize, videoDims, clipCover]);
 
   // Captions as they appear on the video for the chosen display template.
   // Derived locally from the canonical captions — switching templates is
@@ -1193,6 +1224,45 @@ export function EditorPage() {
   const [timelineActiveIdx, setTimelineActiveIdx] = useState(-1);
   const timelineCaptionsLive = useRef(timelineCaptions);
   timelineCaptionsLive.current = timelineCaptions;
+
+  // A clip project: the original plays only between the clip's in and out
+  // points (stops at the end like any video) and is cropped live to the frame
+  // chosen in the aspect menu, following the clip's face track.
+  useEffect(() => {
+    if (!clipProject) return;
+    let raf = 0;
+    let lastPos = '';
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const win = clipWindowRef.current;
+      const v = realVideoRef.current;
+      if (!win || !v) return;
+      if (v.readyState >= 1 && !v.seeking) {
+        if (v.currentTime >= win.end - 0.01) {
+          if (!v.paused) v.pause();
+          if (v.currentTime > win.end) v.currentTime = win.end;
+        } else if (v.currentTime < win.start - 0.05) {
+          v.currentTime = win.start;
+        }
+      }
+      const aspect = parseAspect(styleRef.current.aspectRatio);
+      const f = clipProject.framing;
+      if (f.mode === 'cover' && aspect && v.videoWidth > 0) {
+        const pos = coverObjectPosition(v.videoWidth, v.videoHeight, aspect[0], aspect[1], cropXAt(f.track, v.currentTime - win.start));
+        if (v.style.objectFit !== 'cover') v.style.objectFit = 'cover';
+        if (pos !== lastPos) {
+          lastPos = pos;
+          v.style.objectPosition = pos;
+        }
+      } else if (v.style.objectFit) {
+        v.style.objectFit = '';
+        v.style.objectPosition = '';
+        lastPos = '';
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [clipProject]);
 
   // Playback tracking without re-rendering the page: the rAF loop writes the
   // clock / scrubber / playhead positions straight to the DOM, and only
@@ -1951,15 +2021,18 @@ export function EditorPage() {
     try {
       // Non-kinetic templates first measure the preview's own caption layout
       // in this document (a few seconds for a long video).
+      const win = clipProject ? clipWindowRef.current : null;
       const job = await buildDeviceExportJob({
         exportId,
         source: route.source,
         width: route.width,
         height: route.height,
-        durationSec: route.durationSec,
+        durationSec: win ? win.end - win.start : route.durationSec,
         format: exportFormat,
         style: styleSnap,
-        captions,
+        // A clip: its captions back on the original's timeline, then trimmed and cropped like the preview.
+        captions: win ? shiftCaptions(captions, win.start) : captions,
+        ...(win && clipProject ? { trim: { start: win.start, end: win.end }, framing: clipProject.framing } : {}),
         frameRate: exportFrameRate,
         signal: prepare.signal,
         onPrepare: (done, total) => {
@@ -1985,7 +2058,16 @@ export function EditorPage() {
         spokenLanguageRef.current.detected,
         outputLanguage,
       );
-      await saveDeviceExportRecord({ id: exportId, projectId: id, title: projectName, ...meta, result, language }).catch(
+      await saveDeviceExportRecord({
+        id: exportId,
+        projectId: id,
+        title: projectName,
+        ...meta,
+        result,
+        language,
+        // A clip's render is never "the project's last video" (see retention.deleteVideo).
+        ...(clipProject ? { clipId: clipProject.clipId } : {}),
+      }).catch(
         (err) => console.warn('[export] could not list the render in Recent exports', err),
       );
       try {
@@ -2104,9 +2186,10 @@ export function EditorPage() {
       await api.patch(`/projects/${id}/style`, styleSnap);
 
       const route = await chooseExportRoute({
-        projectId: id!,
+        // A clip project renders its original, trimmed and cropped on this device.
+        projectId: clipProject?.sourceId ?? id!,
         clientExportEnabled: flags.clientExportEnabled,
-        serverHasSource: serverHasSourceRef.current,
+        serverHasSource: clipProject ? false : serverHasSourceRef.current,
         style: styleSnap,
         captions,
         quality: exportQuality,
@@ -2364,8 +2447,8 @@ export function EditorPage() {
               {clipProject ? (
                 <p className="muted tiny clip-project-note">
                   These are the clip’s captions, copied from {clipProject.sourceName} — edit them here in the
-                  Phrases list or on the timeline. Nothing is re-transcribed or regenerated, and changes stay
-                  with this clip.
+                  Phrases list or on the timeline. Nothing is cut, re-transcribed or regenerated: the export
+                  trims and crops the original, and changes stay with this clip.
                 </p>
               ) : (
               <div className="panel-controls">
@@ -2757,7 +2840,11 @@ export function EditorPage() {
               <span className="video-filename-saved">· Saved</span>
             </div>
             <video
-              ref={videoRef}
+              ref={(el) => {
+                realVideoRef.current = el;
+                const win = clipWindowRef.current;
+                videoRef.current = el && win ? clipClock(el, win) : el;
+              }}
               playsInline
               // CORS-readable with the auth cookie, so the text-behind-person
               // preview can read its pixels (MediaPipe) without tainting the
@@ -2781,34 +2868,18 @@ export function EditorPage() {
                 }
               }}
             />
-            <AuthenticatedVideo key={videoSourceKey} id={id!} videoRef={videoRef} />
-            {clipVideoMissing && (
+            {mediaProjectId && (
+              <AuthenticatedVideo key={`${videoSourceKey}:${mediaProjectId}`} id={mediaProjectId} videoRef={videoRef} />
+            )}
+            {clipProject && clipOriginalMissing && (
               <div className="warn-banner local-source-banner" role="status">
                 <span>
-                  {clipVideoMissing.canRecut
-                    ? 'This clip’s video isn’t on this device yet. Cut it again from the original video here — the captions are already loaded.'
-                    : 'This clip’s video isn’t on this device, and neither is the original video. Open the clip on the device that has the original.'}
+                  This clip plays its original video, which isn’t on this device. Locate the original on the clips
+                  page to play and export the clip — its captions are loaded.
                 </span>
-                {clipVideoMissing.canRecut && (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={recutPercent !== null}
-                    onClick={() => {
-                      if (!id) return;
-                      setRecutPercent(0);
-                      void recutClipProject(id, (_stage, p) => setRecutPercent(p ?? 100))
-                        .then(() => {
-                          setClipVideoMissing(null);
-                          setVideoSourceKey((k) => k + 1);
-                        })
-                        .catch((err) => setError(err instanceof Error ? err.message : 'Couldn’t cut the clip again'))
-                        .finally(() => setRecutPercent(null));
-                    }}
-                  >
-                    {recutPercent !== null ? `Cutting… ${Math.round(recutPercent)}%` : 'Cut it again'}
-                  </button>
-                )}
+                <Link to={`/clips/${clipProject.sourceId}`} className="btn">
+                  Go to clips
+                </Link>
               </div>
             )}
             {missingSource && (
@@ -2956,6 +3027,15 @@ export function EditorPage() {
                   }
                   onChange={(e) => {
                     const aspectRatio = e.target.value;
+                    if (clipProject) {
+                      // A clip re-crops the original to the new frame; captions keep their proportion.
+                      const cover = clipProject.framing.mode === 'cover';
+                      const k = clipFontFactor(aspectRatio, cover) / clipFontFactor(styleRef.current.aspectRatio, cover);
+                      const fontSize = Math.max(12, Math.round(styleRef.current.fontSize * k * 100) / 100);
+                      setStyle((s) => ({ ...s, aspectRatio, fontSize }));
+                      void api.patch(`/projects/${id}/style`, { aspectRatio, fontSize });
+                      return;
+                    }
                     setStyle((s) => ({ ...s, aspectRatio }));
                     void api.patch(`/projects/${id}/style`, { aspectRatio });
                   }}

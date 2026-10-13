@@ -8,8 +8,10 @@ import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
 import { aspectDims, chunks, clipAspect, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
 import { coverObjectPosition, cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
+import { forgetsProject } from '../../src/lib/media/retentionRules';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
 import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
+import { clipClock, clipFontFactor, clipFraming, shiftCaptions } from '../../src/lib/clips/clipClock';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -328,6 +330,64 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(!look.range && !look.frame && look.look, 'template → the new look only');
   const unknown = clipChanges(null, was);
   assert(unknown.range && unknown.frame && unknown.look, 'no record → apply everything');
+}
+
+// ── the clip clock: the editor sees only the clip, the original keeps playing ──
+{
+  const real = {
+    currentTime: 30,
+    duration: 300,
+    ended: false,
+    tag: 'video',
+    play() {
+      return this;
+    },
+  };
+  const v = clipClock(real as unknown as HTMLVideoElement, { start: 25, end: 55 });
+  assert(v.currentTime === 5, `30 s in the original is 0:05 of the clip, got ${v.currentTime}`);
+  assert(v.duration === 30, `the clip's length, got ${v.duration}`);
+  v.currentTime = 10;
+  assert(real.currentTime === 35, `seeking 0:10 → 35 s in the original, got ${real.currentTime}`);
+  v.currentTime = 100;
+  assert(real.currentTime === 55, 'never past the clip');
+  v.currentTime = -5;
+  assert(real.currentTime === 25, 'never before the clip');
+  real.currentTime = 55;
+  assert(v.ended === true, 'the end of the clip is the end');
+  assert((v.play as () => unknown)() === real, 'methods run on the real video');
+  assert((v as unknown as { tag: string }).tag === 'video', 'everything else passes through');
+
+  const caps = [cap(1, [['Hi', 0.2, 0.5], ['there', 0.5, 0.9]])];
+  const abs = shiftCaptions(caps, 25);
+  assert(abs[0].start === 25.2 && abs[0].words?.[1].end === 25.9, 'captions moved onto the original’s timeline for export');
+  assert(caps[0].start === 0.2, 'the clip’s captions are untouched');
+
+  // Same caption proportion as the main editor (captions sized against a 16:9 strip).
+  assert(Math.abs(clipFontFactor('9:16', true) - 0.31640625) < 1e-9, '9:16 cover');
+  assert(Math.abs(clipFontFactor('1:1', true) - 0.5625) < 1e-9, '1:1 cover');
+  assert(clipFontFactor('16:9', true) === 1 && clipFontFactor('9:16', false) === 1, 'landscape or fit: as authored');
+
+  const auto = { mode: 'auto' as const, x: 0.5, track: [[0, 0.3]] as Array<[number, number]> };
+  assert(JSON.stringify(clipFraming(auto)) === JSON.stringify({ mode: 'cover', track: [[0, 0.3]] }), 'auto → the face track');
+  assert(JSON.stringify(clipFraming({ ...auto, track: [] })) === JSON.stringify({ mode: 'cover', track: [[0, 0.5]] }), 'auto, no track yet → centre');
+  assert(JSON.stringify(clipFraming({ mode: 'manual', x: 0.7 })) === JSON.stringify({ mode: 'cover', track: [[0, 0.7]] }), 'manual → fixed');
+  assert(clipFraming({ mode: 'none', x: 0.5 }).mode === 'contain', 'fit → the whole frame');
+
+  const tall = clipStyle({ template: 'classic', fontSize: 64 }, { templateKey: null, aspect: '9:16' });
+  assert(Math.abs(tall.fontSize - 64 * 0.31640625) < 0.01, `a 9:16 clip's captions fit like the main editor's, got ${tall.fontSize}`);
+  const wide = clipStyle({ template: 'classic', fontSize: 64 }, { templateKey: null, aspect: '16:9' });
+  assert(wide.fontSize === 64, 'a 16:9 clip keeps the size');
+  const fit = clipStyle({ template: 'classic', fontSize: 64 }, { templateKey: null, aspect: '9:16', crop: { mode: 'none' } });
+  assert(fit.fontSize === 64, 'Fit keeps the size (captions sit on the whole frame strip)');
+  const tiny = clipStyle({ template: 'classic', fontSize: 30 }, { templateKey: null, aspect: '9:16' });
+  assert(tiny.fontSize >= 12, 'never under the smallest size the server accepts');
+}
+
+// ── deleting a clip's render never wipes its video ───────────────────────
+{
+  assert(forgetsProject({ clipId: undefined }, true) === true, 'a video’s last render: its captions go with it');
+  assert(forgetsProject({ clipId: 'c1' }, true) === false, 'a clip render is never “the video’s last video”');
+  assert(forgetsProject({ clipId: undefined }, false) === false, 'not the last render: nothing else goes');
 }
 
 // ── textInRange (the in/out sentence shown next to the trim buttons) ─────

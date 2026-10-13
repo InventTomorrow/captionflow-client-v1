@@ -12,8 +12,7 @@ import { useClipsStore } from '../../stores/clipsStore';
 
 const STAGE_TEXT: Record<OpenStage, string> = {
   framing: 'Finding the speaker…',
-  cutting: 'Cutting the clip on this device…',
-  saving: 'Saving the clip’s captions and style…',
+  saving: 'Loading the clip’s captions and style…',
   opening: 'Opening the editor…',
 };
 
@@ -27,7 +26,6 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
   const navigate = useNavigate();
   const setClipLocal = useClipsStore((s) => s.setClipLocal);
   const [stage, setStage] = useState<OpenStage>('opening');
-  const [percent, setPercent] = useState<number | undefined>(undefined);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
   const started = useRef(false);
@@ -39,15 +37,14 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
       setStage('opening');
       try {
         const r = await openClipInEditor(projectId, clip, {
-          onProgress: (s, p) => {
-            setStage(s);
-            setPercent(p);
-          },
+          onProgress: setStage,
           onClipUpdated: setClipLocal,
         });
         navigate(`/projects/${r.projectId}/editor`);
       } catch (e) {
-        setError(errorMessage(e, 'Couldn’t open this clip in the editor'));
+        // Only a request that failed is a network problem; anything on this device says what it is.
+        const fromServer = (e as { isAxiosError?: boolean } | null)?.isAxiosError;
+        setError(fromServer || !(e instanceof Error) ? errorMessage(e, 'Couldn’t open this clip in the editor') : e.message);
         setBusy(false);
       }
     },
@@ -77,11 +74,10 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
           {busy && (
             <div className="export-progress" role="status" aria-live="polite">
               <div className="progress-bar thin">
-                <div style={{ width: `${stage === 'cutting' ? Math.max(3, percent ?? 0) : stage === 'framing' ? 8 : 100}%` }} />
+                <div style={{ width: `${stage === 'framing' ? 30 : stage === 'saving' ? 70 : 100}%` }} />
               </div>
               <span className="muted tiny">
                 {STAGE_TEXT[stage]}
-                {stage === 'cutting' && percent ? ` ${Math.round(percent)}%` : ''}
               </span>
             </div>
           )}
@@ -98,8 +94,8 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
             </>
           )}
           <p className="muted tiny">
-            The clip opens as its own video with its captions and style, ready to edit. Nothing is re-transcribed or
-            regenerated.
+            The clip opens on its own — just its part of the video, cropped, with its captions and style. Nothing is
+            cut, re-transcribed or regenerated; trimming and cropping happen when you export.
           </p>
         </div>
       </div>
