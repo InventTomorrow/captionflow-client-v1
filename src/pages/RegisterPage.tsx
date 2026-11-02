@@ -6,6 +6,7 @@ import { useResendVerification } from '../lib/emailVerification';
 import {
   ArrowRightIcon,
   AuthBrand,
+  AuthSplitShell,
   PasswordChecklist,
   PasswordInput,
 } from '../components/AuthParts';
@@ -205,11 +206,7 @@ export function RegisterPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-glow" aria-hidden="true" />
-      <div className="auth-orb" aria-hidden="true" />
-
-      <section className="auth-card">
+    <AuthSplitShell mode="register">
         <AuthBrand />
 
         {pending ? (
@@ -292,12 +289,16 @@ export function RegisterPage() {
               </button>
             </form>
 
+            <p className="auth-legal">
+              By creating an account you agree to our <Link to="/terms">Terms of Service</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>.
+            </p>
+
             <p className="auth-footer">
               Have an account? <Link to="/login">Sign in</Link>
             </p>
           </>
         )}
-      </section>
-    </main>
+    </AuthSplitShell>
   );
 }

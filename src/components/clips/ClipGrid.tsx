@@ -5,10 +5,16 @@
  * (content-visibility), so a feed of hundreds stays light without a
  * virtualizer fighting a responsive column count. With `selected` set the
  * grid is in selection mode: cards show checkboxes and nothing plays.
+ *
+ * A clip of a video from a pasted link plays from its own part once this
+ * device has fetched it (opened or rendered); until then its card shows the
+ * video's poster and opens the clip.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
+import { localClipMedia } from '../../lib/clips/clipMedia';
 import { clipAspect, clipStyle, cropTrackFor, deferredIn } from '../../lib/clips/clipMath';
+import { linkPosters } from '../../lib/clips/linkSource';
 import { loadProjectAssets, type ProjectAssets } from '../../lib/clips/projectAssets';
 import { projectCaptions } from '../../lib/clips/renderClip';
 import type { RenderState } from '../../stores/clipsStore';
@@ -18,7 +24,7 @@ import { ClipPreview } from './ClipPreview';
 interface ClipGridProps {
   clips: Clip[];
   /** The project of every clip, when the grid shows a single project (clip set page). */
-  project?: { _id: string; video?: { kind?: string } };
+  project?: { _id: string; sourceUrl?: string; video?: { kind?: string } };
   showProject?: boolean;
   showReason?: boolean;
   renders: Record<string, RenderState | undefined>;
@@ -31,6 +37,9 @@ interface ClipGridProps {
   onDownload?(clip: Clip): void;
   onDelete?(clip: Clip): void;
 }
+
+/** A linked video's clip part on this device: object URL + the source time at its 0:00 (null = none here). */
+type Part = { url: string; offset: number } | null;
 
 export function ClipGrid({
   clips,
@@ -48,15 +57,33 @@ export function ClipGrid({
 }: ClipGridProps) {
   const [active, setActive] = useState<string | null>(null);
   const [assets, setAssets] = useState<Record<string, ProjectAssets | undefined>>({});
+  const [parts, setParts] = useState<Record<string, Part | undefined>>({});
+  const partUrls = useRef<string[]>([]);
 
   const kindOf = useCallback((c: Clip) => c.project?.video?.kind ?? project?.video?.kind, [project]);
+  const linkOf = useCallback((c: Clip) => c.project?.sourceUrl ?? project?.sourceUrl, [project]);
+
+  useEffect(() => () => partUrls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const activate = useCallback(
     (id: string | null) => {
       setActive(id);
       const clip = id ? clips.find((c) => c._id === id) : undefined;
-      const have = clip && assets[clip.projectId];
-      if (!clip || (have && !deferredIn(have.captions, [clip]))) return;
+      if (!clip) return;
+      // A linked video's clip: its own part, if this device has fetched it (looked up again until
+      // found — a render or the clip page may fetch it — and after a trim).
+      const partKey = `${clip._id}:${clip.start}:${clip.end}`;
+      if (linkOf(clip) && !parts[partKey]) {
+        void localClipMedia(clip.projectId, clip)
+          .then((m) => {
+            const url = m ? URL.createObjectURL(m.file) : null;
+            if (url) partUrls.current.push(url);
+            setParts((s) => ({ ...s, [partKey]: url && m ? { url, offset: m.offset } : null }));
+          })
+          .catch(() => setParts((s) => ({ ...s, [partKey]: null })));
+      }
+      const have = assets[clip.projectId];
+      if (have && !deferredIn(have.captions, [clip])) return;
       void (have ? Promise.resolve(have) : loadProjectAssets(clip.projectId, kindOf(clip)))
         .then(async (a) => {
           // A clip trimmed since its captions were loaded may reach captions not translated yet.
@@ -67,7 +94,7 @@ export function ClipGrid({
         })
         .catch(() => undefined);
     },
-    [clips, assets, kindOf],
+    [clips, assets, parts, kindOf, linkOf],
   );
 
   // Stop playback when the active clip leaves the list (filter change, delete) or selection starts.
@@ -79,13 +106,17 @@ export function ClipGrid({
     <ul className={`clip-grid${selected ? ' is-selecting' : ''}`}>
       {clips.map((clip) => {
         const a = assets[clip.projectId];
+        const link = linkOf(clip);
+        const part = link ? parts[`${clip._id}:${clip.start}:${clip.end}`] : undefined;
+        const src = link ? part?.url : a?.url;
         const preview =
-          !selected && active === clip._id && a?.url ? (
+          !selected && active === clip._id && src && a ? (
             <ClipPreview
-              src={a.url}
-              credentials={a.credentials}
+              src={src}
+              credentials={!link && a.credentials}
               start={clip.start}
               end={clip.end}
+              offset={part?.offset ?? 0}
               captions={a.captions}
               style={clipStyle(a.style, clip)}
               track={cropTrackFor(clip)}
@@ -98,8 +129,11 @@ export function ClipGrid({
             key={clip._id}
             clip={clip}
             projectId={clip.projectId}
+            videoKind={kindOf(clip)}
             preview={preview}
-            hasSource={a ? !!a.url : true}
+            hasSource={link ? part !== null : a ? !!a.url : true}
+            canRender={link ? true : undefined}
+            fallbackPosters={linkPosters(link)}
             showProject={showProject}
             showReason={showReason}
             render={renders[clip._id]}

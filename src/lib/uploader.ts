@@ -9,11 +9,11 @@ import {
   uploadVideoToProject,
 } from './export/serverUpload';
 
-const MAX_SIZE = 1 * 1024 * 1024 * 1024;
+const MAX_SIZE = 5 * 1024 * 1024 * 1024;
 const ALLOWED_EXT = /\.(mp4|mov|avi|mkv|webm|flv)$/i;
 
 export function validateVideoFile(file: File) {
-  if (file.size > MAX_SIZE) throw new Error('File exceeds 1GB limit');
+  if (file.size > MAX_SIZE) throw new Error('File exceeds 5GB limit');
   if (!ALLOWED_EXT.test(file.name) && !file.type.startsWith('video/')) {
     throw new Error('Unsupported format');
   }

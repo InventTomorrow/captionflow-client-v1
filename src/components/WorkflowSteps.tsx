@@ -26,9 +26,9 @@ import { useScrollHold } from '../lib/useScrollHold';
  *    compositor. Row/word/step indexes ride on --k.
  */
 
-/** A caption-free still from the templates showcase's original clip
- *  (public/landing/templates/_originals/tpl-2.mp4), so the cards show the
- *  video before captions and the caption card can draw its own. */
+/** A caption-free still of the templates showcase's Karaoke Fill host (an
+ *  AI-generated, fictional creator — no real people on the site), so the
+ *  cards show the video before captions and the caption card can draw its own. */
 const FRAME_SRC = '/landing/workflow/frame-raw.jpg';
 
 const TRANSCRIPT = [
@@ -318,9 +318,9 @@ export function WorkflowSteps() {
     const io = new IntersectionObserver(
       ([entry]) => {
         setVisible(entry.isIntersecting);
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.25) setLive(true);
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.12) setLive(true);
       },
-      { threshold: [0, 0.25] },
+      { threshold: [0, 0.12], rootMargin: '0px 0px -8% 0px' },
     );
     io.observe(el);
     return () => io.disconnect();

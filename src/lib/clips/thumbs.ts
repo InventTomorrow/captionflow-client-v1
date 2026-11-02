@@ -5,8 +5,9 @@
  * in-point or the framing makes a new one). At most two are decoded at a time.
  */
 import { openDB, type IDBPDatabase } from 'idb';
-import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
-import { getSourceFile } from '../media/localMedia';
+import { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource, type Source } from 'mediabunny';
+import { API_URL } from '../api';
+import { localClipMedia } from './clipMedia';
 import { clipAspect, clipFrameTime, cropTrackFor, thumbKey, type ClipFraming, type ClipTiming } from './clipMath';
 import { cropRect, cropXAt, integerCrop } from './cropTrack';
 
@@ -39,8 +40,18 @@ async function slot<T>(fn: () => Promise<T>): Promise<T> {
 
 const inflight = new Map<string, Promise<string | null>>();
 
-/** The clip's poster as a data URL, or null when this device has no copy of the video. */
-export function getClipThumb(projectId: string, clip: ClipTiming & ClipFraming): Promise<string | null> {
+/**
+ * The clip's poster as a data URL, or null when there is nothing to decode on
+ * this device. Decodes from the device's copy — the whole original, or the
+ * clip's own part of a linked video; otherwise, for a full-video upload the
+ * server streams, a single frame over the Range-capable stream (only that
+ * frame's bytes are fetched). Result is cached in IndexedDB by framing.
+ */
+export function getClipThumb(
+  projectId: string,
+  clip: ClipTiming & ClipFraming,
+  videoKind?: string,
+): Promise<string | null> {
   const key = thumbKey(clip);
   const pending = inflight.get(key);
   if (pending) return pending;
@@ -51,9 +62,16 @@ export function getClipThumb(projectId: string, clip: ClipTiming & ClipFraming):
     } catch {
       /* no IndexedDB (private mode): just render */
     }
-    const file = await getSourceFile(projectId);
-    if (!file) return null;
-    const url = await slot(() => renderThumb(file, clip));
+    const media = await localClipMedia(projectId, clip).catch(() => null);
+    let source: Source | null = null;
+    if (media) source = new BlobSource(media.file);
+    else if (videoKind && videoKind !== 'audio') {
+      source = new UrlSource(`${API_URL}/api/projects/${projectId}/video`, {
+        requestInit: { credentials: 'include' },
+      });
+    }
+    if (!source) return null;
+    const url = await slot(() => renderThumb(source!, clip, media?.offset ?? 0));
     if (url) await (await db()).put('clip-thumbs', url, key).catch(() => undefined);
     return url;
   })().finally(() => inflight.delete(key));
@@ -61,8 +79,9 @@ export function getClipThumb(projectId: string, clip: ClipTiming & ClipFraming):
   return p;
 }
 
-async function renderThumb(file: File, clip: ClipTiming & ClipFraming): Promise<string | null> {
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+/** `offset`: source time at the decoded file's 0:00 (a clip's part of a linked video). */
+async function renderThumb(source: Source, clip: ClipTiming & ClipFraming, offset: number): Promise<string | null> {
+  const input = new Input({ formats: ALL_FORMATS, source });
   try {
     const video = await input.getPrimaryVideoTrack();
     if (!video || !(await video.canDecode())) return null;
@@ -79,7 +98,7 @@ async function renderThumb(file: File, clip: ClipTiming & ClipFraming): Promise<
         ? { fit: 'fill' as const, crop: integerCrop(cropRect(sw, sh, w, h, cropXAt(track, t - clip.start)), sw, sh) }
         : { fit: 'contain' as const }),
     });
-    const frame = await sink.getCanvas(t);
+    const frame = await sink.getCanvas(t - offset);
     if (!frame) return null;
     const canvas = frame.canvas;
     if ('convertToBlob' in canvas) {

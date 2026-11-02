@@ -31,7 +31,7 @@ import {
   saveExportRecord,
   type LocalExportRecord,
 } from '../media/localMedia';
-import { probeMediaFile } from '../media/probe';
+import { probeMediaFile, type MediaProbe } from '../media/probe';
 import { FONT_URL_BASE } from '../render/fonts';
 import {
   exportFrameSize,
@@ -154,6 +154,8 @@ export interface RouteInput {
   format: ExportFormat;
   /** Display size from the server's probe, used when there is no local probe. */
   fallbackDims?: { width: number; height: number };
+  /** Render from this file instead of the project's stored original (a clip's part of a linked video). */
+  media?: { file: File; probe: MediaProbe | null };
 }
 
 export async function chooseExportRoute(input: RouteInput): Promise<ExportRoute> {
@@ -178,11 +180,12 @@ export async function chooseExportRoute(input: RouteInput): Promise<ExportRoute>
   // preview's own segmenter), so it no longer decides the route.
   const notes: string[] = [];
 
-  const source = await getSourceFile(input.projectId);
+  const source = input.media?.file ?? (await getSourceFile(input.projectId));
   if (!source) return toServer('The original video isn’t stored on this device');
 
-  const record = await getSourceRecord(input.projectId);
-  const probe = record?.probe ?? (await probeMediaFile(source));
+  const probe = input.media
+    ? (input.media.probe ?? (await probeMediaFile(source)))
+    : ((await getSourceRecord(input.projectId))?.probe ?? (await probeMediaFile(source)));
   if (probe && probe.hasVideo && !probe.canDecodeVideo) {
     return toServer(`This browser can’t decode ${probe.videoCodec ?? 'this'} video`);
   }
@@ -329,8 +332,12 @@ export class DeviceExportError extends Error {
 }
 
 export interface DeviceExportProgress {
-  stage: ExportStage;
+  /** 'download': a clip's part of a linked video is being fetched before the render. */
+  stage: ExportStage | 'download';
+  /** This stage's own progress (the render ETA reads it). */
   percent: number;
+  /** The whole job's progress, when a download came first. */
+  overall?: number;
   processedSec?: number;
 }
 
@@ -407,6 +414,7 @@ export function startDeviceExport(
 
 /** "Rendering… 42% · about 12 s left" */
 export function describeDeviceProgress(p: DeviceExportProgress, startedAt: number): string {
+  if (p.stage === 'download') return `Getting this part of the video… ${Math.round(p.percent)}%`;
   if (p.stage === 'fonts') return 'Loading caption fonts…';
   if (p.stage === 'prepare') return 'Preparing the video…';
   if (p.stage === 'matte') return 'Preparing text behind person…';

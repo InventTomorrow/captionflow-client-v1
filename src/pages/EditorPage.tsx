@@ -9,14 +9,13 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
-import { api, API_URL } from '../lib/api';
+import { api, API_URL, errorMessage } from '../lib/api';
 import { useCaptionStore, type Caption, type WordRole, type WordStyle } from '../stores/captionStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
 import { useAuthStore } from '../stores/authStore';
 import { PlanBadge } from '../components/AppShell';
 import { joinProjectRoom, connectSocket, getSocket } from '../lib/socket';
-import { PrepareMediaModal } from '../components/PrepareMediaModal';
 import { PricingModal } from '../components/PricingModal';
 import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
 import { CaptionOverlay, findActiveCaption } from '../components/CaptionOverlay';
@@ -48,7 +47,9 @@ import { deleteSource, getSourceFile, markExportDownloaded, evictOldExportsIfNee
 import { CAPTION_LANGUAGE_OPTIONS, captionLanguageLabel } from '../lib/languageLabel';
 import { clipClock, clipFontFactor, clipFraming, parseAspect, shiftCaptions, type ClipWindow } from '../lib/clips/clipClock';
 import { finishCaptions } from '../lib/clips/api';
+import { clipMedia } from '../lib/clips/clipMedia';
 import { deferredIn } from '../lib/clips/clipMath';
+import type { MediaProbe } from '../lib/media/probe';
 import { coverObjectPosition, cropXAt } from '../lib/clips/cropTrack';
 import { locateOriginal } from '../lib/media/locateSource';
 import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
@@ -502,7 +503,9 @@ export function EditorPage() {
   } | null>(null);
   const stageCanvasRef = useRef<HTMLDivElement>(null);
   const captionLayerRef = useRef<HTMLDivElement>(null);
-  const [showPrepare, setShowPrepare] = useState(false);
+  /** Prevent duplicate auto-starts if a legacy uploaded project is opened in
+   * development StrictMode before its status changes to processing. */
+  const initialTranscriptionStarted = useRef(false);
   const [showExport, setShowExport] = useState(false);
   /** Text-behind-person matte status, mirrored from the server via socket. */
   const [masks, setMasks] = useState<MasksState>({ status: 'none' });
@@ -577,6 +580,44 @@ export function EditorPage() {
   const clipWindowRef = useRef<ClipWindow | null>(null);
   /** Which project's video plays: this one's, or (a clip project) its original's. */
   const [mediaProjectId, setMediaProjectId] = useState<string | null>(null);
+  /**
+   * A clip project whose original came from a pasted link plays the clip's own
+   * part of it (fetched if this device doesn't have it): the clip window and
+   * the export trim are on that part's timeline, `offset` seconds in.
+   */
+  const [clipPart, setClipPart] = useState<
+    | { status: 'loading'; percent: number }
+    | { status: 'error'; error: string }
+    | { status: 'ready'; file: File; probe: MediaProbe | null; offset: number }
+    | null
+  >(null);
+  const clipPartArgs = useRef<{ sourceId: string; clipId: string; win: ClipWindow } | null>(null);
+  const clipPartStop = useRef<AbortController | null>(null);
+  useEffect(() => () => clipPartStop.current?.abort(), []);
+  const loadClipPart = useCallback(async () => {
+    const args = clipPartArgs.current;
+    if (!args) return;
+    clipPartStop.current?.abort();
+    const stop = new AbortController();
+    clipPartStop.current = stop;
+    setClipPart({ status: 'loading', percent: 0 });
+    try {
+      const media = await clipMedia(args.sourceId, { _id: args.clipId, ...args.win }, {
+        imported: true,
+        signal: stop.signal,
+        onProgress: (percent) => !stop.signal.aborted && setClipPart({ status: 'loading', percent }),
+      });
+      if (stop.signal.aborted) return;
+      if (!media) throw new Error('This clip’s part of the video isn’t available.');
+      const shifted = { start: args.win.start - media.offset, end: args.win.end - media.offset };
+      clipWindowRef.current = shifted;
+      if (realVideoRef.current) videoRef.current = clipClock(realVideoRef.current, shifted);
+      setClipPart({ status: 'ready', file: media.file, probe: media.probe, offset: media.offset });
+      setMediaProjectId(args.sourceId);
+    } catch (err) {
+      if (!stop.signal.aborted) setClipPart({ status: 'error', error: errorMessage(err, 'This clip’s part of the video couldn’t be fetched — try again.') });
+    }
+  }, []);
   const clipCover = clipProject?.framing.mode === 'cover';
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateError, setLocateError] = useState('');
@@ -952,7 +993,13 @@ export function EditorPage() {
           clipId: String(src.clipId),
           framing: clipFraming({ mode: src.crop?.mode ?? 'none', x: src.crop?.x ?? 0.5, track: src.crop?.track ?? [] }),
         });
-        setMediaProjectId(sourceId);
+        if (src.imported) {
+          // The original came from a link: play just this clip's part of it.
+          clipPartArgs.current = { sourceId, clipId: String(src.clipId), win };
+          void loadClipPart();
+        } else {
+          setMediaProjectId(sourceId);
+        }
         // Projects from before clips played their original kept a cut copy here: free it.
         void deleteSource(id).catch(() => undefined);
       } else {
@@ -1046,13 +1093,31 @@ export function EditorPage() {
         chosen: settings?.sourceLanguage,
         detected: r.data.project.transcription?.language,
       };
-      // Freshly uploaded project, never transcribed — show the Prepare Your
-      // Media popup so the user can pick languages and start transcription.
+      // Caption now collects these choices before upload. Older untouched
+      // projects start here with their stored/default settings as a fallback.
       const status = r.data.project.status as string;
       const caps = await getAllForProject(id);
       if (['uploaded', 'uploading'].includes(status)) {
-        setShowPrepare(true);
         setCaptions(caps);
+        if (!initialTranscriptionStarted.current && status === 'uploaded') {
+          initialTranscriptionStarted.current = true;
+          beginGeneration();
+          setProcessing(true);
+          setPipelineStage({ current: 'extracting', percent: 0 });
+          didSeekToCaption.current = false;
+          void api
+            .post(`/projects/${id}/transcribe`, {
+              sourceLanguage: settings?.sourceLanguage || 'auto',
+              outputLanguage: settings?.outputLanguage || 'keep_original',
+              keyterms: settings?.keyterms || [],
+            })
+            .catch((startError) => {
+              initialTranscriptionStarted.current = false;
+              setProcessing(false);
+              const message = (startError as { response?: { data?: { message?: string } } }).response?.data?.message;
+              setError(message || 'Could not start transcription. Return to Caption and try again.');
+            });
+        }
       } else if (['processing', 'transcribing', 'translating'].includes(status)) {
         // Pipeline already running (e.g. after a refresh) — resume streaming.
         // Do NOT finalize empty captions or late partials get dropped.
@@ -1076,7 +1141,7 @@ export function EditorPage() {
       console.error('Failed to load project', err);
       setError('Failed to load this project - it may have been deleted, or try refreshing.');
     });
-  }, [id, setCaptions, setPipelineStage, beginGeneration, reloadFinalCaptions]);
+  }, [id, setCaptions, setPipelineStage, beginGeneration, reloadFinalCaptions, loadClipPart]);
 
   useEffect(() => {
     if (didSeekToCaption.current || !captions.length) return;
@@ -2206,6 +2271,8 @@ export function EditorPage() {
         fallbackDims: savedVideoDims.current
           ? { width: savedVideoDims.current.w, height: savedVideoDims.current.h }
           : undefined,
+        // A linked video's clip renders from its part (clipWindowRef is already on its timeline).
+        media: clipPart?.status === 'ready' ? { file: clipPart.file, probe: clipPart.probe } : undefined,
       });
       console.info('[export] route:', route.path, route.path === 'device' ? `${route.width}x${route.height}` : route.reason);
       if (route.path === 'device') {
@@ -2878,7 +2945,26 @@ export function EditorPage() {
               }}
             />
             {mediaProjectId && (
-              <AuthenticatedVideo key={`${videoSourceKey}:${mediaProjectId}`} id={mediaProjectId} videoRef={videoRef} />
+              <AuthenticatedVideo
+                key={`${videoSourceKey}:${mediaProjectId}:${clipPart?.status === 'ready' ? clipPart.offset : 'whole'}`}
+                id={mediaProjectId}
+                file={clipPart?.status === 'ready' ? clipPart.file : undefined}
+                videoRef={videoRef}
+              />
+            )}
+            {clipPart && clipPart.status !== 'ready' && (
+              <div className="warn-banner local-source-banner" role="status" aria-live="polite">
+                <span>
+                  {clipPart.status === 'error'
+                    ? clipPart.error
+                    : `Getting this clip’s part of the video… ${clipPart.percent}%`}
+                </span>
+                {clipPart.status === 'error' && (
+                  <button type="button" className="btn" onClick={() => void loadClipPart()}>
+                    Try again
+                  </button>
+                )}
+              </div>
             )}
             {missingSource && (
               <div className="warn-banner local-source-banner" role="status">
@@ -3424,20 +3510,6 @@ export function EditorPage() {
         </div>
       </div>
 
-      {showPrepare && id && (
-        <PrepareMediaModal
-          projectId={id}
-          onClose={() => setShowPrepare(false)}
-          onStarted={() => {
-            setShowPrepare(false);
-            beginGeneration();
-            setProcessing(true);
-            setPipelineStage({ current: 'extracting', percent: 0 });
-            didSeekToCaption.current = false;
-          }}
-        />
-      )}
-
       {showExport && (
         <div className="modal-backdrop" onClick={closeExportModal}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -3610,14 +3682,24 @@ const WORD_COLOR_SWATCHES = [
 
 function AuthenticatedVideo({
   id,
+  file,
   videoRef,
 }: {
   id: string;
+  /** Play this file instead of the project's video (a clip's part of a linked video). */
+  file?: File;
   videoRef: React.RefObject<HTMLVideoElement | null>;
 }) {
   useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || !file) return;
+    const url = URL.createObjectURL(file);
+    v.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file, videoRef]);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || file) return;
     const serverSrc = `${API_URL}/api/projects/${id}/video`;
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -3659,6 +3741,6 @@ function AuthenticatedVideo({
       cancelled = true;
       dropLocal();
     };
-  }, [id, videoRef]);
+  }, [id, file, videoRef]);
   return null;
 }

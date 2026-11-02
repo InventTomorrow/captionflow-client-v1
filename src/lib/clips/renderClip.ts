@@ -8,7 +8,7 @@
  * job builder), the clip's style (clipMath.clipStyle), its framing
  * (cropTrackFor). The server only checks the plan and counts the render.
  */
-import { api } from '../api';
+import { api, errorMessage } from '../api';
 import { getAllForProject, replaceAllForProject } from '../captionDb';
 import {
   buildDeviceExportJob,
@@ -20,12 +20,14 @@ import {
   type ExportStyle,
 } from '../export/clientExport';
 import type { EditorStyle } from '../export/styleSnapshot';
-import { evictOldExportsIfNeeded, getSourceFile, getSourceRecord, type LocalExportRecord } from '../media/localMedia';
+import { evictOldExportsIfNeeded, type LocalExportRecord } from '../media/localMedia';
 import { probeMediaFile } from '../media/probe';
 import { exportFrameSize, type ExportFormat, type ExportQuality } from '../render/frame';
 import type { Caption } from '../../stores/captionStore';
 import { authorizeClipRender, completeClipRender, failClipRender, finishCaptions, type Clip } from './api';
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
+import { shiftCaptions } from './clipClock';
+import { clipMedia } from './clipMedia';
 import { clipAspect, clipStyle, cropTrackFor, deferredIn, type TimeRange } from './clipMath';
 
 export interface ClipRenderContext {
@@ -33,9 +35,16 @@ export interface ClipRenderContext {
   projectName: string;
   /** The project's saved caption style (Project.style). */
   projectStyle: Partial<EditorStyle>;
+  /** The video came from a pasted link: this clip's part of it is fetched first when not on this device. */
+  imported?: boolean;
+  /** The source's length in seconds (bounds the part asked for). */
+  duration?: number;
   /** Called when the render had to save something on the clip first (its face track). */
   onClipUpdated?: (clip: Clip) => void;
 }
+
+/** Share of the progress bar a clip part's download takes before its render. */
+const DOWNLOAD_SHARE = 30;
 
 export interface ClipRenderOptions {
   quality: ExportQuality;
@@ -83,12 +92,11 @@ export function renderClip(
 ): ClipRenderHandle {
   let cancelInner: (() => void) | null = null;
   let cancelled = false;
+  const stop = new AbortController();
   let clip = clipIn;
   const promise = (async () => {
     const blocker = deviceExportBlocker();
     if (blocker) throw new ClipRenderError('UNSUPPORTED', blocker);
-    const source = await getSourceFile(ctx.projectId);
-    if (!source) throw new ClipRenderError('NO_SOURCE', 'The original video isn’t on this device');
     const style = clipStyle(ctx.projectStyle, clip);
     if (!isDeviceExportTemplate(style.template)) {
       throw new ClipRenderError('UNSUPPORTED', 'This caption style can’t be rendered on this device yet — pick another');
@@ -96,7 +104,26 @@ export function renderClip(
     const captions = await projectCaptions(ctx.projectId, [clip]);
     if (!captions.length) throw new ClipRenderError('NO_CAPTIONS', 'This video has no captions yet');
 
-    const probe = (await getSourceRecord(ctx.projectId))?.probe ?? (await probeMediaFile(source));
+    // The original on this device, or — a linked video — just this clip's part, fetched now.
+    const media = await clipMedia(ctx.projectId, clip, {
+      imported: ctx.imported,
+      duration: ctx.duration,
+      signal: stop.signal,
+      onProgress: (pct) => onProgress({ stage: 'download', percent: pct, overall: (pct * DOWNLOAD_SHARE) / 100 }),
+    }).catch((err: unknown) => {
+      if ((err as { name?: string }).name === 'AbortError') throw new ClipRenderError('CANCELLED', 'Cancelled');
+      throw new ClipRenderError('NO_SOURCE', errorMessage(err, 'This clip’s part of the video couldn’t be fetched — try again.'));
+    });
+    if (!media) throw new ClipRenderError('NO_SOURCE', 'The original video isn’t on this device');
+    if (cancelled) throw new ClipRenderError('CANCELLED', 'Cancelled');
+    const source = media.file;
+    const offset = media.offset;
+    // After a download the render fills the rest of the bar.
+    const report = media.fetched
+      ? (p: DeviceExportProgress) => onProgress({ ...p, overall: DOWNLOAD_SHARE + (p.percent * (100 - DOWNLOAD_SHARE)) / 100 })
+      : onProgress;
+
+    const probe = media.probe ?? (await probeMediaFile(source));
     const { width, height } = exportFrameSize(opts.quality, clipAspect(clip), probe?.width ?? 0, probe?.height ?? 0);
     await authorizeClipRender(clip._id, {
       quality: opts.quality,
@@ -109,7 +136,7 @@ export function renderClip(
     await evictOldExportsIfNeeded(80).catch(() => 0);
     // Auto framing never renders a centre crop by accident: track the face first.
     if (needsFaceTrack(clip)) {
-      onProgress({ stage: 'prepare', percent: 1 });
+      report({ stage: 'prepare', percent: 1 });
       const tracked = await ensureFaceTrack(ctx.projectId, clip).catch(() => null);
       if (tracked) {
         clip = tracked;
@@ -126,12 +153,13 @@ export function renderClip(
       durationSec: clip.end - clip.start,
       format: opts.format,
       style: style as ExportStyle,
-      captions,
-      trim: { start: clip.start, end: clip.end },
+      // A part of a linked video starts at `offset`: clip times and captions move onto its own timeline.
+      captions: offset ? shiftCaptions(captions, -offset) : captions,
+      trim: { start: clip.start - offset, end: clip.end - offset },
       framing: track ? { mode: 'cover', track } : { mode: 'contain' },
     });
     if (cancelled) throw new ClipRenderError('CANCELLED', 'Cancelled');
-    const handle = startDeviceExport(job, onProgress);
+    const handle = startDeviceExport(job, report);
     cancelInner = handle.cancel;
     const result = await handle.promise;
     const record = await saveDeviceExportRecord({
@@ -163,6 +191,7 @@ export function renderClip(
     promise,
     cancel() {
       cancelled = true;
+      stop.abort();
       cancelInner?.();
     },
   };

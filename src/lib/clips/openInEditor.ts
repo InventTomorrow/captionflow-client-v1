@@ -3,25 +3,28 @@
  *
  * Nothing is cut: the project plays the ORIGINAL video through the clip clock
  * (clipClock.ts) — only the clip's range, cropped live to the clip's framing —
- * and the render trims and crops at export time. Opening makes the project the
- * first time (the clip's captions copied from 0:00, its look as the style) and
- * reopens it after that, applying anything changed on the clip since. Nothing
- * is transcribed, translated or regenerated, and nothing is stored but the
- * captions copy.
+ * and the render trims and crops at export time. For a video from a pasted
+ * link, "the original" is the clip's own part of it, fetched now if this
+ * device doesn't have it (nothing else of the video is downloaded). Opening
+ * makes the project the first time (the clip's captions copied from 0:00, its
+ * look as the style) and reopens it after that, applying anything changed on
+ * the clip since. Nothing is transcribed, translated or regenerated.
  */
-import { api } from '../api';
+import { api, errorMessage } from '../api';
 import { getAllForProject, replaceAllForProject } from '../captionDb';
 import type { EditorStyle } from '../export/styleSnapshot';
-import { deleteSource, getSourceFile } from '../media/localMedia';
+import { deleteSource } from '../media/localMedia';
 import type { Caption } from '../../stores/captionStore';
 import { openClipProject, type Clip } from './api';
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
+import { clipMedia, localClipMedia } from './clipMedia';
 import { clipAspect, clipStyle } from './clipMath';
 import { clipChanges, clipEditBasis, clipProjectCaptions } from './clipProject';
 import { projectCaptions } from './renderClip';
 
-export type OpenStage = 'framing' | 'saving' | 'opening';
-export type OpenProgress = (stage: OpenStage) => void;
+export type OpenStage = 'downloading' | 'framing' | 'saving' | 'opening';
+/** `percent`: the download's progress, while downloading. */
+export type OpenProgress = (stage: OpenStage, percent?: number) => void;
 
 /** The clip's editor project, ready to open. */
 export type OpenResult = { projectId: string };
@@ -29,7 +32,11 @@ export type OpenResult = { projectId: string };
 /** A failure on this device (shown as is — not a network error). */
 export class OpenInEditorError extends Error {}
 
-type SourceProject = { style?: Partial<EditorStyle>; video?: { width?: number; height?: number; originalSize?: number; size?: number } };
+type SourceProject = {
+  style?: Partial<EditorStyle>;
+  video?: { width?: number; height?: number; originalSize?: number; size?: number; duration?: number };
+  sourceUrl?: string;
+};
 
 const NO_CAPTIONS = 'This clip has no captions on this device yet — open its video once so they load, then try again.';
 
@@ -47,9 +54,22 @@ export async function openClipInEditor(
 ): Promise<OpenResult> {
   const { onProgress } = opts;
   let clip = clipIn;
+  const src = await api.get(`/projects/${projectId}`).then((r) => (r.data?.project ?? {}) as SourceProject);
+
+  // A linked video: the editor plays this clip's part, so it must be here first.
+  if (src.sourceUrl && !(await localClipMedia(projectId, clip))) {
+    onProgress?.('downloading', 0);
+    await clipMedia(projectId, clip, {
+      imported: true,
+      duration: src.video?.duration,
+      onProgress: (pct) => onProgress?.('downloading', pct),
+    }).catch((err: unknown) => {
+      throw new OpenInEditorError(errorMessage(err, 'This clip’s part of the video couldn’t be fetched — try again.'));
+    });
+  }
 
   // Auto framing follows the speaker: track the face first (once per clip range).
-  if (needsFaceTrack(clip) && (await getSourceFile(projectId).catch(() => null))) {
+  if (needsFaceTrack(clip) && (await localClipMedia(projectId, clip))) {
     onProgress?.('framing');
     const tracked = await ensureFaceTrack(projectId, clip).catch(() => null);
     if (tracked) {
@@ -57,8 +77,8 @@ export async function openClipInEditor(
       opts.onClipUpdated?.(tracked);
     }
   }
+
   const basisKey = clipEditBasis(clip);
-  const source = () => api.get(`/projects/${projectId}`).then((r) => (r.data?.project ?? {}) as SourceProject);
   const videoOf = (s: SourceProject) => ({
     // The editor plays the original: its frame, the clip's length.
     width: Number(s.video?.width) || 1920,
@@ -89,7 +109,6 @@ export async function openClipInEditor(
       if (!captions.length) captions = await projectCaptions(editId);
     }
     if (!captions.length) throw new OpenInEditorError(NO_CAPTIONS);
-    const src = await source();
     const style = changed.look
       ? clipStyle(src.style ?? {}, clip)
       : { ...(editProject.style ?? {}), aspectRatio: clipAspect(clip) };
@@ -102,8 +121,7 @@ export async function openClipInEditor(
 
   // Make it.
   onProgress?.('saving');
-  const [captions, src] = await Promise.all([projectCaptions(projectId, [clip]), source()]);
-  const copy = clipProjectCaptions(captions, clip);
+  const copy = clipProjectCaptions(await projectCaptions(projectId, [clip]), clip);
   if (!copy.length) throw new OpenInEditorError(NO_CAPTIONS);
   const res = await openClipProject(clip._id, {
     style: clipStyle(src.style ?? {}, clip),

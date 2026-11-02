@@ -8,7 +8,7 @@ import {
   useResendVerification,
   type VerifiedEmailState,
 } from '../lib/emailVerification';
-import { ArrowRightIcon, AuthBrand, PasswordInput } from '../components/AuthParts';
+import { ArrowRightIcon, AuthBrand, AuthSplitShell, PasswordInput } from '../components/AuthParts';
 
 function MailIcon() {
   return (
@@ -45,9 +45,11 @@ function SpinnerIcon() {
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const location = useLocation();
   // Present when the email-verification page sent the person here: the address
   // it just confirmed ('' if the server did not say which).
-  const verifiedEmail = (useLocation().state as VerifiedEmailState | null)?.verifiedEmail;
+  const locationState = location.state as (VerifiedEmailState & { from?: string }) | null;
+  const verifiedEmail = locationState?.verifiedEmail;
   const [email, setEmail] = useState(verifiedEmail ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -66,7 +68,8 @@ export function LoginPage() {
     try {
       await login(email, password);
       const role = useAuthStore.getState().user?.role;
-      navigate(role === 'admin' || role === 'support' ? '/admin' : '/projects/upload');
+      const requestedPath = locationState?.from?.startsWith('/') ? locationState.from : '/projects/upload';
+      navigate(role === 'admin' || role === 'support' ? '/admin' : requestedPath, { replace: true });
     } catch (err: unknown) {
       setError(errorMessage(err, 'Login failed'));
       if (errorCode(err) === EMAIL_NOT_VERIFIED) setUnverifiedEmail(email);
@@ -76,11 +79,7 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-glow" aria-hidden="true" />
-      <div className="auth-orb" aria-hidden="true" />
-
-      <section className="auth-card">
+    <AuthSplitShell mode="login">
         <AuthBrand />
 
         <div className="auth-heading">
@@ -175,7 +174,6 @@ export function LoginPage() {
         <p className="auth-footer">
           No account? <Link to="/register">Create one</Link>
         </p>
-      </section>
-    </main>
+    </AuthSplitShell>
   );
 }

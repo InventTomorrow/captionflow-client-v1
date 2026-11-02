@@ -241,11 +241,18 @@ async function pump() {
   if (active) return;
   const job = queue.shift();
   if (!job) return;
-  const started = performance.now();
+  let started = performance.now();
+  let downloading = false;
   setRender(job.clip._id, { status: 'rendering', percent: 0, detail: 'Preparing…' });
-  const handle = renderClip(job.clip, { ...job.ctx, onClipUpdated: (c) => useClipsStore.getState().setClipLocal(c) }, job.opts, (p) =>
-    setRender(job.clip._id, { status: 'rendering', percent: p.percent, detail: describeDeviceProgress(p, started) }),
-  );
+  const handle = renderClip(job.clip, { ...job.ctx, onClipUpdated: (c) => useClipsStore.getState().setClipLocal(c) }, job.opts, (p) => {
+    // The render's time-left estimate starts when rendering does, not with a download before it.
+    if (p.stage === 'download') downloading = true;
+    else if (downloading) {
+      downloading = false;
+      started = performance.now();
+    }
+    setRender(job.clip._id, { status: 'rendering', percent: p.overall ?? p.percent, detail: describeDeviceProgress(p, started) });
+  });
   active = { clipId: job.clip._id, cancel: handle.cancel };
   try {
     const record = await handle.promise;

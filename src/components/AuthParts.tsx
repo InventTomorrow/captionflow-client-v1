@@ -4,14 +4,208 @@
  * rules checklist.
  */
 
-import { useState, type InputHTMLAttributes } from 'react';
+import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import {
+  ArrowRight,
+  AudioLines,
+  Captions,
+  CheckCircle2,
+  Clock3,
+  Cloud,
+  Grid2X2,
+  Languages,
+  Play,
+  Scissors,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Volume2,
+  WandSparkles,
+  Zap,
+} from 'lucide-react';
 import { PASSWORD_RULES } from '../lib/passwordPolicy';
+
+type AuthMode = 'login' | 'register';
+
+const MARKETING_FEATURES = [
+  { Icon: Captions, title: 'AI Captions', detail: 'Accurate & stylish' },
+  { Icon: Zap, title: 'Quick Edits', detail: 'Trim, highlight, export' },
+  { Icon: Grid2X2, title: 'Pro Templates', detail: '9:16, 16:9 ready' },
+  { Icon: Cloud, title: 'Cloud Workspace', detail: 'Access anywhere' },
+] as const;
+
+function AuthFeatureItem({ Icon, title, detail }: (typeof MARKETING_FEATURES)[number]) {
+  return (
+    <div className="auth-feature-item">
+      <span className="auth-feature-icon"><Icon aria-hidden="true" /></span>
+      <span><strong>{title}</strong><small>{detail}</small></span>
+    </div>
+  );
+}
+
+function AuthMetric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+  return (
+    <div className="auth-preview-metric">
+      <span className="auth-metric-icon">{icon}</span>
+      <span><strong>{value}</strong><small>{label}</small></span>
+    </div>
+  );
+}
+
+function AuthWorkspacePreview() {
+  return (
+    <div className="auth-product-preview" aria-label="Caption workspace preview">
+      <div className="auth-preview-head">
+        <span className="auth-preview-title"><i /> Your workspace</span>
+        <span className="auth-preview-link">All projects <ArrowRight size={14} /></span>
+      </div>
+      <div className="auth-preview-media">
+        <img src="/media/caption-studio-host.jpg" alt="Creator editing a captioned podcast video" />
+        <span className="auth-preview-pill"><CheckCircle2 size={13} /> Draft saved</span>
+        <span className="auth-preview-play"><Play size={18} fill="currentColor" /></span>
+        <span className="auth-preview-duration">02:14</span>
+        <p>Make every <strong>moment</strong><br />impossible to miss.</p>
+        <div className="auth-preview-track"><i /></div>
+      </div>
+      <div className="auth-preview-metrics">
+        <AuthMetric icon={<Captions />} value="98%" label="Caption accuracy" />
+        <AuthMetric icon={<Scissors />} value="8 clips" label="Ready to publish" />
+        <AuthMetric icon={<Clock3 />} value="12 min" label="Time saved" />
+        <AuthMetric icon={<TrendingUp />} value="4.5x" label="Higher engagement" />
+      </div>
+    </div>
+  );
+}
+
+function AuthOrbitBackground() {
+  return (
+    <div className="auth-orbit-layer" aria-hidden="true">
+      <span className="auth-orbit auth-orbit-one" />
+      <span className="auth-orbit auth-orbit-two" />
+      <span className="auth-orbit auth-orbit-three" />
+      <i className="auth-orbit-node auth-node-one" />
+      <i className="auth-orbit-node auth-node-two" />
+      <i className="auth-orbit-node auth-node-three" />
+      <i className="auth-orbit-node auth-node-four" />
+      <b className="auth-orbit-spark auth-spark-one">+</b>
+      <b className="auth-orbit-spark auth-spark-two">+</b>
+    </div>
+  );
+}
+
+function AuthFloatingDecorations() {
+  return (
+    <div className="auth-floating-layer" aria-hidden="true">
+      <div className="auth-floating-item floating-caption-card" data-float-speed="slow" data-float-direction="up" data-rotate="-7">
+        <span><Captions /></span>
+        <p><strong>Auto Captions</strong><small>Turn speech into captions</small></p>
+      </div>
+
+      <div className="auth-floating-item floating-video-card" data-float-speed="medium" data-float-direction="down" data-rotate="8">
+        <Play fill="currentColor" />
+        <small>0:12</small>
+      </div>
+
+      <div className="auth-floating-item floating-waveform-card" data-float-speed="slow" data-float-direction="up" data-rotate="-6">
+        <AudioLines />
+      </div>
+
+      <div className="auth-floating-item floating-document-card" data-float-speed="fast" data-float-direction="down" data-rotate="-11">
+        <span>CC</span><i /><i /><i />
+      </div>
+
+      <div className="auth-floating-item floating-translate-card" data-float-speed="medium" data-float-direction="up" data-rotate="7">
+        <Languages /><strong>Translate</strong>
+      </div>
+
+      <div className="auth-floating-item floating-clip-card" data-float-speed="slow" data-float-direction="down" data-rotate="-8">
+        <span><img src="/media/caption-studio-host.jpg" alt="" /><Play fill="currentColor" /><small>0:28</small></span>
+        <p><i /><i /><i /></p>
+      </div>
+
+      <div className="auth-floating-item floating-clean-audio" data-float-speed="fast" data-float-direction="up" data-rotate="-5">
+        <Volume2 /><strong>Clean Audio</strong><span><i /></span>
+      </div>
+
+      <div className="auth-floating-item floating-caption-clips" data-float-speed="medium" data-float-direction="down" data-rotate="0">
+        <Sparkles />
+        <p><strong>Captions + Clips</strong><small>All in one place</small></p>
+        <ArrowRight />
+      </div>
+
+      <div className="auth-floating-item floating-secure-workspace" data-float-speed="slow" data-float-direction="up" data-rotate="0">
+        <ShieldCheck /><strong>Secure workspace</strong>
+      </div>
+    </div>
+  );
+}
+
+/** Shared product story used by both primary authentication screens. */
+export function AuthShowcase({ mode }: { mode: AuthMode }) {
+  return (
+    <section className="auth-showcase" data-auth-mode={mode} aria-label="Asaan Caption product preview">
+      <div className="auth-showcase-grid" aria-hidden="true" />
+      <div className="auth-showcase-glow" aria-hidden="true" />
+
+      <header className="auth-showcase-head">
+        <span className="auth-showcase-logo">
+          <img src="/logo-mark.png" alt="" />
+          <img src="/logo-wordmark.png" alt="Asaan Caption" />
+        </span>
+        <span className="auth-showcase-kicker"><WandSparkles size={14} /> AI Video Workspace</span>
+      </header>
+
+      <div className="auth-showcase-copy">
+        <h1>
+          Create faster. Publish <span>sharper.</span>
+        </h1>
+        <p>Pick up where you left off with captions, clips, and exports organized in one focused workspace.</p>
+      </div>
+
+      <div className="auth-feature-row">
+        {MARKETING_FEATURES.map((feature) => <AuthFeatureItem key={feature.title} {...feature} />)}
+      </div>
+
+      <AuthWorkspacePreview />
+
+      <footer className="auth-showcase-proof">
+        <div className="auth-creator-proof">
+          <span className="auth-avatar-stack"><i>A</i><i>S</i><i>R</i></span>
+          <p><strong>Join 10,000+ creators and businesses</strong><small>Create better videos, in less time.</small></p>
+        </div>
+        <ul aria-label="Workspace benefits">
+          <li><ShieldCheck /> Secure</li>
+          <li><Sparkles /> Fast</li>
+          <li><Cloud /> Always accessible</li>
+        </ul>
+      </footer>
+    </section>
+  );
+}
+
+export function AuthSplitShell({ mode, children }: { mode: AuthMode; children: ReactNode }) {
+  return (
+    <main className="auth-page auth-split-page">
+      <AuthShowcase mode={mode} />
+      <section className="auth-entry-pane" aria-label={mode === 'login' ? 'Sign in' : 'Create account'}>
+        <AuthOrbitBackground />
+        <AuthFloatingDecorations />
+        <section className="auth-card">{children}</section>
+        <p className="auth-entry-assurance"><ShieldCheck size={14} /> Private, secure, and encrypted</p>
+      </section>
+    </main>
+  );
+}
 
 export function AuthBrand() {
   return (
     <div className="auth-brand">
       <img src="/logo-mark.png" alt="" className="auth-brand-mark-img" />
       <img src="/logo-wordmark.png" alt="Asaan Caption" className="auth-brand-wordmark" />
+      <span className="auth-brand-wordmark-text">
+        <strong>ASAAN</strong>
+        <span>— CAPTION —</span>
+      </span>
       <p className="auth-brand-tagline">Captions for long videos</p>
     </div>
   );

@@ -89,9 +89,9 @@ export function DifferenceShowcase() {
     const io = new IntersectionObserver(
       ([entry]) => {
         setVisible(entry.isIntersecting);
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.15) setLive(true);
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.12) setLive(true);
       },
-      { threshold: [0, 0.15] },
+      { threshold: [0, 0.12], rootMargin: '0px 0px -8% 0px' },
     );
     io.observe(el);
     return () => io.disconnect();

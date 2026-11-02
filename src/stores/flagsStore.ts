@@ -12,6 +12,8 @@ export interface AppFlags {
   audioOnlyUploadEnabled: boolean;
   /** Clips (AI highlight clips): the nav item, pages and endpoints. Off until an admin turns it on. */
   clipsEnabled: boolean;
+  /** Create clips from a pasted link (needs clipsEnabled too). */
+  urlImportEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
 }
@@ -36,6 +38,7 @@ const DEFAULT_FLAGS: AppFlags = {
   clientExportEnabled: true,
   audioOnlyUploadEnabled: true,
   clipsEnabled: false,
+  urlImportEnabled: false,
   maintenanceMode: false,
   maintenanceMessage: '',
 };

@@ -5,7 +5,7 @@
  * components the editor uses. The caption layer covers the whole 9:16 box,
  * exactly like the export canvas, so preview and render place captions alike.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CaptionOverlay } from '../CaptionOverlay';
 import KineticCaptionLayer from '../KineticCaptionLayer';
 import { deriveDisplayCaptions } from '../../lib/displayCaptions';
@@ -18,9 +18,9 @@ import type { Caption } from '../../stores/captionStore';
 
 const noop = () => undefined;
 
-/** Cut to the clip at word level, but keep source times — the overlay reads video.currentTime. */
-function clipCaptions(captions: Caption[], start: number, end: number): Caption[] {
-  const shift = (t: number) => t + start;
+/** Cut to the clip at word level, on the playing file's timeline — the overlay reads video.currentTime. */
+function clipCaptions(captions: Caption[], start: number, end: number, offset: number): Caption[] {
+  const shift = (t: number) => t + start - offset;
   return sliceCaptionsToRange(captions, start, end).map((c) => ({
     ...c,
     start: shift(c.start),
@@ -33,14 +33,19 @@ export interface ClipPreviewProps {
   src: string;
   /** The server stream needs the auth cookie. */
   credentials?: boolean;
+  /** The clip, in source seconds. */
   start: number;
   end: number;
+  /** Source time at `src`'s 0:00: 0 for the whole original, the part's start for a clip's part of a linked video. */
+  offset?: number;
   captions: Caption[];
   style: EditorStyle;
   /** null = letterbox the whole frame ('Fit', or a landscape clip). */
   track: CropTrack | null;
   /** Output frame of the clip (default vertical). */
   aspect?: ClipAspect;
+  /** Decoded poster to show instantly (and behind the video) while it loads. */
+  poster?: string;
   playing: boolean;
   muted?: boolean;
   className?: string;
@@ -52,18 +57,26 @@ export interface ClipPreviewProps {
 export function ClipPreview({
   src,
   credentials,
-  start,
-  end,
+  start: clipStart,
+  end: clipEnd,
+  offset = 0,
   captions,
   style,
   track,
   aspect = '9:16',
+  poster,
   playing,
   muted = true,
   className,
   onTime,
   videoRef: externalRef,
 }: ClipPreviewProps) {
+  // Where the clip sits in the playing file.
+  const start = clipStart - offset;
+  const end = clipEnd - offset;
+  // Until the source has enough data to paint a frame, show a skeleton (the
+  // stream can take a moment, especially for a URL import still downloading).
+  const [ready, setReady] = useState(false);
   const ownRef = useRef<HTMLVideoElement | null>(null);
   const videoRef = externalRef ?? ownRef;
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -75,8 +88,8 @@ export function ClipPreview({
   onTimeRef.current = onTime;
 
   const display = useMemo(
-    () => deriveDisplayCaptions(clipCaptions(captions, start, end), style.displayMode, style.displayWords),
-    [captions, start, end, style.displayMode, style.displayWords],
+    () => deriveDisplayCaptions(clipCaptions(captions, clipStart, clipEnd, offset), style.displayMode, style.displayWords),
+    [captions, clipStart, clipEnd, offset, style.displayMode, style.displayWords],
   );
 
   // Seek into the clip once the source can play; keep looping inside it; frame it.
@@ -113,18 +126,34 @@ export function ClipPreview({
     else v.pause();
   }, [playing, videoRef, src]);
 
+  // Drop the skeleton once the first frame can paint; raise it again for a new source.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    setReady(v.readyState >= 2);
+    const onReady = () => setReady(true);
+    v.addEventListener('loadeddata', onReady);
+    v.addEventListener('canplay', onReady);
+    return () => {
+      v.removeEventListener('loadeddata', onReady);
+      v.removeEventListener('canplay', onReady);
+    };
+  }, [videoRef, src]);
+
   const template = style.template;
   return (
-    <div className={`clip-preview${aspect === '16:9' ? ' is-landscape' : ''}${className ? ` ${className}` : ''}`}>
+    <div className={`clip-preview${aspect === '16:9' ? ' is-landscape' : ''}${ready ? '' : ' is-loading'}${className ? ` ${className}` : ''}`}>
       <video
         ref={videoRef}
         src={src}
+        poster={poster}
         crossOrigin={credentials ? 'use-credentials' : undefined}
         muted={muted}
         playsInline
         preload="metadata"
         style={{ objectFit: track ? 'cover' : 'contain' }}
       />
+      {!ready && <span className="clip-preview-skeleton" aria-hidden="true" />}
       <div className="clip-preview-captions" ref={boxRef} aria-hidden="true">
         {isKineticTemplate(template) ? (
           <KineticCaptionLayer

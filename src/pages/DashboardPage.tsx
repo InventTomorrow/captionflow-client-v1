@@ -66,7 +66,7 @@ export function DashboardPage() {
       <div className="page-header">
         <div>
           <h1>Projects</h1>
-          <p className="muted">Upload up to 1GB and generate timed captions</p>
+          <p className="muted">Upload up to 5GB and generate timed captions</p>
         </div>
         <Link className="btn primary" to="/projects/upload">
           New upload

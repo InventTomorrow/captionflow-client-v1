@@ -14,6 +14,10 @@ export interface ClipProjectSummary {
   name: string;
   kind: 'captions' | 'clips';
   status: string;
+  /** Made from a pasted link — the client embeds the video directly from this URL. */
+  imported?: boolean;
+  sourceUrl?: string;
+  importStatus?: 'queued' | 'downloading' | 'done' | 'error';
   stage?: { current?: string; percent?: number; message?: string };
   /** Clip set summary only: the caption pipeline's language settings. */
   sourceLanguage?: string;
@@ -92,6 +96,23 @@ export interface ClipOptions {
   maxClips?: number;
   minSec?: number;
   maxSec?: number;
+}
+
+export interface UrlImportBody {
+  url: string;
+  sourceLanguage: string;
+  outputLanguage: string;
+  keyterms?: string[];
+  clipOptions?: ClipOptions;
+  templateKey?: string | null;
+  aspect?: ClipAspect;
+}
+
+/** Create a New Clips project from a pasted link. Returns the project id to
+ *  navigate to; `reused` when the same link already has a clips project. */
+export async function createClipsFromUrl(body: UrlImportBody): Promise<{ projectId: string; reused: boolean }> {
+  const { data } = await api.post<{ projectId: string; reused: boolean }>('/clips/url', body);
+  return data;
 }
 
 export async function analyzeClips(projectId: string, options: ClipOptions = {}) {
@@ -229,3 +250,28 @@ export function finishCaptions(projectId: string, ranges: TimeRange[] | 'all'): 
   return p;
 }
 const finishing = new Map<string, Promise<Caption[]>>();
+
+/** A link-imported video's part being cut on the server for this device (clipMedia.ts). */
+export interface ClipSegmentView {
+  id: string;
+  clipId: string;
+  status: 'queued' | 'cutting' | 'ready' | 'error';
+  percent: number;
+  /** Source seconds at the part's 0:00, and where it ends. */
+  start: number;
+  end: number;
+  size?: number;
+  error?: string;
+}
+
+/** Ask the server to cut [start, end] of a link-imported video (or join that cut). */
+export async function requestClipSegment(clipId: string, range: TimeRange): Promise<ClipSegmentView> {
+  const { data } = await api.post<ClipSegmentView>(`/clips/${clipId}/segment`, { start: range.start, end: range.end });
+  return data;
+}
+
+/** The cut's state; the server holds the request until it settles or ~20 s pass. */
+export async function pollClipSegment(clipId: string, segmentId: string): Promise<ClipSegmentView> {
+  const { data } = await api.get<ClipSegmentView>(`/clips/${clipId}/segment/${segmentId}`, { params: { wait: 1 } });
+  return data;
+}

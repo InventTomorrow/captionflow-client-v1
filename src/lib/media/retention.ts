@@ -10,7 +10,7 @@
 
 import { api } from '../api';
 import { deleteAllForProject } from '../captionDb';
-import { deleteExport, deleteSource, listExports, listSources, type LocalExportRecord } from './localMedia';
+import { deleteExport, deleteSegment, deleteSource, listExports, listSegments, listSources, type LocalExportRecord } from './localMedia';
 import { forgetsProject } from './retentionRules';
 
 export const LOCAL_RETENTION_DAYS = 30;
@@ -60,6 +60,13 @@ export async function expireOldLocalMedia(now = Date.now()): Promise<number> {
     if (source.storedAt < cutoff && !liveProjects.has(source.projectId)) {
       // The server's copy expires on its own schedule; nothing to call.
       await forgetProject(source.projectId, false);
+      removed++;
+    }
+  }
+  // Clip parts of linked videos follow the same window (fetched again if wanted later).
+  for (const part of await listSegments()) {
+    if (part.storedAt < cutoff && !liveProjects.has(part.projectId)) {
+      await deleteSegment(part).catch(() => undefined);
       removed++;
     }
   }

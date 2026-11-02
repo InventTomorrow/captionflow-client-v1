@@ -245,8 +245,8 @@ export function RecentVideos() {
           <PlayCircleIcon />
         </span>
         <div className="rv-head-text">
-          <h2 id="rv-title">Recent Videos</h2>
-          <p>Continue working on your latest projects</p>
+          <h2 id="rv-title">Recent caption projects</h2>
+          <p>Continue editing or download your latest exports</p>
         </div>
         {items.length > PREVIEW_COUNT && (
           <button type="button" className="rv-view-all" onClick={() => setShowAll((v) => !v)}>
@@ -259,7 +259,7 @@ export function RecentVideos() {
       {error && <div className="error-banner">{error}</div>}
 
       {items.length === 0 ? (
-        <p className="rv-empty">Your exported videos will show up here.</p>
+        <p className="rv-empty">Your exported caption videos will show up here.</p>
       ) : (
         <ul className="rv-grid">
           {visible.map((item) => (

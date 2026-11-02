@@ -5,6 +5,10 @@
  * "Open in editor" opens the clip on its own in the captions editor (its own
  * project playing the original's range, captions and style copied) — nothing
  * is cut, re-transcribed or regenerated.
+ *
+ * A clip of a video from a pasted link plays from the link at once while just
+ * its own part is fetched; the framed, captioned preview takes over when it
+ * arrives (again after a trim reaches past it).
  */
 import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -12,14 +16,17 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipPreview } from '../../components/clips/ClipPreview';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
+import { LinkedVideo } from '../../components/clips/LinkedVideo';
 import { ReframeControl } from '../../components/clips/ReframeControl';
 import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
 import type { ClipCropMode, ClipPatch } from '../../lib/clips/api';
 import { clipAspect, clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
+import { cropXAt } from '../../lib/clips/cropTrack';
 import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
-import { useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
+import { useClipPart, useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
+import { getClipThumb } from '../../lib/clips/thumbs';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
 import type { ExportQuality } from '../../lib/render/frame';
@@ -46,6 +53,7 @@ export function ClipEditorPage() {
   const [title, setTitle] = useState('');
   const [quality, setQuality] = useState<ExportQuality>('1080p');
   const [reframeStatus, setReframeStatus] = useState('');
+  const [poster, setPoster] = useState<string | undefined>(undefined);
   const openEditor = useOpenInEditor();
   const [params, setParams] = useSearchParams();
   const timeBar = useRef<HTMLSpanElement | null>(null);
@@ -60,7 +68,17 @@ export function ClipEditorPage() {
   const index = clips.findIndex((c) => c._id === clipId);
   const clip = index >= 0 ? clips[index] : undefined;
   const project = data?.project;
-  const source = useClipSource(projectId, project?.video?.kind);
+  const imported = !!project?.sourceUrl;
+  const source = useClipSource(projectId, project?.video?.kind, imported);
+  // A linked video: this clip's own part, fetched while the link plays.
+  const part = useClipPart(projectId, clip, { enabled: imported && !source.local, fetch: true, duration: project?.video?.duration });
+  const media = source.url
+    ? { src: source.url, offset: 0, credentials: !source.local }
+    : part.url
+      ? { src: part.url, offset: part.media?.offset ?? 0, credentials: false }
+      : null;
+  /** The clip's video is on this device (framing and renders work without a fetch). */
+  const onDevice = source.local || part.status === 'ready';
   const captions = useProjectCaptions(projectId, !!project, clip);
   const projectStyle = useProjectStyle(projectId);
   const style = useMemo(() => (projectStyle && clip ? clipStyle(projectStyle, clip) : null), [projectStyle, clip]);
@@ -76,6 +94,18 @@ export function ClipEditorPage() {
   }, [clip, sentences, captions]);
 
   useEffect(() => setTitle(clip?.title ?? ''), [clip?._id, clip?.title]);
+
+  // A poster so the clip shows a frame instantly while the (often streamed) video loads.
+  useEffect(() => {
+    if (!clip) return;
+    let cancelled = false;
+    void getClipThumb(projectId, clip, project?.video?.kind).then((url) => {
+      if (!cancelled && url) setPoster(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, clip, project?.video?.kind, onDevice]);
 
   // ?open=editor (an old link into the clip's editor): open it right away.
   const openNow = params.get('open') === 'editor';
@@ -102,7 +132,7 @@ export function ClipEditorPage() {
   // Auto framing: track the face once per clip range (shared with the clip list and renders).
   const setClipLocal = useClipsStore((s) => s.setClipLocal);
   useEffect(() => {
-    if (!clip || !needsFaceTrack(clip) || !source.local) return;
+    if (!clip || !needsFaceTrack(clip) || !onDevice) return;
     let live = true;
     setReframeStatus('Finding the speaker…');
     void ensureFaceTrack(projectId, clip, (done, total) => live && setReframeStatus(`Finding the speaker… ${Math.round((100 * done) / total)}%`))
@@ -114,7 +144,7 @@ export function ClipEditorPage() {
     return () => {
       live = false;
     };
-  }, [clip, source.local, projectId, setClipLocal]);
+  }, [clip, onDevice, projectId, setClipLocal]);
 
   function setMode(mode: ClipCropMode) {
     if (!clip) return;
@@ -124,7 +154,13 @@ export function ClipEditorPage() {
 
   async function startRender() {
     if (!clip || !project || !projectStyle) return;
-    enqueueRenders([{ clip, ctx: { projectId, projectName: project.name, projectStyle }, opts: { quality, format: 'mp4' } }]);
+    enqueueRenders([
+      {
+        clip,
+        ctx: { projectId, projectName: project.name, projectStyle, imported, duration: project.video?.duration },
+        opts: { quality, format: 'mp4' },
+      },
+    ]);
   }
 
   async function download() {
@@ -163,11 +199,13 @@ export function ClipEditorPage() {
   const length = clip.end - clip.start;
   const aspect = clipAspect(clip);
   const landscape = aspect === '16:9';
+  const track = cropTrackFor(clip);
+  const cropX = track ? cropXAt(track, 0) : null;
 
   return (
     <div className="clips-page clip-editor">
       <nav className="clips-crumbs" aria-label="Breadcrumb">
-        <Link to="/clips">Clips</Link>
+        <Link to="/clips">Viral Clips</Link>
         <span aria-hidden="true">/</span>
         <Link to={`/clips/${projectId}`}>{project?.name}</Link>
         <span aria-hidden="true">/</span>
@@ -225,16 +263,18 @@ export function ClipEditorPage() {
       <div className={`clip-editor-grid${landscape ? ' is-landscape' : ''}`}>
         <section className="clip-editor-stage" aria-label="Preview">
           <div className={`clip-stage-frame${landscape ? ' is-landscape' : ''}`}>
-            {source.url && captions && style ? (
+            {media && captions && style ? (
               <ClipPreview
-                src={source.url}
-                credentials={!source.local}
+                src={media.src}
+                credentials={media.credentials}
                 start={clip.start}
                 end={clip.end}
+                offset={media.offset}
                 captions={captions}
                 style={style}
                 track={cropTrackFor(clip)}
                 aspect={aspect}
+                poster={poster}
                 playing={playing}
                 muted={muted}
                 className="is-large"
@@ -243,33 +283,63 @@ export function ClipEditorPage() {
                   if (timeText.current) timeText.current.textContent = formatClipLength(t);
                 }}
               />
+            ) : imported && project?.sourceUrl ? (
+              // From the link while this clip's part arrives — nothing else of the video is fetched.
+              <div className={`clip-preview is-large clip-part-wait${landscape ? ' is-landscape' : ''}`}>
+                <LinkedVideo
+                  sourceUrl={project.sourceUrl}
+                  range={clip}
+                  cropX={cropX}
+                  title={clip.title || 'Clip'}
+                  className="clip-part-player"
+                />
+                <div className="clip-part-status" role="status" aria-live="polite">
+                  {part.status === 'error' ? (
+                    <>
+                      <span>{part.error}</span>
+                      <button type="button" className="btn ghost clip-part-retry" onClick={part.retry}>
+                        Try again
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span>Getting this clip’s part of the video… {part.percent}%</span>
+                      <span className="clip-part-bar" aria-hidden="true">
+                        <span style={{ width: `${Math.max(3, part.percent)}%` }} />
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className={`clip-preview is-large clip-preview-empty${landscape ? ' is-landscape' : ''}`}>
                 Loading…
               </div>
             )}
-            <div className="clip-stage-controls">
-              <button
-                type="button"
-                className="clip-stage-btn"
-                onClick={() => setPlaying((p) => !p)}
-                aria-label={playing ? 'Pause' : 'Play'}
-              >
-                {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-              </button>
-              <span className="clip-stage-time">
-                <span ref={timeText}>0:00</span> / {formatClipLength(length)}
-              </span>
-              <button
-                type="button"
-                className="clip-stage-btn"
-                onClick={() => setMuted((m) => !m)}
-                aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
-                aria-pressed={!muted}
-              >
-                {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
-              </button>
-            </div>
+            {media && (
+              <div className="clip-stage-controls">
+                <button
+                  type="button"
+                  className="clip-stage-btn"
+                  onClick={() => setPlaying((p) => !p)}
+                  aria-label={playing ? 'Pause' : 'Play'}
+                >
+                  {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+                </button>
+                <span className="clip-stage-time">
+                  <span ref={timeText}>0:00</span> / {formatClipLength(length)}
+                </span>
+                <button
+                  type="button"
+                  className="clip-stage-btn"
+                  onClick={() => setMuted((m) => !m)}
+                  aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+                  aria-pressed={!muted}
+                >
+                  {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+                </button>
+              </div>
+            )}
           </div>
           <span className="clip-time" aria-hidden="true">
             <span ref={timeBar} />
@@ -362,7 +432,7 @@ export function ClipEditorPage() {
             />
           </div>
 
-          {source.local && (
+          {(source.local || imported) && (
           <div className="clip-side-card">
             <h2 className="clip-side-h">Render</h2>
             <div className="clip-render-row">
@@ -381,7 +451,7 @@ export function ClipEditorPage() {
                   Cancel {Math.round(render?.percent ?? 0)}%
                 </button>
               ) : (
-                <button type="button" className="btn primary" disabled={!source.local || !projectStyle} onClick={() => void startRender()}>
+                <button type="button" className="btn primary" disabled={!projectStyle} onClick={() => void startRender()}>
                   {rendered ? 'Render again' : 'Render clip'}
                 </button>
               )}

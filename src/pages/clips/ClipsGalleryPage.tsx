@@ -4,7 +4,7 @@
  * scrolls. Hover/tap a card to watch it with captions; Edit opens the clip.
  * Select picks clips (any videos) for one caption template or a delete.
  */
-import { ListChecks } from 'lucide-react';
+import { ArrowRight, Check, Clock3, Film, ListChecks, Play, Sparkles, Trophy, UploadCloud } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
@@ -119,43 +119,70 @@ export function ClipsGalleryPage() {
   }
 
   return (
-    <div className="clips-page">
-      <header className="clips-head">
-        <div>
-          <h1>Clips</h1>
-          <p className="clips-sub">Short vertical moments picked from your videos, ready to post.</p>
+    <div className="clips-page clips-library-page">
+      <div className="clips-library-glow clips-library-glow-a" aria-hidden="true" />
+      <div className="clips-library-glow clips-library-glow-b" aria-hidden="true" />
+
+      <header className="clips-library-hero">
+        <div className="clips-library-hero-copy">
+          <div className="clips-library-kicker"><Sparkles size={14} aria-hidden="true" /> Content library</div>
+          <h1>Viral Clips</h1>
+          <p>Find, refine, and publish the strongest moments from every long-form video.</p>
+          <div className="clips-library-benefits" aria-label="Viral Clips benefits">
+            <span><Check size={13} /> AI-ranked highlights</span>
+            <span><Check size={13} /> Caption-ready</span>
+            <span><Check size={13} /> Built for every platform</span>
+          </div>
         </div>
-        <Link to="/clips/new" className="btn primary clips-cta">
-          New clips
+        <Link to="/clips" className="btn primary clips-library-create">
+          <Sparkles size={17} aria-hidden="true" />
+          Create Viral Clips
+          <ArrowRight size={17} aria-hidden="true" />
         </Link>
       </header>
 
-      <div className="clips-filters" role="toolbar" aria-label="Filter clips">
-        <div className="clip-seg" role="radiogroup" aria-label="Sort">
-          {(['score', 'recent'] as const).map((s) => (
+      <section className="clips-library-toolbar" aria-label="Clip library controls">
+        <div className="clips-library-sort">
+          <span className="clips-library-control-label">Sort by</span>
+          <div className="clip-seg" role="radiogroup" aria-label="Sort clips">
             <button
-              key={s}
               type="button"
               role="radio"
-              aria-checked={feed.sort === s}
-              className={`clip-seg-btn${feed.sort === s ? ' is-on' : ''}`}
-              onClick={() => setFeedFilter({ sort: s })}
+              aria-checked={feed.sort === 'score'}
+              className={`clip-seg-btn${feed.sort === 'score' ? ' is-on' : ''}`}
+              onClick={() => setFeedFilter({ sort: 'score' })}
             >
-              {s === 'score' ? 'Best' : 'Newest'}
+              <Trophy size={15} aria-hidden="true" /> Best moments
             </button>
-          ))}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={feed.sort === 'recent'}
+              className={`clip-seg-btn${feed.sort === 'recent' ? ' is-on' : ''}`}
+              onClick={() => setFeedFilter({ sort: 'recent' })}
+            >
+              <Clock3 size={15} aria-hidden="true" /> Newest
+            </button>
+          </div>
         </div>
-        <label className="clips-check">
-          <input type="checkbox" checked={feed.rendered} onChange={(e) => setFeedFilter({ rendered: e.target.checked })} />
-          Rendered only
-        </label>
-        {items.length > 0 && !selected && (
-          <button type="button" className="btn ghost clips-head-btn" onClick={() => setSelected(new Set())}>
-            <ListChecks size={16} aria-hidden="true" />
-            Select
-          </button>
-        )}
-      </div>
+        <div className="clips-library-toolbar-end">
+          <label className="clips-library-rendered">
+            <input
+              type="checkbox"
+              checked={feed.rendered}
+              onChange={(e) => setFeedFilter({ rendered: e.target.checked })}
+            />
+            <span className="clips-library-switch" aria-hidden="true"><span /></span>
+            <span><strong>Rendered only</strong><small>Ready to download</small></span>
+          </label>
+          {items.length > 0 && !selected && (
+            <button type="button" className="btn ghost clips-head-btn" onClick={() => setSelected(new Set())}>
+              <ListChecks size={16} aria-hidden="true" />
+              Select clips
+            </button>
+          )}
+        </div>
+      </section>
 
       {selected && (
         <ClipBulkBar
@@ -177,7 +204,7 @@ export function ClipsGalleryPage() {
       )}
 
       {working.length > 0 && (
-        <div className="clips-working" role="status">
+        <div className="clips-working clips-library-working" role="status">
           {working.map(([pid, v]) => (
             <Link key={pid} to={`/clips/${pid}`} className="clips-working-item">
               <span className="clips-spinner" aria-hidden="true" />
@@ -188,28 +215,82 @@ export function ClipsGalleryPage() {
       )}
 
       {items.length > 0 ? (
-        <ClipGrid
-          clips={items}
-          showProject
-          renders={renders}
-          selected={selected ?? undefined}
-          onToggleSelect={(c) => toggleSelect(c._id)}
-          onOpen={(c) => navigate(`/clips/${c.projectId}/${c._id}`)}
-          onEditCaptions={(c) => openEditor.open(c.projectId, c)}
-          onDownload={(c) => void download(c)}
-          onDelete={(c) => void remove(c)}
-        />
+        <section className="clips-library-results" aria-label="Your Viral Clips">
+          <header>
+            <div>
+              <h2>Your clips</h2>
+              <p>{items.length} {items.length === 1 ? 'moment' : 'moments'} ready to review</p>
+            </div>
+            <span>{feed.sort === 'score' ? 'Strongest first' : 'Newest first'}</span>
+          </header>
+          <ClipGrid
+            clips={items}
+            showProject
+            renders={renders}
+            selected={selected ?? undefined}
+            onToggleSelect={(c) => toggleSelect(c._id)}
+            onOpen={(c) => navigate(`/clips/${c.projectId}/${c._id}`)}
+            onEditCaptions={(c) => openEditor.open(c.projectId, c)}
+            onDownload={(c) => void download(c)}
+            onDelete={(c) => void remove(c)}
+          />
+        </section>
       ) : (
         !feed.loading && (
-          <div className="clips-empty">
-            <p>{feed.rendered ? 'No rendered clips yet.' : 'No clips yet.'}</p>
-            <p className="clips-sub">
-              Upload a long video, or open a captioned video and choose <strong>Find clips</strong>.
-            </p>
-            <Link to="/clips/new" className="btn primary">
-              Upload a video
-            </Link>
-          </div>
+          <section className="clips-library-empty">
+            <div className="clips-library-empty-copy">
+              <span className="clips-library-empty-label"><Film size={14} /> Your clip library</span>
+              <h2>{feed.rendered ? 'Nothing rendered yet.' : 'Your best moments are waiting.'}</h2>
+              <p>
+                {feed.rendered
+                  ? 'Your clips are still here. Show the full library, then render any moment when it is ready to publish.'
+                  : 'Bring a podcast, interview, stream, or vlog. Viral Clips finds the hooks, reframes the speaker, and styles the captions for you.'}
+              </p>
+              <div className="clips-library-empty-actions">
+                {feed.rendered ? (
+                  <button type="button" className="btn primary" onClick={() => setFeedFilter({ rendered: false })}>
+                    Show all clips <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <Link to="/clips" className="btn primary">
+                    <UploadCloud size={17} aria-hidden="true" /> Create your first clips
+                  </Link>
+                )}
+                <Link to="/projects/upload" className="btn ghost">Open caption editor</Link>
+              </div>
+              <div className="clips-library-empty-note">
+                <Check size={14} aria-hidden="true" /> Works best with videos that have at least one minute of speech.
+              </div>
+            </div>
+
+            <div className="clips-library-preview" aria-hidden="true">
+              <div className="clips-library-preview-card clips-library-preview-back-a">
+                <img src="/media/virsl-creator-man.jpg" alt="" loading="lazy" />
+                <span>00:28</span>
+              </div>
+              <div className="clips-library-preview-card clips-library-preview-back-b">
+                <img src="/media/virsl-creator-woman.jpg" alt="" loading="lazy" />
+                <span>00:41</span>
+              </div>
+              <div className="clips-library-preview-card clips-library-preview-main">
+                <img src="/media/virsl-creator-woman.jpg" alt="" loading="eager" />
+                <div className="clips-library-preview-top">
+                  <span><Sparkles size={12} /> 94 score</span>
+                  <span>9:16</span>
+                </div>
+                <div className="clips-library-preview-caption">
+                  Turn one long story into<br /><strong>moments people remember.</strong>
+                </div>
+                <span className="clips-library-preview-play"><Play size={18} fill="currentColor" /></span>
+                <div className="clips-library-preview-wave">
+                  {[12, 22, 15, 31, 20, 36, 18, 27, 14, 23, 10, 19].map((height, index) => (
+                    <span key={index} style={{ height }} />
+                  ))}
+                </div>
+              </div>
+              <div className="clips-library-preview-chip"><Sparkles size={13} /> AI finds the hook</div>
+            </div>
+          </section>
         )
       )}
       {styling && selected && (

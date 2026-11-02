@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, Link, NavLink, useMatch, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
@@ -44,12 +44,11 @@ function NavClipsIcon() {
   );
 }
 
-function NavUploadIcon() {
+function NavCaptionIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 13v8" />
-      <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-      <path d="m8 17 4-4 4 4" />
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M7 10h4M7 14h6M15 10h2M15 14h2" />
     </svg>
   );
 }
@@ -100,10 +99,14 @@ function UserMenu({ name, email, onLogout }: { name?: string; email?: string; on
         className="topbar-user-btn"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={`Open account menu for ${name || 'your account'}`}
         onClick={() => setOpen((o) => !o)}
       >
         <span className="topbar-avatar">{(name || '?')[0]?.toUpperCase()}</span>
-        <span className="topbar-user-name">{name}</span>
+        <span className="topbar-user-copy">
+          <span className="topbar-user-name">{name}</span>
+          <span className="topbar-user-meta">Account</span>
+        </span>
         <ChevronDownIcon />
       </button>
       {open && (
@@ -228,9 +231,9 @@ export function PlanBadge({
           </div>
         </div>
         <div className="plan-badge plan-badge-free">
-          <button type="button" className="plan-badge-link" onClick={() => onUpgradeClick?.()}>
+          <button type="button" className="plan-badge-link" aria-label="Upgrade plan" onClick={() => onUpgradeClick?.()}>
             <CrownIcon />
-            Upgrade Plan
+            <span className="plan-badge-text">Upgrade Plan</span>
           </button>
         </div>
       </>
@@ -240,9 +243,9 @@ export function PlanBadge({
   return (
     <div className="plan-badge-wrap" ref={boxRef}>
       <div className="plan-badge plan-badge-paid">
-        <button type="button" className="plan-badge-link" onClick={() => void toggleOpen()}>
+        <button type="button" className="plan-badge-link" aria-label={`${label} plan and usage`} onClick={() => void toggleOpen()}>
           <CrownIcon />
-          {label} Plan
+          <span className="plan-badge-text">{label} Plan</span>
         </button>
       </div>
       {open && (
@@ -273,6 +276,7 @@ export function AppShell() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const location = useLocation();
   const editorActive = useEditorChromeStore((s) => s.active);
   const editorMatch = useMatch('/projects/:id/editor');
   const onExport = useEditorChromeStore((s) => s.onExport);
@@ -280,6 +284,11 @@ export function AppShell() {
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
   const [pricingOpen, setPricingOpen] = useState(false);
+  const creatorSurface = location.pathname === '/projects/upload'
+    ? ' main-creator main-creator-caption'
+    : location.pathname === '/clips/new'
+      ? ' main-creator main-creator-clips'
+      : '';
 
   // Clips progress arrives in the user's own socket room, on any page.
   useEffect(() => {
@@ -295,6 +304,12 @@ export function AppShell() {
     void loadFlags();
   }, [loadFlags]);
 
+  // Each workspace should open at its own heading instead of inheriting the
+  // previous page's scroll position when users switch tools in the header.
+  useEffect(() => {
+    if (!editorActive) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [editorActive, location.pathname]);
+
   return (
     <div className={`shell ${editorActive ? 'shell-editor' : ''}`}>
       {flags.maintenanceMode && (
@@ -303,107 +318,110 @@ export function AppShell() {
         </div>
       )}
       <header className="topbar">
-        <Link to="/projects/upload" className="brand">
-          <img src="/logo.png" alt="Asaan Caption" className="brand-logo" />
-        </Link>
-        {editorActive ? (
-          <>
-            <span className="topbar-divider" aria-hidden="true" />
-            {flags.clipsEnabled && editorMatch?.params.id && (
-              <Link to={`/clips/${editorMatch.params.id}`} className="btn ghost topbar-upload-btn">
-                <NavClipsIcon />
-                Find clips
-              </Link>
-            )}
-            <Link to="/projects/upload" className="btn ghost topbar-upload-btn">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 19V5m0 0-6 6m6-6 6 6" />
-              </svg>
-              Upload video
-            </Link>
-            <div className="topbar-right">
-              <div className="topbar-editor-actions">
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={!onDownloadSrt}
-                  onClick={() => onDownloadSrt?.()}
-                >
-                  SRT
-                </button>
-                <button
-                  type="button"
-                  className="btn export"
-                  disabled={!onExport || !flags.exportsEnabled}
-                  title={!flags.exportsEnabled ? 'Exports are temporarily disabled' : undefined}
-                  onClick={() => onExport?.()}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  >
-                    <path d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-                  </svg>
-                  Export
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <nav className="topbar-nav">
-              {/* Admin toggles this via System > Flags > Projects list enabled */}
-              {flags.projectsListEnabled && (
-                <NavLink to="/projects" end>
-                  <NavFolderIcon />
-                  Projects
-                </NavLink>
-              )}
-              <NavLink to="/projects/upload">
-                <NavUploadIcon />
-                Upload
-              </NavLink>
-              {flags.clipsEnabled && (
-                <NavLink to="/clips">
+        <div className="topbar-inner">
+          <Link to="/projects/upload" className="brand" aria-label="Asaan Caption home">
+            <img src="/logo-mark.png" alt="" className="brand-logo-mark" />
+            <img src="/logo-wordmark.png" alt="Asaan Caption" className="brand-logo-wordmark" />
+          </Link>
+          {editorActive ? (
+            <>
+              <span className="topbar-divider" aria-hidden="true" />
+              {flags.clipsEnabled && editorMatch?.params.id && (
+                <Link to={`/clips/${editorMatch.params.id}`} className="btn ghost topbar-upload-btn">
                   <NavClipsIcon />
-                  Clips
-                </NavLink>
+                  Find clips
+                </Link>
               )}
-              {(user?.role === 'admin' || user?.role === 'support') && (
-                <NavLink to="/admin">
-                  <NavUserIcon />
-                  Admin
-                </NavLink>
-              )}
-            </nav>
-            <div className="topbar-right">
-              <div className="topbar-account">
-                <PlanBadge
-                  plan={user?.plan}
-                  planName={user?.planName}
-                  onUpgradeClick={() => setPricingOpen(true)}
-                />
-                <UserMenu name={user?.name} email={user?.email} onLogout={() => void signOut()} />
+              <Link to="/projects/upload" className="btn ghost topbar-upload-btn">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 19V5m0 0-6 6m6-6 6 6" />
+                </svg>
+                New caption
+              </Link>
+              <div className="topbar-right">
+                <div className="topbar-editor-actions">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={!onDownloadSrt}
+                    onClick={() => onDownloadSrt?.()}
+                  >
+                    SRT
+                  </button>
+                  <button
+                    type="button"
+                    className="btn export"
+                    disabled={!onExport || !flags.exportsEnabled}
+                    title={!flags.exportsEnabled ? 'Exports are temporarily disabled' : undefined}
+                    onClick={() => onExport?.()}
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <path d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                    </svg>
+                    Export
+                  </button>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          ) : (
+            <>
+              <nav className="topbar-nav" aria-label="Primary navigation">
+                {/* Admin toggles this via System > Flags > Projects list enabled */}
+                {flags.projectsListEnabled && (
+                  <NavLink to="/projects" end aria-label="Projects">
+                    <NavFolderIcon />
+                    <span>Projects</span>
+                  </NavLink>
+                )}
+                <NavLink to="/projects/upload" aria-label="Caption">
+                  <NavCaptionIcon />
+                  <span>Caption</span>
+                </NavLink>
+                {flags.clipsEnabled && (
+                  <NavLink to="/clips" aria-label="Viral Clips">
+                    <NavClipsIcon />
+                    <span>Viral Clips</span>
+                  </NavLink>
+                )}
+                {(user?.role === 'admin' || user?.role === 'support') && (
+                  <NavLink to="/admin" aria-label="Admin">
+                    <NavUserIcon />
+                    <span>Admin</span>
+                  </NavLink>
+                )}
+              </nav>
+              <div className="topbar-right">
+                <div className="topbar-account">
+                  <PlanBadge
+                    plan={user?.plan}
+                    planName={user?.planName}
+                    onUpgradeClick={() => setPricingOpen(true)}
+                  />
+                  <UserMenu name={user?.name} email={user?.email} onLogout={() => void signOut()} />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </header>
-      <main className={`main ${editorActive ? 'main-editor' : ''}`}>
+      <main className={`main${editorActive ? ' main-editor' : ''}${creatorSurface}`}>
         <Outlet />
       </main>
       {/* Rendered here, outside <header>, because .topbar's backdrop-filter

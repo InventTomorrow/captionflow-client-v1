@@ -10,6 +10,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyResetLinkPage } from './pages/VerifyResetLinkPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { UploadPage } from './pages/UploadPage';
+import { LegalPage } from './pages/legal/LegalPage';
 import { AppShell } from './components/AppShell';
 import { AdminShell } from './components/admin/AdminShell';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -133,6 +134,9 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/verify" element={<VerifyResetLinkPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+      <Route path="/terms" element={<LegalPage doc="terms" />} />
+      <Route path="/cookies" element={<LegalPage doc="cookies" />} />
       {TemplateGalleryPage && (
         <Route
           path="/dev/template-cards"
@@ -222,8 +226,9 @@ export default function App() {
           </Private>
         }
       >
-        <Route index element={<ClipsGate><ClipsGalleryPage /></ClipsGate>} />
+        <Route index element={<ClipsGate><NewClipsPage /></ClipsGate>} />
         <Route path="new" element={<ClipsGate><NewClipsPage /></ClipsGate>} />
+        <Route path="library" element={<ClipsGate><ClipsGalleryPage /></ClipsGate>} />
         <Route path=":projectId" element={<ClipsGate><ClipSetPage /></ClipsGate>} />
         <Route path=":projectId/:clipId" element={<ClipsGate><ClipEditorPage /></ClipsGate>} />
       </Route>

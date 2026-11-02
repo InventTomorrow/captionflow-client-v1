@@ -53,6 +53,23 @@ export interface LocalExportRecord {
   clipId?: string;
 }
 
+/**
+ * One part of a video that came from a pasted link — the only piece of it this
+ * device ever stores: a clip's range, cut by the server (sources/<projectId>~…).
+ */
+export interface LocalSegmentRecord {
+  /** `${projectId}:${start}:${end}` */
+  key: string;
+  projectId: string;
+  /** Source seconds at the file's 0:00, and where it ends. */
+  start: number;
+  end: number;
+  size: number;
+  opfsPath: string;
+  storedAt: number;
+  probe: MediaProbe | null;
+}
+
 interface MediaDbSchema extends DBSchema {
   sources: { key: string; value: LocalSourceRecord };
   exports: {
@@ -60,10 +77,13 @@ interface MediaDbSchema extends DBSchema {
     value: LocalExportRecord;
     indexes: { 'by-exportedAt': number; 'by-project': string };
   };
+  segments: { key: string; value: LocalSegmentRecord; indexes: { 'by-project': string } };
 }
 
 const DB_NAME = 'captionflow-media';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+/** Parts kept per video; the oldest go first (each is a few MB). */
+const MAX_SEGMENTS_PER_PROJECT = 24;
 
 let dbPromise: Promise<IDBPDatabase<MediaDbSchema>> | null = null;
 
@@ -76,6 +96,9 @@ function getDb() {
           const ex = db.createObjectStore('exports', { keyPath: 'id' });
           ex.createIndex('by-exportedAt', 'exportedAt');
           ex.createIndex('by-project', 'projectId');
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('segments', { keyPath: 'key' }).createIndex('by-project', 'projectId');
         }
       },
     });
@@ -252,6 +275,71 @@ export async function deleteSource(projectId: string): Promise<void> {
   const rec = await db.get('sources', projectId);
   if (rec) await call<void>({ op: 'remove', path: rec.opfsPath }).catch(() => undefined);
   await db.delete('sources', projectId);
+  await deleteSegments(projectId);
+}
+
+/* ---------- parts of link-imported videos ---------- */
+
+const ms = (t: number) => Math.round(t * 1000);
+
+/** Keep one part of a link-imported video; parts it makes redundant (inside it) go. */
+export async function storeSegmentFile(
+  projectId: string,
+  start: number,
+  end: number,
+  file: Blob,
+  probe: MediaProbe | null,
+): Promise<LocalSegmentRecord> {
+  void requestPersistence();
+  const key = `${projectId}:${ms(start)}:${ms(end)}`;
+  const opfsPath = `sources/${projectId}~${ms(start)}-${ms(end)}.mp4`;
+  await call<void>({ op: 'write', path: opfsPath, blob: file });
+  const record: LocalSegmentRecord = { key, projectId, start, end, size: file.size, opfsPath, storedAt: Date.now(), probe };
+  const db = await getDb();
+  await db.put('segments', record);
+  const others = (await db.getAllFromIndex('segments', 'by-project', projectId)).filter((s) => s.key !== key);
+  const inside = others.filter((s) => s.start >= start && s.end <= end);
+  const overflow = others
+    .filter((s) => !inside.includes(s))
+    .sort((a, b) => a.storedAt - b.storedAt)
+    .slice(0, Math.max(0, others.length - inside.length - (MAX_SEGMENTS_PER_PROJECT - 1)));
+  for (const s of [...inside, ...overflow]) await deleteSegment(s);
+  return record;
+}
+
+/** The stored part covering [start, end] (the shortest one), or null. Records whose file vanished are dropped. */
+export async function findSegment(
+  projectId: string,
+  range: { start: number; end: number },
+): Promise<{ record: LocalSegmentRecord; file: File } | null> {
+  if (!isLocalMediaSupported()) return null;
+  const db = await getDb();
+  const covering = (await db.getAllFromIndex('segments', 'by-project', projectId))
+    // Times are stored to the millisecond; allow that much rounding.
+    .filter((s) => s.start <= range.start + 0.002 && s.end >= range.end - 0.002)
+    .sort((a, b) => a.end - a.start - (b.end - b.start));
+  for (const record of covering) {
+    const file = await readOpfsFile(record.opfsPath);
+    if (file) return { record, file };
+    await db.delete('segments', record.key);
+  }
+  return null;
+}
+
+export async function listSegments(): Promise<LocalSegmentRecord[]> {
+  if (!isLocalMediaSupported()) return [];
+  return (await getDb()).getAll('segments');
+}
+
+export async function deleteSegment(record: LocalSegmentRecord): Promise<void> {
+  await call<void>({ op: 'remove', path: record.opfsPath }).catch(() => undefined);
+  await (await getDb()).delete('segments', record.key);
+}
+
+export async function deleteSegments(projectId: string): Promise<void> {
+  if (!isLocalMediaSupported()) return;
+  const db = await getDb();
+  for (const s of await db.getAllFromIndex('segments', 'by-project', projectId)) await deleteSegment(s);
 }
 
 /* ---------- exports ---------- */

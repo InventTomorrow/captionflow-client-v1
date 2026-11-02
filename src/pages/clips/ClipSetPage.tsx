@@ -14,6 +14,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
+import { LinkedVideo } from '../../components/clips/LinkedVideo';
 import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { captionLanguageLabel } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
@@ -60,7 +61,10 @@ export function ClipSetPage() {
   const openEditor = useOpenInEditor();
 
   const project = data?.project;
-  const source = useClipSource(projectId, project?.video?.kind);
+  /** From a pasted link: plays from the link; each clip fetches only its own part when rendered or edited. */
+  const imported = !!project?.sourceUrl;
+  const source = useClipSource(projectId, project?.video?.kind, imported);
+  const canRender = source.local || imported;
   const projectStyle = useProjectStyle(projectId);
 
   useEffect(() => {
@@ -126,7 +130,7 @@ export function ClipSetPage() {
     enqueueRenders(
       list.map((clip) => ({
         clip,
-        ctx: { projectId, projectName: project.name, projectStyle },
+        ctx: { projectId, projectName: project.name, projectStyle, imported, duration: project.video?.duration },
         opts: { quality: '1080p' as const, format: 'mp4' as const },
       })),
     );
@@ -143,14 +147,16 @@ export function ClipSetPage() {
     await removeClip(clip._id).catch((e) => setError(errorMessage(e, 'Couldn’t delete the clip')));
   }
 
+
   // Frame every Auto clip on the speaker as soon as clips arrive (on this device, one at a time).
+  // A linked video's clips are framed once their part is here (it is never fetched just for this).
   const setClipLocal = useClipsStore((s) => s.setClipLocal);
   useEffect(() => {
-    if (!source.local) return;
+    if (!source.local && !imported) return;
     for (const c of clips) {
       if (needsFaceTrack(c)) void ensureFaceTrack(projectId, c).then((u) => u && setClipLocal(u)).catch(() => undefined);
     }
-  }, [clips, source.local, projectId, setClipLocal]);
+  }, [clips, source.local, imported, projectId, setClipLocal]);
 
   const unrendered = clips.filter((c) => c.status !== 'rendered' && renders[c._id]?.status !== 'done');
 
@@ -212,7 +218,7 @@ export function ClipSetPage() {
     return (
       <div className="clips-page">
         <nav className="clips-crumbs" aria-label="Breadcrumb">
-          <Link to="/clips">Clips</Link>
+          <Link to="/clips">Viral Clips</Link>
           <span aria-hidden="true">/</span>
           <span>{project.name}</span>
         </nav>
@@ -229,7 +235,7 @@ export function ClipSetPage() {
   return (
     <div className="clips-page">
       <nav className="clips-crumbs" aria-label="Breadcrumb">
-        <Link to="/clips">Clips</Link>
+        <Link to="/clips">Viral Clips</Link>
         <span aria-hidden="true">/</span>
         <span>{project?.name ?? '…'}</span>
       </nav>
@@ -246,7 +252,7 @@ export function ClipSetPage() {
           )}
         </div>
         <div className="clips-head-actions">
-          {project && (
+          {project && !imported && (
             <Link to={`/projects/${projectId}/editor`} className="btn ghost clips-head-btn">
               <Captions size={16} aria-hidden="true" />
               Full video in editor
@@ -269,7 +275,7 @@ export function ClipSetPage() {
               {clips.length || runStatus === 'ready' ? 'Find more / re-run' : 'Find clips'}
             </button>
           )}
-          {unrendered.length > 0 && source.local && (
+          {unrendered.length > 0 && canRender && (
             <button type="button" className="btn primary" onClick={() => renderJobs(unrendered)} disabled={!projectStyle}>
               Render all ({unrendered.length})
             </button>
@@ -283,6 +289,15 @@ export function ClipSetPage() {
         </div>
       )}
       {planError && <UpgradeBanner info={planError} />}
+
+      {project?.sourceUrl && (
+        <section className="clips-panel clip-source-panel" aria-label="Source video">
+          <LinkedVideo sourceUrl={project.sourceUrl} title={project.name} />
+          <p className="clips-sub">
+            Plays from the link — the video isn’t downloaded. Only a clip you render or edit is fetched, just its own part.
+          </p>
+        </section>
+      )}
 
       {(showOptions || (canAnalyze && runStatus === 'idle' && !clips.length)) && (
         <section className="clips-panel clips-options-panel" aria-label="Find clips">
@@ -332,7 +347,7 @@ export function ClipSetPage() {
           onToggleAll={() => setSelected(selected.size === clips.length ? new Set() : new Set(clips.map((c) => c._id)))}
           onStyle={() => setSheet('selected')}
           onRender={
-            source.local && projectStyle ? () => renderJobs(clips.filter((c) => selected.has(c._id))) : undefined
+            canRender && projectStyle ? () => renderJobs(clips.filter((c) => selected.has(c._id))) : undefined
           }
           onDelete={() => void deleteSelected()}
           onDone={() => setSelected(null)}
@@ -349,7 +364,7 @@ export function ClipSetPage() {
           onToggleSelect={(c) => toggleSelect(c._id)}
           onOpen={(c) => navigate(`/clips/${projectId}/${c._id}`)}
           onEditCaptions={(c) => openEditor.open(projectId, c)}
-          onRender={source.local ? (c) => renderJobs([c]) : undefined}
+          onRender={canRender ? (c) => renderJobs([c]) : undefined}
           onDownload={(c) => void download(c)}
           onDelete={(c) => void remove(c)}
         />

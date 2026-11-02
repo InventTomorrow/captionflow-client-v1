@@ -16,10 +16,16 @@ import { clipAspect, formatClipLength, scoreTone } from '../../lib/clips/clipMat
 interface ClipCardProps {
   clip: Clip;
   projectId: string;
+  /** The project's video kind — lets the poster decode from the server stream when the device has no copy. */
+  videoKind?: string;
   /** Live preview to show instead of the poster (this card is the active one). */
   preview?: ReactNode;
-  /** This device has the original video (posters + renders possible). */
+  /** This device can play the clip (hover preview). */
   hasSource: boolean;
+  /** Rendering is possible (default: hasSource) — a linked video's clip fetches its part first. */
+  canRender?: boolean;
+  /** Posters to show while no frame of the clip is on this device (a linked video's own), best first. */
+  fallbackPosters?: string[];
   showProject?: boolean;
   showReason?: boolean;
   render?: RenderState;
@@ -37,8 +43,11 @@ interface ClipCardProps {
 export function ClipCard({
   clip,
   projectId,
+  videoKind,
   preview,
   hasSource,
+  canRender = hasSource,
+  fallbackPosters,
   showProject,
   showReason,
   render,
@@ -55,6 +64,8 @@ export function ClipCard({
   /** undefined = not tried yet; null = no poster possible on this device. */
   const [thumb, setThumb] = useState<string | null | undefined>(undefined);
   const [near, setNear] = useState(false);
+  const [fallbackIdx, setFallbackIdx] = useState(0);
+  const fallback = fallbackPosters?.[fallbackIdx];
   const selecting = selected !== undefined;
 
   useEffect(() => {
@@ -70,11 +81,11 @@ export function ClipCard({
   useEffect(() => {
     if (!near) return;
     let cancelled = false;
-    void getClipThumb(projectId, clip).then((url) => !cancelled && setThumb(url));
+    void getClipThumb(projectId, clip, videoKind).then((url) => !cancelled && setThumb(url));
     return () => {
       cancelled = true;
     };
-  }, [near, projectId, clip]);
+  }, [near, projectId, clip, videoKind]);
 
   const tone = scoreTone(clip.score);
   const length = formatClipLength(clip.end - clip.start);
@@ -106,7 +117,17 @@ export function ClipCard({
       >
         {preview ??
           (thumb ? (
-            <img src={thumb} alt="" loading="lazy" />
+            <img src={thumb} alt="" loading="lazy" className="clip-card-poster" />
+          ) : thumb === undefined ? (
+            <span className="clip-card-skeleton" aria-hidden="true" />
+          ) : fallback ? (
+            <img
+              src={fallback}
+              alt=""
+              loading="lazy"
+              className="clip-card-poster"
+              onError={() => setFallbackIdx((i) => i + 1)}
+            />
           ) : (
             <span className="clip-card-placeholder" aria-hidden="true">
               <Film size={26} />
@@ -168,7 +189,7 @@ export function ClipCard({
                 type="button"
                 className="clip-act"
                 onClick={onRender}
-                disabled={!hasSource || rendering}
+                disabled={!canRender || rendering}
                 aria-label={rendering ? `Rendering ${Math.round(render?.percent ?? 0)}%` : 'Render clip'}
                 title="Render clip"
               >

@@ -11,10 +11,13 @@ import { openClipInEditor, type OpenStage } from '../../lib/clips/openInEditor';
 import { useClipsStore } from '../../stores/clipsStore';
 
 const STAGE_TEXT: Record<OpenStage, string> = {
+  downloading: 'Getting this clip’s part of the video…',
   framing: 'Finding the speaker…',
   saving: 'Loading the clip’s captions and style…',
   opening: 'Opening the editor…',
 };
+/** Where each stage sits on the bar; a download fills its share as it goes. */
+const STAGE_AT: Record<OpenStage, number> = { downloading: 0, framing: 60, saving: 80, opening: 100 };
 
 interface Props {
   projectId: string;
@@ -26,6 +29,7 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
   const navigate = useNavigate();
   const setClipLocal = useClipsStore((s) => s.setClipLocal);
   const [stage, setStage] = useState<OpenStage>('opening');
+  const [downloaded, setDownloaded] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
   const started = useRef(false);
@@ -37,7 +41,10 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
       setStage('opening');
       try {
         const r = await openClipInEditor(projectId, clip, {
-          onProgress: setStage,
+          onProgress: (next, percent) => {
+            setStage(next);
+            if (next === 'downloading') setDownloaded(percent ?? 0);
+          },
           onClipUpdated: setClipLocal,
         });
         navigate(`/projects/${r.projectId}/editor`);
@@ -74,10 +81,11 @@ export function OpenInEditorDialog({ projectId, clip, onClose }: Props) {
           {busy && (
             <div className="export-progress" role="status" aria-live="polite">
               <div className="progress-bar thin">
-                <div style={{ width: `${stage === 'framing' ? 30 : stage === 'saving' ? 70 : 100}%` }} />
+                <div style={{ width: `${stage === 'downloading' ? Math.max(4, downloaded * 0.6) : STAGE_AT[stage]}%` }} />
               </div>
               <span className="muted tiny">
                 {STAGE_TEXT[stage]}
+                {stage === 'downloading' && ` ${downloaded}%`}
               </span>
             </div>
           )}

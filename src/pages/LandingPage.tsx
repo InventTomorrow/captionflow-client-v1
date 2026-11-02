@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useFlagsStore } from '../stores/flagsStore';
@@ -23,6 +23,7 @@ import { TemplateShowcase, type ShowcaseTemplate } from '../components/TemplateS
 import { WorkflowSteps } from '../components/WorkflowSteps';
 import { DifferenceShowcase } from '../components/DifferenceShowcase';
 import { WhyWeBuilt } from '../components/WhyWeBuilt';
+import { ClipsShowcase } from '../components/ClipsShowcase';
 
 /** Yearly billing toggle hidden for now — flip back on when yearly pricing is ready to promote. */
 const SHOW_YEARLY_TOGGLE = false;
@@ -52,7 +53,7 @@ function Reveal({
           io.disconnect();
         }
       },
-      { threshold: 0.15 },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -158,6 +159,7 @@ function Magnetic({ children, strength = 0.32 }: { children: ReactNode; strength
 const NAV_LINKS: Array<{ id: string; label: string }> = [
   { id: 'templates', label: 'Templates' },
   { id: 'difference', label: 'Features' },
+  { id: 'clips', label: 'Viral Clips' },
   { id: 'how-it-works', label: 'How It Works' },
   { id: 'about', label: 'Why Us' },
   { id: 'pricing', label: 'Pricing' },
@@ -319,6 +321,11 @@ export function LandingPage() {
     document.getElementById('templates')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const startClipping = () => {
+    if (loading) return;
+    navigate(user ? '/clips' : '/login', user ? undefined : { state: { from: '/clips' } });
+  };
+
   /** Get Started always resolves against the current session — no session → /login, signed in → /projects/upload. */
   const getStarted = () => {
     if (loading) return;
@@ -471,11 +478,15 @@ export function LandingPage() {
 
         <section
           id="templates"
-          className="lp-section lp-section-surface lp-section-sparkle lp-section-stage"
+          className="lp-section lp-section-chapter lp-section-surface lp-section-sparkle lp-section-stage"
         >
           <SparkleBackdrop />
           <div className="lp-container lp-center">
             <Reveal className="lp-section-head">
+              <p className="lp-eyebrow lp-eyebrow-pill">
+                <span className="lp-eyebrow-dot" aria-hidden="true" />
+                Styles made for your voice
+              </p>
               <h2 className="lp-h2">
                 All your favourite <span className="lp-accent-text">templates</span>
               </h2>
@@ -489,7 +500,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="difference" className="lp-section lp-diff">
+        <section id="difference" className="lp-section lp-section-chapter lp-diff">
           <AmbientBackdrop />
           <div className="lp-diff-arc" aria-hidden="true" />
           <div className="lp-container">
@@ -512,29 +523,57 @@ export function LandingPage() {
           <div className="lp-diff-floor" aria-hidden="true" />
         </section>
 
-        <section id="how-it-works" className="lp-section lp-section-ambient">
+        <section id="clips" className="lp-section lp-section-chapter lp-clips-section">
+          <AmbientBackdrop />
+          <div className="lp-clips-halo" aria-hidden="true" />
+          <div className="lp-container">
+            <Reveal className="lp-section-head">
+              <p className="lp-eyebrow lp-eyebrow-pill">
+                <span className="lp-eyebrow-dot" aria-hidden="true" />
+                New · Viral Clips
+              </p>
+              <h2 className="lp-h2 lp-h2-wide">
+                One long video. <span className="lp-accent-text">A week of content.</span>
+              </h2>
+              <p className="lp-body-text lp-narrow-text">
+                Upload a podcast, interview, vlog, or stream. We find the strongest moments,
+                reframe them for vertical, and add captions — ready for you to review and post.
+              </p>
+            </Reveal>
+            <ClipsShowcase onStart={startClipping} />
+          </div>
+        </section>
+
+        <section id="how-it-works" className="lp-section lp-section-chapter lp-section-ambient">
           <AmbientBackdrop />
           <div className="lp-container">
             <Reveal className="lp-section-head">
-              <p className="lp-eyebrow">The whole workflow. Nothing missing.</p>
-              <span className="lp-eyebrow-line" aria-hidden="true" />
+              <p className="lp-eyebrow lp-eyebrow-pill">
+                <span className="lp-eyebrow-dot" aria-hidden="true" />
+                The whole workflow. Nothing missing.
+              </p>
               <h2 className="lp-h2">
                 Upload. Process. Export.
                 <br />
                 Done within <span className="lp-accent-text">2 minutes</span>.
               </h2>
+              <p className="lp-body-text lp-narrow-text">
+                One focused flow from your original video to a polished, captioned export.
+              </p>
             </Reveal>
             <WorkflowSteps />
           </div>
         </section>
 
-        <section id="about" className="lp-section lp-why-section">
+        <section id="about" className="lp-section lp-section-chapter lp-why-section">
           <AmbientBackdrop />
           <div className="lp-diff-arc" aria-hidden="true" />
           <div className="lp-container">
             <Reveal className="lp-section-head">
-              <p className="lp-eyebrow">Why we built this</p>
-              <span className="lp-eyebrow-line" aria-hidden="true" />
+              <p className="lp-eyebrow lp-eyebrow-pill">
+                <span className="lp-eyebrow-dot" aria-hidden="true" />
+                Why we built this
+              </p>
               <h2 className="lp-h2 lp-h2-wide">
                 Why we built <span className="lp-accent-text">Asaan Caption</span>
               </h2>
@@ -549,10 +588,13 @@ export function LandingPage() {
         <div className="lp-mesh-zone">
           <MeshBackdrop />
 
-          <section id="pricing" className="lp-section">
+          <section id="pricing" className="lp-section lp-section-chapter">
             <div className="lp-container">
               <Reveal className="lp-section-head">
-                <p className="lp-eyebrow">Honest pricing. Nothing hidden.</p>
+                <p className="lp-eyebrow lp-eyebrow-pill">
+                  <span className="lp-eyebrow-dot" aria-hidden="true" />
+                  Honest pricing. Nothing hidden.
+                </p>
                 <h2 className="lp-h2">
                   Stop paying for features
                   <br />
@@ -596,10 +638,13 @@ export function LandingPage() {
           </section>
 
           {dayPassPlans.length > 0 && (
-            <section id="day-pass" className="lp-section lp-daypass-section">
+            <section id="day-pass" className="lp-section lp-section-chapter lp-daypass-section">
               <div className="lp-container">
                 <Reveal className="lp-section-head lp-daypass-head">
-                  <p className="lp-eyebrow">No subscription needed</p>
+                  <p className="lp-eyebrow lp-eyebrow-pill">
+                    <span className="lp-eyebrow-dot" aria-hidden="true" />
+                    No subscription needed
+                  </p>
                   <h2 className="lp-h2">
                     Short on time? <span className="lp-accent-text">Grab a Pass</span>
                   </h2>
@@ -679,10 +724,14 @@ export function LandingPage() {
             </section>
           )}
 
-          <section id="start" className="lp-section lp-final-cta">
+          <section id="start" className="lp-section lp-section-chapter lp-final-cta">
             <div className="lp-blob" aria-hidden="true" />
             <div className="lp-container lp-narrow lp-center">
               <Reveal>
+                <p className="lp-eyebrow lp-eyebrow-pill">
+                  <span className="lp-eyebrow-dot" aria-hidden="true" />
+                  Ready when you are
+                </p>
                 <h2 className="lp-h2">
                   The <span className="lp-accent-text">broken transcript</span> era is over.
                 </h2>
@@ -764,22 +813,22 @@ export function LandingPage() {
             <div className="lp-ft-col-label">Legal</div>
             <ul className="lp-ft-links">
               <li>
-                <a href="#top">
+                <Link to="/privacy">
                   <span className="lp-ft-dot" />
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#top">
+                <Link to="/terms">
                   <span className="lp-ft-dot" />
                   Terms of Service
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#top">
+                <Link to="/cookies">
                   <span className="lp-ft-dot" />
                   Cookie Policy
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
