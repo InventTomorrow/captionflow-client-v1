@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
+import { YoutubeLoginCard } from './YoutubeLoginCard';
 
 export function AdminSystemPage() {
   const isAdmin = useAuthStore((s) => s.user?.role) === 'admin';
@@ -107,6 +108,7 @@ export function AdminSystemPage() {
             </>
           )}
         </section>
+        <YoutubeLoginCard isAdmin={isAdmin} />
         <section className="admin-card">
           <h2>API cost assumptions</h2>
           <p className="muted">
