@@ -15,7 +15,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 0.85rem;
   border: 0;
   border-radius: 0.5rem;
@@ -44,6 +44,7 @@
 }
 
 .reel-feed {
+  position: relative; /* reels' offsetTop is measured from the feed (ReelFeed goTo) */
   height: clamp(520px, calc(100dvh - 210px), 980px);
   overflow-y: auto;
   scroll-snap-type: y mandatory;

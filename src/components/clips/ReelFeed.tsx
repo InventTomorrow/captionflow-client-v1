@@ -83,6 +83,8 @@ export function ReelFeed({
   const activeIdx = Math.min(active, Math.max(0, count - 1));
   const mounted = useMemo(() => new Set(reelMountSet(activeIdx, count)), [activeIdx, count]);
   const activeClip = clips[activeIdx];
+  /** Changes whenever the reels are different nodes (a re-run can return as many clips as before). */
+  const idsKey = clips.map((c) => c._id).join(',');
 
   useEffect(() => () => partUrls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -161,17 +163,21 @@ export function ReelFeed({
     );
     reelRefs.current.slice(0, count).forEach((el) => el && io.observe(el));
     return () => io.disconnect();
-  }, [count]);
+    // idsKey: new clips are new <section> nodes, which must be observed instead of the old ones.
+  }, [count, idsKey]);
 
   // A new reel starts playing.
   useEffect(() => setPaused(false), [activeIdx]);
 
-  const goTo = useCallback(
-    (i: number) => reelRefs.current[i]?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }),
-    [],
-  );
+  // Scroll the feed only — scrollIntoView would also move the page (and tuck the reel under the sticky header).
+  const goTo = useCallback((i: number) => {
+    const feed = feedRef.current;
+    const el = reelRefs.current[i];
+    if (feed && el) feed.scrollTo({ top: el.offsetTop, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, []);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const own = e.target === e.currentTarget;
     if (e.key === 'ArrowDown' || e.key === 'PageDown' || (own && e.key === 'j')) {
       e.preventDefault();
@@ -272,8 +278,8 @@ export function ReelFeed({
                   type="button"
                   className="reel-mute"
                   onClick={() => setMuted((m) => !m)}
-                  aria-label={muted ? 'Unmute' : 'Mute'}
-                  aria-pressed={!muted}
+                  aria-label="Mute"
+                  aria-pressed={muted}
                 >
                   {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
                 </button>
@@ -351,7 +357,7 @@ export function ReelFeed({
                     aria-pressed={picked}
                   >
                     <Check size={17} aria-hidden="true" />
-                    <span className="reel-btn-label">{picked ? 'Selected' : 'Select'}</span>
+                    <span className="reel-btn-label">Select</span>
                   </button>
                   <button type="button" className="reel-delete" onClick={() => onDelete(clip)} aria-label={`Delete ${name}`} title="Delete clip">
                     <Trash2 size={17} aria-hidden="true" />
@@ -362,7 +368,7 @@ export function ReelFeed({
           );
         })}
       </div>
-      <div className="reel-nav" aria-label="Move between clips">
+      <div className="reel-nav" role="group" aria-label="Move between clips">
         <button type="button" className="reel-nav-btn" onClick={() => goTo(stepReel(activeIdx, -1, count))} disabled={activeIdx === 0} aria-label="Previous clip">
           <ChevronUp size={20} aria-hidden="true" />
         </button>

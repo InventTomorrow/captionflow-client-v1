@@ -223,7 +223,6 @@ export async function storeSourceFile(
 ): Promise<LocalSourceRecord> {
   void requestPersistence();
   const opfsPath = `sources/${projectId}${extensionOf(file.name, file.type)}`;
-  await call<void>({ op: 'write', path: opfsPath, blob: file }, onProgress);
   const record: LocalSourceRecord = {
     projectId,
     name: file.name,
@@ -234,8 +233,15 @@ export async function storeSourceFile(
     storedAt: Date.now(),
     probe,
   };
-  const db = await getDb();
-  await db.put('sources', record);
+  try {
+    await call<void>({ op: 'write', path: opfsPath, blob: file }, onProgress);
+    const db = await getDb();
+    await db.put('sources', record);
+  } catch (err) {
+    // A part-written copy with no record could never be found to delete (storage full is the usual cause).
+    await call<void>({ op: 'remove', path: opfsPath }).catch(() => undefined);
+    throw err;
+  }
   return record;
 }
 

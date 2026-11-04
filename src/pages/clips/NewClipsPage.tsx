@@ -32,6 +32,7 @@ import { buildExportStyle } from '../../lib/export/styleSnapshot';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../../lib/planErrors';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
+import { refusedByServer } from '../../lib/clips/refused';
 import { deleteSource } from '../../lib/media/localMedia';
 import { ClipsDeviceError, uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
@@ -175,8 +176,9 @@ export function NewClipsPage() {
       created = undefined;
       navigate(`/clips/${projectId}`);
     } catch (err) {
-      // Never leave a half-made Clips video behind (its sound on the server, its copy here).
-      if (created) {
+      // A refused transcribe (plan limits) leaves no half-made Clips video behind — its sound on the
+      // server, its copy here. A timeout or 5xx may have queued the job (and held its quota): keep it.
+      if (created && refusedByServer(err)) {
         const id = created;
         void api.delete(`/projects/${id}`).catch(() => undefined);
         void deleteSource(id).catch(() => undefined);

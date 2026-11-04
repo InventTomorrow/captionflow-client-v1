@@ -13,6 +13,7 @@ import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib
 import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
 import { clipClock, clipFontFactor, clipFraming, shiftCaptions } from '../../src/lib/clips/clipClock';
 import { formatSourceTime, reelMountSet, sourceSpan, stepReel } from '../../src/lib/clips/reelFeed';
+import { refusedByServer } from '../../src/lib/clips/refused';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -479,6 +480,16 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(formatSourceTime(0) === '0:00' && formatSourceTime(65.4) === '1:05', 'm:ss');
   assert(formatSourceTime(3600 + 12 * 60 + 4) === '1:12:04', 'h:mm:ss for long videos');
   assert(formatSourceTime(-3) === '0:00' && formatSourceTime(Number.NaN) === '0:00', 'bad input reads as 0:00');
+}
+
+// ── New Clips cleans up only after a definite refusal (a timeout or 5xx may have queued the job) ──
+{
+  assert(refusedByServer({ response: { status: 403 } }), 'a 403 (plan limits) is a refusal');
+  assert(refusedByServer({ response: { status: 409 } }) && refusedByServer({ response: { status: 422 } }), '409 / 422 are refusals');
+  assert(!refusedByServer({ response: { status: 500 } }) && !refusedByServer({ response: { status: 503 } }), 'a 5xx may have started the job');
+  assert(!refusedByServer({ code: 'ECONNABORTED' }), 'a timeout (no response) may have started the job');
+  assert(!refusedByServer({ message: 'Network Error' }), 'a dropped connection may have started the job');
+  assert(!refusedByServer(undefined) && !refusedByServer(null) && !refusedByServer('x'), 'non-errors are not refusals');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

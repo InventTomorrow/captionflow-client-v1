@@ -571,6 +571,8 @@ export function EditorPage() {
     framing: ReturnType<typeof clipFraming>;
   } | null>(null);
   const isClipProjectRef = useRef(false);
+  /** A New Clips video (kind 'clips'): its video stays on this device — it is never uploaded for a server render. */
+  const isClipsVideoRef = useRef(false);
   /**
    * A clip project has no video of its own: it plays the original between the
    * clip's in and out points (clipClock), cropped live, and the export trims
@@ -982,6 +984,7 @@ export function EditorPage() {
         Boolean(serverVideo?.filePath) && serverVideo?.kind !== 'audio';
       const src = r.data.project.kind === 'clip' ? r.data.project.clipSource : null;
       isClipProjectRef.current = !!src;
+      isClipsVideoRef.current = r.data.project.kind === 'clips';
       if (src) {
         const sourceId = String(src.projectId);
         const win = { start: Number(src.start) || 0, end: Number(src.end) || 0 };
@@ -2296,6 +2299,13 @@ export function EditorPage() {
       // may first need this device's copy of the video.
       const uploadFirst =
         route.path === 'server' ? route.uploadFirst : serverHasSourceRef.current ? undefined : route.source;
+      if (uploadFirst && isClipsVideoRef.current) {
+        setExportStatus('error');
+        setExportError(
+          'This export can only run on the server, and a Clips video never leaves your device. Pick a different caption style, or render the clips from the Clips page.',
+        );
+        return;
+      }
       if (uploadFirst) {
         // The server has no copy of the video (audio-only upload, or released
         // after an export) — send this device's copy before it can render.

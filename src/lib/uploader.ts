@@ -1,5 +1,5 @@
 import { api } from './api';
-import { isLocalMediaSupported, storeSourceFile } from './media/localMedia';
+import { deleteSource, isLocalMediaSupported, storeSourceFile } from './media/localMedia';
 import { probeMediaFile, type MediaProbe } from './media/probe';
 import { extractAudioForUpload, type ExtractedAudio } from './media/extractAudio';
 import {
@@ -357,17 +357,18 @@ export async function uploadProjectMedia(
 }
 
 /** Why this device can't make Clips from a file (the video never leaves the device). */
-export type ClipsDeviceErrorCode = 'UNSUPPORTED' | 'NO_AUDIO' | 'NO_LOCAL_COPY';
+export type ClipsDeviceErrorCode = 'UNSUPPORTED' | 'NO_AUDIO' | 'EXTRACT_FAILED' | 'NO_LOCAL_COPY';
+
+const CLIPS_DEVICE_MESSAGES: Record<ClipsDeviceErrorCode, string> = {
+  UNSUPPORTED: 'This browser can’t make clips from this file. Try Chrome or Edge on a computer, or an MP4 or MOV file.',
+  NO_AUDIO: 'This video has no sound, so there is nothing to find clips in. Try a different file.',
+  EXTRACT_FAILED: 'This browser couldn’t read this video’s sound. Try Chrome or Edge on a computer, or an MP4 file.',
+  NO_LOCAL_COPY: 'This browser couldn’t keep the video on your device (storage may be full). Free some space and try again.',
+};
 
 export class ClipsDeviceError extends Error {
   constructor(public readonly code: ClipsDeviceErrorCode) {
-    super(
-      code === 'NO_AUDIO'
-        ? 'This video has no sound we can read, so clips can’t be found in it. Try a different file.'
-        : code === 'NO_LOCAL_COPY'
-          ? 'This browser couldn’t keep the video on your device (storage may be full). Free some space and try again.'
-          : 'This browser can’t make clips from this file. Try Chrome or Edge on a computer, or an MP4 or MOV file.',
-    );
+    super(CLIPS_DEVICE_MESSAGES[code]);
     this.name = 'ClipsDeviceError';
   }
 }
@@ -393,11 +394,14 @@ async function uploadSoundOnly(
   extracting(0);
   const audio = await extractAudioForUpload(file, extracting, signal);
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-  if (!audio) throw new ClipsDeviceError('NO_AUDIO');
+  if (!audio) throw new ClipsDeviceError('EXTRACT_FAILED');
 
-  // The local copy starts as soon as the project exists, alongside the upload.
+  // The local copy starts as soon as the project exists (a chunked upload
+  // allots it at /upload/init), alongside the upload.
+  let allotted: string | undefined;
   let stored: Promise<boolean> | undefined;
   const storeLocally = (projectId: string) => {
+    allotted = projectId;
     stored ??= storeSourceFile(projectId, file, probe).then(
       () => true,
       (err) => {
@@ -406,25 +410,44 @@ async function uploadSoundOnly(
       },
     );
   };
-  const projectId = await sendMedia(
-    {
-      blob: audio.blob,
-      fileName: audio.fileName,
-      mimeType: audio.mimeType,
-      mediaKind: 'audio',
-      sourceMeta: sourceMetaFrom(file, probe),
-      label: 'Uploading…',
-    },
-    onProgress,
-    signal,
-    { onProjectId: storeLocally },
-  );
+  /** Leave nothing behind: the server's project and, once its write has settled, this device's copy. */
+  const discard = async () => {
+    const id = allotted;
+    if (!id) return;
+    await stored;
+    await Promise.all([api.delete(`/projects/${id}`).catch(() => undefined), deleteSource(id).catch(() => undefined)]);
+  };
+
+  let projectId: string;
+  try {
+    projectId = await sendMedia(
+      {
+        blob: audio.blob,
+        fileName: audio.fileName,
+        mimeType: audio.mimeType,
+        mediaKind: 'audio',
+        sourceMeta: sourceMetaFrom(file, probe),
+        label: 'Uploading…',
+      },
+      onProgress,
+      signal,
+      { onProjectId: storeLocally },
+    );
+  } catch (err) {
+    // A failed or cancelled upload: no half-made project here or on the server.
+    await discard();
+    throw err;
+  }
   storeLocally(projectId);
   onProgress(progress({ percent: 100, uploadedBytes: audio.blob.size, totalBytes: audio.blob.size, status: 'Finishing…' }));
-  if (await stored) return { projectId, mode: 'audio', localCopy: true, videoAttached: false };
+  const kept = await stored;
+  if (signal?.aborted) {
+    await discard();
+    throw new DOMException('Aborted', 'AbortError');
+  }
+  if (kept) return { projectId, mode: 'audio', localCopy: true, videoAttached: false };
 
   // No copy here means no preview and no render: leave nothing behind.
-  await api.delete(`/projects/${projectId}`).catch(() => undefined);
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  await discard();
   throw new ClipsDeviceError('NO_LOCAL_COPY');
 }
