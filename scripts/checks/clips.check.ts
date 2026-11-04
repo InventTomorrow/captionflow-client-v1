@@ -12,6 +12,7 @@ import { forgetsProject } from '../../src/lib/media/retentionRules';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
 import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
 import { clipClock, clipFontFactor, clipFraming, shiftCaptions } from '../../src/lib/clips/clipClock';
+import { formatSourceTime, reelMountSet, sourceSpan, stepReel } from '../../src/lib/clips/reelFeed';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -454,6 +455,30 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(deferredIn(caps, [{ start: 2.5, end: 3 }, { start: 5, end: 9 }]), 'any of several ranges');
   assert(!deferredIn(caps, []), 'no range → nothing to finish');
   assert(deferredIn(caps, 'all') && !deferredIn([caps[1]], 'all'), 'all');
+}
+
+// ── reels feed: which reels mount a player, keyboard steps, where a clip sits in the long video ──
+{
+  assert(JSON.stringify(reelMountSet(0, 5)) === '[0,1]', 'the active reel and the next one mount');
+  assert(JSON.stringify(reelMountSet(4, 5)) === '[4]', 'the last reel has no next');
+  assert(JSON.stringify(reelMountSet(0, 1)) === '[0]', 'a single clip');
+  assert(JSON.stringify(reelMountSet(0, 0)) === '[]', 'no clips, nothing mounts');
+  assert(JSON.stringify(reelMountSet(7, 3)) === '[2]', 'an index past the end clamps to the last reel');
+  assert(JSON.stringify(reelMountSet(-2, 3)) === '[0,1]', 'a negative index clamps to the first');
+  assert(stepReel(0, 1, 5) === 1 && stepReel(4, 1, 5) === 4, 'down stops at the last reel');
+  assert(stepReel(0, -1, 5) === 0 && stepReel(3, -1, 5) === 2, 'up stops at the first reel');
+  assert(stepReel(2, 1, 0) === 0, 'an empty feed stays at 0');
+  const mid = sourceSpan(900, 960, 3600);
+  assert(near(mid.left, 25) && near(mid.width, 100 / 60), 'a 60 s clip at 15:00 of 1 h sits at 25% and spans 60/3600');
+  const tiny = sourceSpan(10, 10.5, 14400);
+  assert(tiny.width >= 0.6, 'a tiny clip stays visible on the source bar');
+  const end = sourceSpan(14390, 14420, 14400);
+  assert(end.left + end.width <= 100 + 1e-9 && end.left >= 0, 'a clip padded past the end stays on the bar');
+  const none = sourceSpan(5, 20, 0);
+  assert(none.left === 0 && none.width === 0, 'unknown duration → no span');
+  assert(formatSourceTime(0) === '0:00' && formatSourceTime(65.4) === '1:05', 'm:ss');
+  assert(formatSourceTime(3600 + 12 * 60 + 4) === '1:12:04', 'h:mm:ss for long videos');
+  assert(formatSourceTime(-3) === '0:00' && formatSourceTime(Number.NaN) === '0:00', 'bad input reads as 0:00');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

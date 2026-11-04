@@ -6,13 +6,16 @@
  * Clips are a preview of what this device can play: a video that can't play
  * here shows no clips (and never asks for a file). "Style all clips"
  * puts one caption template on every clip (and on later runs); Select picks
- * some clips for one template, a render or a delete.
+ * some clips for one template, a render or a delete. Clips show as a reels
+ * feed (one clip per screen, playing from the original on this device) or as
+ * a grid; the choice is remembered on this browser.
  */
-import { Captions, ListChecks, Palette } from 'lucide-react';
+import { Captions, GalleryVerticalEnd, LayoutGrid, ListChecks, Palette } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
 import { ClipGrid } from '../../components/clips/ClipGrid';
+import { ReelFeed } from '../../components/clips/ReelFeed';
 import { ClipStyleSheet } from '../../components/clips/ClipStyleSheet';
 import { LinkedVideo } from '../../components/clips/LinkedVideo';
 import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
@@ -24,6 +27,7 @@ import { ClipProcessing } from '../../components/clips/ClipProcessing';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { errorMessage } from '../../lib/api';
 import { analyzeClips, type Clip, type ClipLookPatch } from '../../lib/clips/api';
+import { readClipsView, writeClipsView, type ClipsView } from '../../lib/clips/reelFeed';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipSource, useProjectStyle } from '../../lib/clips/useClipMedia';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
@@ -58,6 +62,7 @@ export function ClipSetPage() {
   const [preset, setPreset] = useState<LengthPresetId>('standard');
   const [maxClips, setMaxClips] = useState(8);
   const [starting, setStarting] = useState(false);
+  const [view, setView] = useState<ClipsView>(readClipsView);
   const openEditor = useOpenInEditor();
 
   const project = data?.project;
@@ -179,6 +184,11 @@ export function ClipSetPage() {
     ? captionLanguageLabel(project.sourceLanguage, project.detectedLanguage, project.outputLanguage)
     : undefined;
 
+  function chooseView(next: ClipsView) {
+    setView(next);
+    writeClipsView(next);
+  }
+
   function toggleSelect(id: string) {
     setSelected((cur) => {
       const next = new Set(cur ?? []);
@@ -257,6 +267,18 @@ export function ClipSetPage() {
               <Captions size={16} aria-hidden="true" />
               Full video in editor
             </Link>
+          )}
+          {clips.length > 0 && (
+            <div className="clips-view-toggle" role="group" aria-label="Show clips as">
+              <button type="button" aria-pressed={view === 'reels'} onClick={() => chooseView('reels')}>
+                <GalleryVerticalEnd size={16} aria-hidden="true" />
+                Reels
+              </button>
+              <button type="button" aria-pressed={view === 'grid'} onClick={() => chooseView('grid')}>
+                <LayoutGrid size={16} aria-hidden="true" />
+                Grid
+              </button>
+            </div>
           )}
           {clips.length > 0 && !working && (
             <button type="button" className="btn ghost clips-head-btn" onClick={() => setSheet('all')}>
@@ -354,7 +376,22 @@ export function ClipSetPage() {
         />
       )}
 
-      {clips.length > 0 && project && (
+      {clips.length > 0 && project && view === 'reels' && (
+        <ReelFeed
+          clips={clips}
+          project={project}
+          renders={renders}
+          selected={selected ?? undefined}
+          onToggleSelect={(c) => toggleSelect(c._id)}
+          onOpen={(c) => navigate(`/clips/${projectId}/${c._id}`)}
+          onEditCaptions={(c) => openEditor.open(projectId, c)}
+          onRender={canRender ? (c) => renderJobs([c]) : undefined}
+          onDownload={(c) => void download(c)}
+          onDelete={(c) => void remove(c)}
+        />
+      )}
+
+      {clips.length > 0 && project && view === 'grid' && (
         <ClipGrid
           clips={clips}
           project={project}
