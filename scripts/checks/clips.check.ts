@@ -12,7 +12,7 @@ import { forgetsProject } from '../../src/lib/media/retentionRules';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../src/lib/languageLabel';
 import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/clips/clipProject';
 import { clipClock, clipFontFactor, clipFraming, shiftCaptions } from '../../src/lib/clips/clipClock';
-import { formatSourceTime, reelMountSet, sourceSpan, stepReel } from '../../src/lib/clips/reelFeed';
+import { feedHeightFor, formatSourceTime, playFallback, reelMountSet, sourceSpan, stepReel } from '../../src/lib/clips/reelFeed';
 import { refusedByServer } from '../../src/lib/clips/refused';
 
 let passed = 0;
@@ -490,6 +490,26 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(!refusedByServer({ code: 'ECONNABORTED' }), 'a timeout (no response) may have started the job');
   assert(!refusedByServer({ message: 'Network Error' }), 'a dropped connection may have started the job');
   assert(!refusedByServer(undefined) && !refusedByServer(null) && !refusedByServer('x'), 'non-errors are not refusals');
+}
+
+// ── reels feed height: the screen under the header; a phone (either way up) gets a full screen under its app bar ──
+{
+  assert(feedHeightFor({ viewportW: 1440, viewportH: 900, top: 320, barH: 72 }) === 564, 'desktop: what is left under the page header');
+  assert(feedHeightFor({ viewportW: 2560, viewportH: 1600, top: 320, barH: 72 }) === 980, 'a big screen is capped');
+  assert(feedHeightFor({ viewportW: 1024, viewportH: 700, top: 370, barH: 72 }) === 480, 'a short desktop keeps a usable minimum (you scroll to it)');
+  assert(feedHeightFor({ viewportW: 390, viewportH: 844, top: 600, barH: 64 }) === 772, 'phone upright: a full screen under the app bar');
+  const sideways = feedHeightFor({ viewportW: 844, viewportH: 390, top: 300, barH: 64 });
+  assert(sideways === 318, `phone sideways fits under its app bar (got ${sideways})`);
+  assert(sideways <= 390 - 64, 'never taller than the screen under the app bar');
+  assert(feedHeightFor({ viewportW: 700, viewportH: 200, top: 0, barH: 64 }) >= 240, 'a tiny window still gets something');
+}
+
+// ── playback the browser refuses (iPhone: sound needs a tap on that very video) ──
+{
+  assert(playFallback('NotAllowedError', false) === 'retry-muted', 'sound refused → play muted (the mute button shows it)');
+  assert(playFallback('NotAllowedError', true) === 'paused', 'even muted refused (low power mode) → show it paused, a tap plays');
+  assert(playFallback('AbortError', false) === 'ignore', 'a pause/seek interrupting play() is not a failure');
+  assert(playFallback(undefined, true) === 'ignore', 'unknown → leave it');
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

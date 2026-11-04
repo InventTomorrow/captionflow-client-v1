@@ -443,3 +443,82 @@
     display: none;
   }
 }
+
+/* Short and wide (a phone held sideways, a small laptop window): the reel and a compact
+   details column side by side, everything inside one screen. Comes after the phone block so
+   a sideways phone narrower than 760 px also gets columns instead of a squashed stack. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .reel,
+  .reel.is-landscape {
+    grid-template-columns: auto minmax(0, 18rem);
+    grid-template-rows: minmax(0, 1fr);
+    justify-items: stretch;
+    gap: 1rem;
+    padding: 0.5rem 3.75rem 0.5rem 0.75rem;
+  }
+
+  .reel.is-landscape {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+  }
+
+  .reel-stage.is-landscape {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+  }
+
+  .reel-side {
+    width: auto;
+    gap: 0.4rem;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .reel-count,
+  .reel-hook,
+  .reel-why {
+    display: none;
+  }
+
+  .reel-title {
+    font-size: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .reel-actions {
+    gap: 0.4rem;
+    margin-top: 0;
+  }
+
+  .reel-actions .btn.ghost.reel-btn {
+    flex: 1 1 0;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .reel-actions .btn.ghost.reel-btn .reel-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .reel-delete {
+    margin-left: 0;
+  }
+
+  .reel-nav {
+    display: flex;
+    right: 0.4rem;
+    gap: 0.25rem;
+  }
+
+  .reel-nav-pos {
+    display: none;
+  }
+}

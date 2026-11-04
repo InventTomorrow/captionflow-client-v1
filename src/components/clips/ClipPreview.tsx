@@ -13,6 +13,7 @@ import { isKineticTemplate } from '../../lib/kinetic/engine';
 import { sliceCaptionsToRange } from '../../lib/clips/sliceCaptions';
 import { aspectDims, type ClipAspect } from '../../lib/clips/clipMath';
 import { coverObjectPosition, cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
+import { playFallback } from '../../lib/clips/reelFeed';
 import type { EditorStyle } from '../../lib/export/styleSnapshot';
 import type { Caption } from '../../stores/captionStore';
 
@@ -51,6 +52,8 @@ export interface ClipPreviewProps {
   className?: string;
   /** Clip-relative playhead, for a progress bar (called each animation frame while playing). */
   onTime?: (t: number) => void;
+  /** The browser refused play(): it now plays muted ('retry-muted'), or stays stopped ('paused'). */
+  onPlayBlocked?: (outcome: 'retry-muted' | 'paused') => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
@@ -69,6 +72,7 @@ export function ClipPreview({
   muted = true,
   className,
   onTime,
+  onPlayBlocked,
   videoRef: externalRef,
 }: ClipPreviewProps) {
   // Where the clip sits in the playing file.
@@ -86,6 +90,8 @@ export function ClipPreview({
   dimsRef.current = aspectDims(aspect);
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
+  const onPlayBlockedRef = useRef(onPlayBlocked);
+  onPlayBlockedRef.current = onPlayBlocked;
 
   const display = useMemo(
     () => deriveDisplayCaptions(clipCaptions(captions, clipStart, clipEnd, offset), style.displayMode, style.displayWords),
@@ -119,11 +125,27 @@ export function ClipPreview({
     };
   }, [videoRef, start, end, src]);
 
+  // A refused play() never leaves a stopped video that looks like it plays (iPhones refuse sound
+  // on a video the person didn't tap): it plays muted instead, or the caller shows it paused.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (playing) void v.play().catch(() => undefined);
-    else v.pause();
+    if (!playing) {
+      v.pause();
+      return;
+    }
+    void v.play().catch((err: unknown) => {
+      const outcome = playFallback((err as { name?: string } | null)?.name, v.muted);
+      if (outcome === 'retry-muted') {
+        v.muted = true;
+        onPlayBlockedRef.current?.('retry-muted');
+        void v.play().catch((again: unknown) => {
+          if (playFallback((again as { name?: string } | null)?.name, true) === 'paused') onPlayBlockedRef.current?.('paused');
+        });
+      } else if (outcome === 'paused') {
+        onPlayBlockedRef.current?.('paused');
+      }
+    });
   }, [playing, videoRef, src]);
 
   // Drop the skeleton once the first frame can paint; raise it again for a new source.

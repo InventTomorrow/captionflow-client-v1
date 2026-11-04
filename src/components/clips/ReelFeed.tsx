@@ -16,7 +16,7 @@ import { localClipMedia } from '../../lib/clips/clipMedia';
 import { clipAspect, clipStyle, cropTrackFor, deferredIn, formatClipLength, scoreTone } from '../../lib/clips/clipMath';
 import { linkPosters } from '../../lib/clips/linkSource';
 import { loadProjectAssets, type ProjectAssets } from '../../lib/clips/projectAssets';
-import { formatSourceTime, reelMountSet, sourceSpan, stepReel } from '../../lib/clips/reelFeed';
+import { feedHeightFor, formatSourceTime, reelMountSet, sourceSpan, stepReel } from '../../lib/clips/reelFeed';
 import { projectCaptions } from '../../lib/clips/renderClip';
 import { getClipThumb } from '../../lib/clips/thumbs';
 import type { RenderState } from '../../stores/clipsStore';
@@ -40,12 +40,6 @@ interface ReelFeedProps {
 /** A linked video's clip part on this device: object URL + the source time at its 0:00 (null = none here). */
 type Part = { url: string; offset: number } | null;
 
-/** The feed fills the screen below the page header (never shorter than this, never taller than the max). */
-const FEED_MIN_PX = 480;
-const FEED_MAX_PX = 980;
-/** On a phone the page header is taller than a screen: the feed is a full screen (minus the app bar) you scroll to. */
-const PHONE_MAX_WIDTH = 760;
-const PHONE_APP_BAR_PX = 88;
 
 const partKey = (c: Clip) => `${c._id}:${c.start}:${c.end}`;
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -86,7 +80,15 @@ export function ReelFeed({
   /** Changes whenever the reels are different nodes (a re-run can return as many clips as before). */
   const idsKey = clips.map((c) => c._id).join(',');
 
-  useEffect(() => () => partUrls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    const urls = partUrls.current; // the same array the lookups push into
+    return () => {
+      alive.current = false;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
 
   // The original (or the server stream), the captions and the video's style — once per project.
   useEffect(() => {
@@ -120,6 +122,8 @@ export function ReelFeed({
       partsAsked.current.add(key);
       void localClipMedia(projectId, clip)
         .then((m) => {
+          // Left the feed (e.g. switched to Grid) before the part was found: make no URL nobody will revoke.
+          if (!alive.current) return;
           const url = m ? URL.createObjectURL(m.file) : null;
           if (url) partUrls.current.push(url);
           setParts((s) => ({ ...s, [key]: url && m ? { url, offset: m.offset } : null }));
@@ -132,16 +136,21 @@ export function ReelFeed({
   useLayoutEffect(() => {
     const el = feedRef.current;
     if (!el) return;
-    const fit = () => {
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const h = Math.round(
-        window.innerWidth <= PHONE_MAX_WIDTH ? window.innerHeight - PHONE_APP_BAR_PX : window.innerHeight - top - 16,
+    const fit = () =>
+      setFeedHeight(
+        feedHeightFor({
+          viewportW: window.innerWidth,
+          viewportH: window.innerHeight,
+          top: el.getBoundingClientRect().top + window.scrollY,
+          // The sticky app bar stays on screen above the feed.
+          barH: document.querySelector('.topbar')?.getBoundingClientRect().height ?? 0,
+        }),
       );
-      setFeedHeight(Math.min(FEED_MAX_PX, Math.max(FEED_MIN_PX, h)));
-    };
     fit();
+    // The page container, not <body>: body is fixed at the screen's height, so it never resizes when
+    // the header above the feed grows (its stats arrive after the clips) — the page container does.
     const ro = new ResizeObserver(fit);
-    ro.observe(document.body);
+    ro.observe(el.closest('.clips-page') ?? el.parentElement ?? document.body);
     window.addEventListener('resize', fit);
     return () => {
       ro.disconnect();
@@ -169,6 +178,38 @@ export function ReelFeed({
   // A new reel starts playing.
   useEffect(() => setPaused(false), [activeIdx]);
 
+  /** The playing reel's <video> (the active reel's ClipPreview). */
+  const activeVideo = () => reelRefs.current[activeIdx]?.querySelector('video') ?? null;
+
+  // Play and unmute act on the video inside the tap / key press itself: iPhones allow sound
+  // (and play after a refusal) only from a gesture, not from an effect a render later.
+  function togglePlay() {
+    const v = activeVideo();
+    if (paused) {
+      if (v) void v.play().catch(() => undefined);
+      setPaused(false);
+    } else {
+      v?.pause();
+      setPaused(true);
+    }
+  }
+
+  function toggleMute() {
+    const next = !muted;
+    const v = activeVideo();
+    if (v) {
+      v.muted = next;
+      if (!next && !paused && v.paused) void v.play().catch(() => undefined);
+    }
+    setMuted(next);
+  }
+
+  /** The browser refused to play the active reel (iPhone: sound on a video nobody tapped). */
+  const onPlayBlocked = useCallback((outcome: 'retry-muted' | 'paused') => {
+    if (outcome === 'retry-muted') setMuted(true);
+    else setPaused(true);
+  }, []);
+
   // Scroll the feed only — scrollIntoView would also move the page (and tuck the reel under the sticky header).
   const goTo = useCallback((i: number) => {
     const feed = feedRef.current;
@@ -187,9 +228,9 @@ export function ReelFeed({
       goTo(stepReel(activeIdx, -1, count));
     } else if (own && e.key === ' ') {
       e.preventDefault();
-      setPaused((p) => !p);
+      togglePlay();
     } else if (own && e.key === 'm') {
-      setMuted((m) => !m);
+      toggleMute();
     }
   }
 
@@ -249,6 +290,7 @@ export function ReelFeed({
                     muted={muted || !isActive}
                     className="reel-video"
                     onTime={isActive ? (t) => onTime(t, clip.end - clip.start) : undefined}
+                    onPlayBlocked={isActive ? onPlayBlocked : undefined}
                   />
                 ) : (
                   <ReelPoster clip={clip} projectId={projectId} videoKind={project.video?.kind} near={Math.abs(i - activeIdx) <= 2} fallbacks={linkPosters(link)} />
@@ -262,7 +304,7 @@ export function ReelFeed({
                   <button
                     type="button"
                     className="reel-tap"
-                    onClick={() => (isActive ? setPaused((p) => !p) : goTo(i))}
+                    onClick={() => (isActive ? togglePlay() : goTo(i))}
                     aria-label={isActive ? (paused ? 'Play' : 'Pause') : `Play ${name}`}
                   />
                 )}
@@ -277,14 +319,15 @@ export function ReelFeed({
                 <button
                   type="button"
                   className="reel-mute"
-                  onClick={() => setMuted((m) => !m)}
+                  onClick={toggleMute}
                   aria-label="Mute"
                   aria-pressed={muted}
                 >
                   {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
                 </button>
                 <span className="reel-progress" aria-hidden="true">
-                  <span ref={isActive ? progressRef : undefined} />
+                  {/* Only the playing reel's bar moves; a reel you scroll back to starts from empty. */}
+                  <span ref={isActive ? progressRef : undefined} style={isActive ? undefined : { transform: 'scaleX(0)' }} />
                 </span>
                 {rendering && (
                   <span className="clip-render-bar" role="progressbar" aria-label="Rendering" aria-valuenow={Math.round(render?.percent ?? 0)} aria-valuemin={0} aria-valuemax={100}>
@@ -378,7 +421,7 @@ export function ReelFeed({
         <button type="button" className="reel-nav-btn" onClick={() => goTo(stepReel(activeIdx, 1, count))} disabled={activeIdx >= count - 1} aria-label="Next clip">
           <ChevronDown size={20} aria-hidden="true" />
         </button>
-        <button type="button" className="reel-nav-btn" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play' : 'Pause'}>
+        <button type="button" className="reel-nav-btn" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
           {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
         </button>
       </div>

@@ -21,6 +21,41 @@ export function stepReel(current: number, delta: number, count: number): number 
   return Math.min(Math.max(0, current + delta), count - 1);
 }
 
+/** The feed fills the screen under the page header — never shorter than this, never taller than the max. */
+const FEED_MIN_PX = 480;
+const FEED_MAX_PX = 980;
+/** Below this it is never shrunk further (a very small window scrolls instead). */
+const FEED_FLOOR_PX = 240;
+/** Phones (and any short screen, like a phone held sideways) get a full screen under their app bar. */
+const PHONE_MAX_WIDTH = 760;
+const SHORT_MAX_HEIGHT = 560;
+
+/**
+ * Height of the reels feed, in px. Desktop: the screen left under the page
+ * header (`top`, from the document's top). Phone, upright or sideways: a full
+ * screen under the sticky app bar (`barH`) — the header above is taller than
+ * a phone screen, so you scroll to the feed and it fills the view.
+ */
+export function feedHeightFor(v: { viewportW: number; viewportH: number; top: number; barH: number }): number {
+  const underBar = v.viewportH - v.barH - 8;
+  const phone = v.viewportW <= PHONE_MAX_WIDTH || v.viewportH <= SHORT_MAX_HEIGHT;
+  const wanted = phone ? underBar : v.viewportH - v.top - 16;
+  const floor = Math.max(FEED_FLOOR_PX, Math.min(FEED_MIN_PX, underBar));
+  return Math.round(Math.min(FEED_MAX_PX, Math.max(floor, wanted)));
+}
+
+/**
+ * What a reel does when the browser refuses play(). iPhones only allow sound
+ * on a video the person tapped, so the next reel can be refused: it plays
+ * muted instead (the mute button shows it; one tap brings the sound back).
+ * Refused even muted (e.g. Low Power Mode) → shown paused, a tap plays it.
+ * An AbortError just means a pause or seek interrupted play().
+ */
+export function playFallback(errorName: string | undefined, muted: boolean): 'retry-muted' | 'paused' | 'ignore' {
+  if (errorName !== 'NotAllowedError') return 'ignore';
+  return muted ? 'paused' : 'retry-muted';
+}
+
 /** Smallest visible width (percent) of a clip on the source bar. */
 const MIN_SPAN_PCT = 0.6;
 

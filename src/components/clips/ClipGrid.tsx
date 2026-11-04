@@ -63,7 +63,15 @@ export function ClipGrid({
   const kindOf = useCallback((c: Clip) => c.project?.video?.kind ?? project?.video?.kind, [project]);
   const linkOf = useCallback((c: Clip) => c.project?.sourceUrl ?? project?.sourceUrl, [project]);
 
-  useEffect(() => () => partUrls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    const urls = partUrls.current; // the same array the lookups push into
+    return () => {
+      alive.current = false;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
 
   const activate = useCallback(
     (id: string | null) => {
@@ -76,6 +84,8 @@ export function ClipGrid({
       if (linkOf(clip) && !parts[partKey]) {
         void localClipMedia(clip.projectId, clip)
           .then((m) => {
+            // Left the grid before the part was found: make no URL nobody will revoke.
+            if (!alive.current) return;
             const url = m ? URL.createObjectURL(m.file) : null;
             if (url) partUrls.current.push(url);
             setParts((s) => ({ ...s, [partKey]: url && m ? { url, offset: m.offset } : null }));
