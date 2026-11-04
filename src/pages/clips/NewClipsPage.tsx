@@ -32,7 +32,7 @@ import { buildExportStyle } from '../../lib/export/styleSnapshot';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../../lib/planErrors';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
-import { uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
+import { ClipsDeviceError, uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
 
 function formatSize(bytes: number) {
@@ -143,6 +143,8 @@ export function NewClipsPage() {
     try {
       const uploaded = await uploadProjectMedia(file, setProgress, abort.signal, {
         audioOnlyEnabled: flags.audioOnlyUploadEnabled,
+        // Clips: only the sound goes up; the video never leaves this device.
+        requireAudioOnly: true,
       });
       const projectId = uploaded.projectId;
       const card = templateByKey(templateKey);
@@ -171,6 +173,7 @@ export function NewClipsPage() {
       const data = (err as { response?: { data?: ApiErrorPayload } }).response?.data;
       const plan = resolvePlanError(data);
       if (plan) setPlanError(plan);
+      else if (err instanceof ClipsDeviceError) setError(err.message);
       else if ((err as { name?: string }).name !== 'CanceledError' && (err as { name?: string }).name !== 'AbortError') {
         setError(errorMessage(err, 'Something went wrong — please try again'));
       }
