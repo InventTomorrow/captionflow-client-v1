@@ -32,6 +32,7 @@ import { buildExportStyle } from '../../lib/export/styleSnapshot';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../../lib/planErrors';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
+import { deleteSource } from '../../lib/media/localMedia';
 import { ClipsDeviceError, uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
 
@@ -140,6 +141,8 @@ export function NewClipsPage() {
     setPlanError(null);
     const abort = new AbortController();
     abortRef.current = abort;
+    /** Set once the sound is uploaded: a later refusal (plan limits) removes it again. */
+    let created: string | undefined;
     try {
       const uploaded = await uploadProjectMedia(file, setProgress, abort.signal, {
         audioOnlyEnabled: flags.audioOnlyUploadEnabled,
@@ -147,6 +150,7 @@ export function NewClipsPage() {
         requireAudioOnly: true,
       });
       const projectId = uploaded.projectId;
+      created = projectId;
       const card = templateByKey(templateKey);
       if (card) {
         await api
@@ -168,8 +172,15 @@ export function NewClipsPage() {
           .slice(0, 50),
         clipOptions: clipOptionsFrom(preset, maxClips),
       });
+      created = undefined;
       navigate(`/clips/${projectId}`);
     } catch (err) {
+      // Never leave a half-made Clips video behind (its sound on the server, its copy here).
+      if (created) {
+        const id = created;
+        void api.delete(`/projects/${id}`).catch(() => undefined);
+        void deleteSource(id).catch(() => undefined);
+      }
       const data = (err as { response?: { data?: ApiErrorPayload } }).response?.data;
       const plan = resolvePlanError(data);
       if (plan) setPlanError(plan);

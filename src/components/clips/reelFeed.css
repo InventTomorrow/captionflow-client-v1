@@ -39,13 +39,13 @@
 
 .reel-shell {
   position: relative;
-  margin-bottom: 1.5rem;
+  max-width: 64rem;
+  margin: 0 auto 1.5rem;
 }
 
 .reel-feed {
   height: clamp(520px, calc(100dvh - 210px), 980px);
   overflow-y: auto;
-  overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
   border: 1px solid var(--cf-divider);
@@ -282,6 +282,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.reel-why {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--cf-divider);
+}
+
 .reel-why p {
   margin: 0.25rem 0 0;
   color: var(--cf-text-secondary);
@@ -409,18 +414,14 @@
   }
 
   .reel-actions {
-    flex-wrap: nowrap;
+    gap: 0.4rem;
     margin-top: 0;
   }
 
-  .reel-actions .btn.primary.reel-btn {
-    flex: 1 1 auto;
-  }
-
-  /* Icons only for the secondary actions on a phone (their names stay for screen readers via title/aria). */
+  /* Icons only for the secondary actions on a phone, sharing the row under the main button. */
   .reel-actions .btn.ghost.reel-btn {
-    flex: 0 0 44px;
-    width: 44px;
+    flex: 1 1 0;
+    min-width: 44px;
     padding: 0;
   }
 

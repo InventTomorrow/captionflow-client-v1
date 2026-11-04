@@ -10,7 +10,7 @@
  * editor, render / download, delete).
  */
 import { Captions, Check, ChevronDown, ChevronUp, Clapperboard, Download, Film, Pause, Play, SquarePen, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
 import { localClipMedia } from '../../lib/clips/clipMedia';
 import { clipAspect, clipStyle, cropTrackFor, deferredIn, formatClipLength, scoreTone } from '../../lib/clips/clipMath';
@@ -40,6 +40,13 @@ interface ReelFeedProps {
 /** A linked video's clip part on this device: object URL + the source time at its 0:00 (null = none here). */
 type Part = { url: string; offset: number } | null;
 
+/** The feed fills the screen below the page header (never shorter than this, never taller than the max). */
+const FEED_MIN_PX = 480;
+const FEED_MAX_PX = 980;
+/** On a phone the page header is taller than a screen: the feed is a full screen (minus the app bar) you scroll to. */
+const PHONE_MAX_WIDTH = 760;
+const PHONE_APP_BAR_PX = 88;
+
 const partKey = (c: Clip) => `${c._id}:${c.start}:${c.end}`;
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -62,6 +69,7 @@ export function ReelFeed({
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [assets, setAssets] = useState<ProjectAssets | undefined>();
+  const [feedHeight, setFeedHeight] = useState<number | undefined>();
   const [parts, setParts] = useState<Record<string, Part | undefined>>({});
   const partUrls = useRef<string[]>([]);
   const partsAsked = useRef(new Set<string>());
@@ -71,6 +79,7 @@ export function ReelFeed({
   const link = project.sourceUrl;
   const duration = project.video?.duration ?? 0;
   const count = clips.length;
+  const hasClips = count > 0;
   const activeIdx = Math.min(active, Math.max(0, count - 1));
   const mounted = useMemo(() => new Set(reelMountSet(activeIdx, count)), [activeIdx, count]);
   const activeClip = clips[activeIdx];
@@ -116,6 +125,27 @@ export function ReelFeed({
         .catch(() => setParts((s) => ({ ...s, [key]: null })));
     }
   }, [link, mounted, clips, projectId]);
+
+  // Size the feed to the screen left under the header, so a whole reel and its details are in view.
+  useLayoutEffect(() => {
+    const el = feedRef.current;
+    if (!el) return;
+    const fit = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const h = Math.round(
+        window.innerWidth <= PHONE_MAX_WIDTH ? window.innerHeight - PHONE_APP_BAR_PX : window.innerHeight - top - 16,
+      );
+      setFeedHeight(Math.min(FEED_MAX_PX, Math.max(FEED_MIN_PX, h)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(document.body);
+    window.addEventListener('resize', fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', fit);
+    };
+  }, [hasClips]);
 
   // The reel mostly in view is the active one.
   useEffect(() => {
@@ -169,6 +199,7 @@ export function ReelFeed({
       <div
         className="reel-feed"
         ref={feedRef}
+        style={feedHeight ? { height: feedHeight } : undefined}
         tabIndex={0}
         onKeyDown={onKeyDown}
         role="region"
