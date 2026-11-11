@@ -1,7 +1,9 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
-import { AuthBrand } from '../components/AuthParts';
+import { api, errorMessage } from '../lib/api';
+import { AuthBrand, PasswordChecklist, PasswordInput } from '../components/AuthParts';
+import { passwordPolicyMessage } from '../lib/passwordPolicy';
+import { useFlagsStore } from '../stores/flagsStore';
 
 function MailIcon() {
   return (
@@ -30,7 +32,155 @@ function SpinnerIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+/**
+ * Shown instead of the emailed-link form while the server has no mail
+ * (MAIL_TRANSPORT=off): the account's email plus a new password, set right
+ * here. The server refuses admin/support accounts and rate-limits it.
+ */
+function DirectReset() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  // Same checklist behaviour as the emailed reset form: red only after a refused submit.
+  const [flagUnmet, setFlagUnmet] = useState(false);
+  const policyError = passwordPolicyMessage(password);
+  const banner = (flagUnmet && policyError) || error;
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    // Checked here so a weak password or a typo never spends one of the 5 tries an hour.
+    if (policyError) {
+      setFlagUnmet(true);
+      setError('');
+      return;
+    }
+    if (password !== confirm) {
+      setError('Those passwords do not match.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/auth/reset-password-direct', { email, password });
+      setDone(true);
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Could not reset your password. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="auth-status" role="status">
+        <div className="auth-status-icon is-ok">
+          <CheckIcon />
+        </div>
+        <div className="auth-heading">
+          <h2>Password updated</h2>
+          <p>
+            You can sign in with your new password now. Any other devices that were signed in have
+            been signed out.
+          </p>
+        </div>
+        <Link className="btn primary auth-submit auth-status-action" to="/login">
+          Go to sign in
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="auth-heading">
+        <h2>Forgot your password?</h2>
+        <p>Enter your account email and choose a new password.</p>
+      </div>
+
+      {banner && <div className="error-banner">{banner}</div>}
+
+      <form className="auth-form" onSubmit={onSubmit}>
+        <div className="auth-field">
+          <label htmlFor="forgot-email">Email</label>
+          <div className="auth-input-wrap">
+            <MailIcon />
+            <input
+              id="forgot-email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="forgot-password">New password</label>
+          <PasswordInput
+            id="forgot-password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            aria-describedby="forgot-password-rules"
+          />
+          <PasswordChecklist id="forgot-password-rules" password={password} flagUnmet={flagUnmet} />
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="forgot-confirm">Confirm new password</label>
+          <PasswordInput
+            id="forgot-confirm"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+        </div>
+
+        <button className="btn primary auth-submit" disabled={busy} type="submit">
+          {busy ? (
+            <>
+              <SpinnerIcon />
+              Updating…
+            </>
+          ) : (
+            'Reset password'
+          )}
+        </button>
+      </form>
+
+      <p className="auth-footer">
+        Remembered it? <Link to="/login">Sign in</Link>
+      </p>
+    </>
+  );
+}
+
 export function ForgotPasswordPage() {
+  // Signed-out pages sit outside the app shell that loads flags, so load them here.
+  const loadFlags = useFlagsStore((s) => s.load);
+  const flagsLoaded = useFlagsStore((s) => s.loaded);
+  const emailEnabled = useFlagsStore((s) => s.flags.emailEnabled);
+  useEffect(() => {
+    void loadFlags();
+  }, [loadFlags]);
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -70,7 +220,9 @@ export function ForgotPasswordPage() {
       <section className="auth-card">
         <AuthBrand />
 
-        {sent ? (
+        {!flagsLoaded ? null : !emailEnabled ? (
+          <DirectReset />
+        ) : sent ? (
           <>
             <div className="auth-status">
               <div className="auth-status-icon">

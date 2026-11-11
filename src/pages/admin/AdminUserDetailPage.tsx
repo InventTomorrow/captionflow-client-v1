@@ -92,6 +92,18 @@ export function AdminUserDetailPage() {
     setMsg('Sessions cleared');
   }
 
+  async function verifyEmail() {
+    setMsg('');
+    setError('');
+    try {
+      await api.post(`/admin/users/${id}/verify-email`);
+      setMsg('Email marked as verified');
+      await load();
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed');
+    }
+  }
+
   if (error && !data) return <div className="error-banner">{error}</div>;
   if (!data) return <div className="center">Loading…</div>;
 
@@ -115,6 +127,17 @@ export function AdminUserDetailPage() {
             <dd>
               <span className={`admin-badge ${String(u.status)}`}>{String(u.status)}</span>
             </dd>
+            <dt>Email</dt>
+            <dd>
+              {u.emailVerified === false ? (
+                <span className="admin-badge email-unverified">Not verified</span>
+              ) : (
+                <span className="admin-badge email-verified">
+                  Verified
+                  {u.emailVerifiedAt ? ` ${new Date(String(u.emailVerifiedAt)).toLocaleDateString()}` : ''}
+                </span>
+              )}
+            </dd>
             <dt>Role</dt>
             <dd>{String(u.role)}</dd>
             <dt>Plan</dt>
@@ -136,6 +159,11 @@ export function AdminUserDetailPage() {
             </dd>
           </dl>
           <div className="admin-actions">
+            {u.emailVerified === false && (
+              <button type="button" className="btn primary" onClick={() => void verifyEmail()}>
+                Mark email verified
+              </button>
+            )}
             <button type="button" className="btn ghost" onClick={() => void toggleSuspend()}>
               {u.status === 'suspended' ? 'Reactivate' : 'Suspend'}
             </button>
