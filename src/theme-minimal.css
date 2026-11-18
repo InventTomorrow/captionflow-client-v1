@@ -405,3 +405,10 @@ html .shell:not(.shell-editor) :is(.creation-workflow, .creation-uploader, .crea
 html .shell:not(.shell-editor) .creation-workflow:hover { background: color-mix(in srgb, var(--cf-card) 80%, transparent); }
 html .shell:not(.shell-editor) .creation-workflow.is-selected { background: color-mix(in srgb, var(--cf-accent) 6%, color-mix(in srgb, var(--cf-surface) 72%, transparent)); }
 html .shell:not(.shell-editor) .creation-uploader.is-dragging { background: color-mix(in srgb, var(--cf-card) 85%, transparent); }
+
+/* Create page on phones: the upload text takes the row beside the icon, the button goes full width below. */
+@media (max-width: 700px) {
+  html .creation-uploader { flex-wrap: wrap; align-items: center; }
+  html .creation-uploader .creation-upload-copy { flex: 1 1 0; min-width: 0; }
+  html .creation-uploader .creation-browse { flex: 1 1 100%; margin-left: 0; justify-content: center; }
+}
