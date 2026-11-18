@@ -17,6 +17,7 @@ import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipPreview } from '../../components/clips/ClipPreview';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
 import { LinkedVideo } from '../../components/clips/LinkedVideo';
+import { PageLoader } from '../../components/PageLoader';
 import { ReframeControl } from '../../components/clips/ReframeControl';
 import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
@@ -169,7 +170,8 @@ export function ClipEditorPage() {
     if (rec) await downloadLocalFile(rec.opfsPath, exportFileName(clip.title || project?.name || 'clip', rec.quality, rec.format));
   }
 
-  if (!data) return <div className="clips-page">{error ? <div className="error-banner">{error}</div> : <p className="clips-loading">Loading…</p>}</div>;
+  if (!data && !error) return <PageLoader inline />;
+  if (!data) return <div className="clips-page"><div className="error-banner">{error}</div></div>;
   if (!clip) {
     return (
       <div className="clips-page">

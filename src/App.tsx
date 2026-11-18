@@ -12,6 +12,7 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { UploadPage } from './pages/UploadPage';
 import { LegalPage } from './pages/legal/LegalPage';
 import { AppShell } from './components/AppShell';
+import { PageLoader } from './components/PageLoader';
 import { AdminShell } from './components/admin/AdminShell';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
@@ -42,9 +43,9 @@ function ClipsGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void load();
   }, [load]);
-  if (!loaded) return null;
+  if (!loaded) return <PageLoader inline />;
   if (!flags.clipsEnabled) return <Navigate to="/projects/upload" replace />;
-  return <Suspense fallback={<div className="center">Loading…</div>}>{children}</Suspense>;
+  return <Suspense fallback={<PageLoader inline />}>{children}</Suspense>;
 }
 
 const AdminTemplatesPage = lazy(() =>
@@ -102,7 +103,7 @@ function EditorRedirect() {
 function Private({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
-  if (loading) return <div className="center">Loading…</div>;
+  if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -110,7 +111,7 @@ function Private({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
-  if (loading) return <div className="center">Loading…</div>;
+  if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'admin' && user.role !== 'support') {
     return <Navigate to="/projects/upload" replace />;
@@ -212,7 +213,7 @@ export default function App() {
         <Route
           path=":id/editor"
           element={
-            <Suspense fallback={<div className="center">Loading editor…</div>}>
+            <Suspense fallback={<PageLoader inline label="Loading editor" />}>
               <EditorRoute />
             </Suspense>
           }
@@ -248,7 +249,7 @@ export default function App() {
         <Route
           path="templates"
           element={
-            <Suspense fallback={<div className="center">Loading…</div>}>
+            <Suspense fallback={<PageLoader inline />}>
               <AdminTemplatesPage />
             </Suspense>
           }

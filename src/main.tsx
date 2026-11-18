@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { BootLoaderDone } from './components/BootLoaderDone';
 import { hideBootLoader } from './lib/bootLoader';
 import './index.css';
 import './clips.css';
@@ -14,12 +15,11 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <App />
+        <BootLoaderDone />
       </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>,
 );
 
-// The loading screen (index.html): app pages drop it once rendered; the landing page
-// keeps it until its hero is ready (LandingPage.tsx). Never longer than 8 s, whatever happens.
-if (window.location.pathname !== '/') requestAnimationFrame(() => hideBootLoader());
+// Whatever happens, the boot loader never stays longer than 8 s.
 window.setTimeout(hideBootLoader, 8000);

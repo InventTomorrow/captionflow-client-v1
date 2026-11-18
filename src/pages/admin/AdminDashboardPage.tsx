@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageLoader } from '../../components/PageLoader';
 import { KpiCard } from '../../components/admin/KpiCard';
 import { AdminSelect } from '../../components/admin/AdminSelect';
 import { BarList, SplitBar, TimeChart, type ChartPoint } from '../../components/admin/Charts';
@@ -79,7 +80,7 @@ export function AdminDashboardPage() {
   const periodLabel = PERIOD_OPTIONS.find((p) => p.value === period)?.label.toLowerCase() ?? '';
 
   if (error && !data) return <div className="error-banner">{error}</div>;
-  if (!data) return <div className="center">Loading dashboard…</div>;
+  if (!data) return <PageLoader inline />;
 
   const endedPlans = Math.max(0, data.totalUsers - data.trialUsers - data.activePlans);
 

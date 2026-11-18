@@ -279,6 +279,12 @@ export function AppShell() {
   const location = useLocation();
   const editorActive = useEditorChromeStore((s) => s.active);
   const editorMatch = useMatch('/projects/:id/editor');
+  // Editor header/layout from the moment the route matches, not only once the
+  // lazily loaded EditorPage registers itself — otherwise the header flips from
+  // the nav to the editor bar on every editor open. (`?clip=` links redirect to
+  // Clips, so they keep the normal header.)
+  const editorChrome =
+    editorActive || (!!editorMatch && !new URLSearchParams(location.search).get('clip'));
   const onExport = useEditorChromeStore((s) => s.onExport);
   const onDownloadSrt = useEditorChromeStore((s) => s.onDownloadSrt);
   const flags = useFlagsStore((s) => s.flags);
@@ -311,7 +317,7 @@ export function AppShell() {
   }, [editorActive, location.pathname]);
 
   return (
-    <div className={`shell ${editorActive ? 'shell-editor' : ''}`}>
+    <div className={`shell ${editorChrome ? 'shell-editor' : ''}`}>
       {flags.maintenanceMode && (
         <div className="maintenance-banner">
           {flags.maintenanceMessage || 'Asaan Caption is undergoing maintenance - some features may be unavailable.'}
@@ -323,7 +329,7 @@ export function AppShell() {
             <img src="/logo-mark.png" alt="" className="brand-logo-mark" />
             <img src="/logo-wordmark.png" alt="Asaan Caption" className="brand-logo-wordmark" />
           </Link>
-          {editorActive ? (
+          {editorChrome ? (
             <>
               <span className="topbar-divider" aria-hidden="true" />
               {flags.clipsEnabled && editorMatch?.params.id && (
@@ -421,7 +427,7 @@ export function AppShell() {
           )}
         </div>
       </header>
-      <main className={`main${editorActive ? ' main-editor' : ''}${creatorSurface}`}>
+      <main className={`main${editorChrome ? ' main-editor' : ''}${creatorSurface}`}>
         <Outlet />
       </main>
       {/* Rendered here, outside <header>, because .topbar's backdrop-filter

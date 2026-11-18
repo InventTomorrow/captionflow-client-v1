@@ -24,6 +24,7 @@ import { templateByKey } from '../../lib/templateCatalog';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
 import { clipOptionsFrom, LENGTH_PRESETS, type LengthPresetId } from '../../lib/clips/clipOptions';
 import { ClipProcessing } from '../../components/clips/ClipProcessing';
+import { PageLoader } from '../../components/PageLoader';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { errorMessage } from '../../lib/api';
 import { analyzeClips, type Clip, type ClipLookPatch } from '../../lib/clips/api';
@@ -222,6 +223,9 @@ export function ClipSetPage() {
       setError(errorMessage(err, 'Couldn’t delete those clips'));
     }
   }
+
+  // Nothing of this video to draw until it loads (a failed load keeps the page for its error).
+  if (!data && !error) return <PageLoader inline />;
 
   // A video this device can't play: its clips aren't shown here.
   if (project && source.missing) {

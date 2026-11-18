@@ -1,0 +1,69 @@
+/* PageLoader — matches the boot loader in index.html (#boot-loader). Keep the two in step. */
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  background: var(--cf-bg, #090a0c);
+}
+/* Inside the app shell: fills the page area under the top bar, which stays visible.
+   The parent stretches it (below) instead of a viewport-based min-height, which
+   ignored the parent's padding and pushed the page past the viewport — a
+   scrollbar flashed in and shifted the sticky header sideways. */
+.page-loader-inline {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background: transparent;
+}
+.main:has(> .page-loader-inline),
+.admin-content:has(> .page-loader-inline) {
+  display: flex;
+  flex-direction: column;
+}
+.admin-content:has(> .page-loader-inline) {
+  flex: 1;
+}
+.page-loader.is-shown .page-loader-logo,
+.page-loader.is-shown .page-loader-track { animation: page-loader-in 0.25s ease both; }
+.page-loader.no-fade .page-loader-logo,
+.page-loader.no-fade .page-loader-track { animation: none; }
+.page-loader-logo { display: flex; align-items: center; gap: 10px; }
+.page-loader-logo img { display: block; width: auto; }
+.page-loader-track {
+  position: relative;
+  width: 148px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.page-loader-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  background: var(--cf-accent, #89e900);
+  animation: page-loader-slide 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.page-loader-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@keyframes page-loader-slide { from { transform: translateX(-100%); } to { transform: translateX(265%); } }
+@keyframes page-loader-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .page-loader.is-shown .page-loader-logo,
+  .page-loader.is-shown .page-loader-track { animation: none; }
+  .page-loader-track i { animation: none; width: 100%; opacity: 0.45; }
+}

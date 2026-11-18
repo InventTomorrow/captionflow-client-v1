@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { PageLoader } from '../../components/PageLoader';
 import { AdminSelect } from '../../components/admin/AdminSelect';
 
 /** Slug of the free trial's plan record (server TRIAL_PLAN_SLUG). The free trial is not a plan. */
@@ -105,7 +106,7 @@ export function AdminUserDetailPage() {
   }
 
   if (error && !data) return <div className="error-banner">{error}</div>;
-  if (!data) return <div className="center">Loading…</div>;
+  if (!data) return <PageLoader inline />;
 
   const u = data.user;
 

@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { AuthBrand, PasswordChecklist, PasswordInput } from '../components/AuthParts';
+import { PageLoader } from '../components/PageLoader';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { useFlagsStore } from '../stores/flagsStore';
 
@@ -212,6 +213,9 @@ export function ForgotPasswordPage() {
     }
   }
 
+  // emailEnabled decides which form this page is, so wait for the flags (they load once per visit).
+  if (!flagsLoaded) return <PageLoader />;
+
   return (
     <main className="auth-page">
       <div className="auth-glow" aria-hidden="true" />
@@ -220,7 +224,7 @@ export function ForgotPasswordPage() {
       <section className="auth-card">
         <AuthBrand />
 
-        {!flagsLoaded ? null : !emailEnabled ? (
+        {!emailEnabled ? (
           <DirectReset />
         ) : sent ? (
           <>
