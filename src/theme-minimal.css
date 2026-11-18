@@ -1,0 +1,344 @@
+/* theme-minimal.css — the landing page's minimal look, applied across the app.
+ *
+ * Loaded last (main.tsx), after index.css and clips.css. It replaces the
+ * older decorative layers (photo backdrops, glows, orbit rings, gradient
+ * buttons, gradient headline words) with the landing's language: charcoal
+ * surfaces, thin light lines, white primary buttons, grey second lines and
+ * the kiwi green only as a small accent. Selectors start with `html` so they
+ * outrank the rules they replace, wherever those sit in the bundle.
+ */
+
+/* ---------- Brand logo (BrandLogo.tsx: the microphone mark + wordmark images) ---------- */
+.brand-logo { display: inline-flex; align-items: center; gap: 8px; line-height: 0; }
+.brand-logo img { display: block; width: auto; flex: none; }
+.brand-logo-img-mark { height: 36px; }
+.brand-logo-img-word { height: 30px; }
+.brand-logo-sm .brand-logo-img-mark { height: 30px; }
+.brand-logo-sm .brand-logo-img-word { height: 25px; }
+.brand-logo-lg .brand-logo-img-mark { height: 44px; }
+.brand-logo-lg .brand-logo-img-word { height: 36px; }
+
+/* ---------- Top bar ---------- */
+html .topbar {
+  background: color-mix(in srgb, var(--cf-bg) 92%, transparent);
+  border-bottom: 1px solid var(--cf-border);
+}
+html .topbar nav.topbar-nav a + a::before { display: none; }
+html .topbar nav.topbar-nav a { color: var(--cf-text-muted); font-weight: 500; }
+html .topbar nav.topbar-nav a:hover { background: transparent; color: var(--cf-text); }
+html .topbar nav.topbar-nav a.active { background: transparent; color: var(--cf-text); font-weight: 600; }
+html .topbar nav.topbar-nav a.active::after { height: 1px; background: var(--cf-accent); box-shadow: none; }
+html .topbar nav.topbar-nav a.active svg { filter: none; }
+html .topbar-account .plan-badge { border-radius: 6px; box-shadow: none; }
+html .topbar-account .plan-badge-free,
+html .plan-badge-free {
+  background: var(--cf-primary);
+  border-color: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .topbar-account .plan-badge-free .plan-badge-link,
+html .plan-badge-free .plan-badge-link { color: var(--cf-on-primary); }
+html .topbar-account .plan-badge-paid { background: transparent; border-color: var(--cf-border); }
+
+/* ---------- Sign in / sign up / password pages ---------- */
+html .auth-page.auth-split-page {
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, 0.86fr);
+  background: var(--cf-bg);
+}
+html .auth-showcase {
+  justify-content: space-between;
+  gap: 48px;
+  padding: 40px clamp(24px, 5vw, 80px) 32px;
+  background: var(--cf-bg);
+  color: var(--cf-text);
+  border-right: 1px solid var(--cf-border);
+}
+html .auth-showcase::before,
+html .auth-showcase::after { display: none; }
+html .auth-showcase-head { display: flex; align-items: center; }
+html .auth-showcase-logo { color: var(--cf-text); text-decoration: none; }
+html .auth-showcase-copy { max-width: 640px; }
+html .auth-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 22px;
+  font: 11px/1.6 var(--cf-mono);
+  letter-spacing: 0.08em;
+  color: var(--cf-text-secondary);
+}
+html .auth-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cf-accent); flex: none; }
+html .auth-showcase-copy h1 {
+  margin: 0;
+  font-size: clamp(40px, 4.4vw, 66px);
+  font-weight: 450;
+  line-height: 1.06;
+  letter-spacing: -0.05em;
+  color: var(--cf-text);
+}
+html .auth-showcase-copy h1 span {
+  color: var(--cf-text-muted);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+html .auth-showcase-copy p {
+  max-width: 440px;
+  margin: 22px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--cf-text-muted);
+}
+html .auth-points { max-width: 480px; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--cf-border); }
+html .auth-points li {
+  display: flex;
+  gap: 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--cf-border);
+  font-size: 15px;
+  color: var(--cf-text-secondary);
+}
+html .auth-points li span { padding-top: 3px; font: 11px var(--cf-mono); color: var(--cf-text-muted); }
+html .auth-showcase-proof {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--cf-text-muted);
+}
+html .auth-showcase-proof span:last-child { font: 10px var(--cf-mono); letter-spacing: 0.08em; }
+html .auth-entry-pane { background: var(--cf-bg); }
+html .auth-entry-pane .auth-card {
+  border: 1px solid var(--cf-border);
+  border-radius: 12px;
+  background: var(--cf-surface);
+  color: var(--cf-text);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html .auth-split-page .auth-brand { margin-bottom: 4px; }
+html .auth-brand-link { color: var(--cf-text); text-decoration: none; }
+html .auth-split-page .auth-brand-tagline,
+html .auth-brand-tagline { margin: 10px 0 0; font: 11px/1.6 var(--cf-mono); letter-spacing: 0.06em; color: var(--cf-text-muted); }
+html .auth-split-page .auth-heading h2 { color: var(--cf-text); font-weight: 500; letter-spacing: -0.03em; }
+html .auth-split-page .auth-heading p,
+html .auth-split-page .auth-footer,
+html .auth-split-page .auth-note,
+html .auth-split-page .auth-pw-rules li { color: var(--cf-text-muted); }
+html .auth-split-page .auth-field label { color: var(--cf-text-secondary); }
+html .auth-split-page .auth-input-wrap > svg,
+html .auth-split-page .auth-eye { color: var(--cf-text-muted); }
+html .auth-split-page .auth-input-wrap input {
+  border-color: var(--cf-border);
+  background: var(--cf-input);
+  color: var(--cf-text);
+  box-shadow: none;
+}
+html .auth-split-page .auth-input-wrap input::placeholder { color: var(--cf-text-disabled); }
+html .auth-split-page .auth-input-wrap input:focus {
+  border-color: var(--cf-text-muted);
+  background: var(--cf-input);
+  box-shadow: 0 0 0 3px rgba(243, 244, 245, 0.06);
+}
+html .auth-split-page .auth-eye:hover { color: var(--cf-text); background: rgba(255, 255, 255, 0.05); }
+html .auth-split-page .auth-forgot { color: var(--cf-text-muted); }
+html .auth-split-page .auth-forgot:hover { color: var(--cf-text); }
+html .auth-split-page .auth-submit,
+html .auth-submit {
+  border: 1px solid var(--cf-primary);
+  border-radius: 6px;
+  background: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .auth-split-page .auth-submit:hover:not(:disabled),
+html .auth-submit:hover:not(:disabled) { background: var(--cf-primary-hover); box-shadow: none; }
+html .auth-split-page .auth-footer a,
+html .auth-split-page .auth-linkbtn {
+  color: var(--cf-text);
+  text-decoration: underline;
+  text-decoration-color: var(--cf-accent);
+  text-underline-offset: 3px;
+}
+html .auth-split-page .auth-pw-rules li.is-met { color: var(--cf-accent); }
+html .auth-split-page .auth-pw-rules li.is-missing { color: #f87171; }
+html .auth-split-page .auth-email { color: var(--cf-text); }
+html .auth-split-page .ok-banner { border-color: rgba(137, 233, 0, 0.25); background: rgba(137, 233, 0, 0.06); color: #c6f58a; }
+html .auth-split-page .error-banner { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); color: #fca5a5; }
+html .auth-split-page .auth-status-icon { color: var(--cf-accent); }
+html .auth-entry-assurance { color: var(--cf-text-muted); font: 10px/1.6 var(--cf-mono); letter-spacing: 0.06em; }
+@media (max-width: 900px) {
+  html .auth-page.auth-split-page { grid-template-columns: minmax(0, 1fr); }
+  html .auth-showcase { display: none; }
+}
+
+/* ---------- Upload page (caption portal) ---------- */
+html .caption-cinematic-page.caption-portal-page { background: var(--cf-bg); }
+html .caption-portal-page .caption-glow,
+html .caption-portal-page .caption-portal-scene,
+html .caption-portal-page .caption-drop-atmosphere,
+html .caption-upload-beats { display: none; }
+html .caption-portal-page .caption-cinematic-title h1 span,
+html .clips-portal-page .clips-cinematic-title h1 span {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--cf-text-muted);
+}
+html .caption-portal-page .caption-cinematic-canvas,
+html .caption-portal-page .caption-cinematic-bands.caption-wizard-bands,
+html .caption-portal-page .caption-cinematic-submit,
+html .caption-portal-page .caption-language-band,
+html .caption-portal-page .caption-language-layout {
+  border-color: var(--cf-border);
+  background: var(--cf-surface);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop {
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: var(--cf-surface);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop::before,
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop::after { display: none; }
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop:hover,
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop.is-dragging {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: var(--cf-card);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-wizard-panel .caption-cinematic-drop-icon:not(.has-preview) {
+  border: 1px solid var(--cf-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--cf-text-secondary);
+}
+html .caption-portal-page .caption-wizard-panel .caption-browse {
+  border-radius: 6px;
+  background: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-wizard-panel .caption-formats span {
+  border-color: var(--cf-border);
+  background: transparent;
+  color: var(--cf-text-muted);
+  font-family: var(--cf-mono);
+}
+
+/* Step indicators (upload + New Clips) */
+html .caption-portal-page .caption-cinematic-steps li:not(:last-child)::after,
+html .clips-portal-page .clips-cinematic-steps li:not(:last-child)::after { background: var(--cf-border); }
+html .caption-portal-page .caption-cinematic-steps li > span,
+html .clips-portal-page .clips-cinematic-steps li > span {
+  border-color: var(--cf-border);
+  background: var(--cf-bg);
+  color: var(--cf-text-muted);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-cinematic-steps li.is-active > span,
+html .clips-portal-page .clips-cinematic-steps li.is-active > span {
+  border-color: var(--cf-text);
+  background: var(--cf-text);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+
+/* ---------- New Clips page (clips portal) ---------- */
+html .clips-create-page.clips-portal-page { background: var(--cf-bg); }
+html .clips-portal-page .clips-create-library-link { border-color: var(--cf-border); background: transparent; }
+html .clips-portal-page .clips-cinematic-canvas,
+html .clips-portal-page .clips-cinematic-band,
+html .clips-portal-page .clips-source-band,
+html .clips-portal-page .clips-cinematic-submit {
+  border-color: var(--cf-border);
+  background: var(--cf-surface);
+  box-shadow: none;
+}
+html .clips-portal-page .clips-cinematic-bands { border-color: var(--cf-border); }
+html .clips-portal-page .clips-inline-upload {
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: var(--cf-surface);
+  box-shadow: none;
+}
+html .clips-portal-page .clips-inline-upload::before,
+html .clips-portal-page .clips-inline-upload::after { display: none; }
+html .clips-portal-page .clips-inline-upload:hover,
+html .clips-portal-page .clips-inline-upload.is-dragging {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: var(--cf-card);
+  box-shadow: none;
+}
+html .clips-portal-page .clips-inline-upload-icon:not(.has-preview) {
+  border: 1px solid var(--cf-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--cf-text-secondary);
+}
+html .clips-portal-page .clips-inline-upload-action,
+html .clips-portal-page .clips-inline-upload > button {
+  border-radius: 6px;
+  background: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .clips-portal-page .clips-inline-upload-icon.has-preview { box-shadow: none; }
+html .clips-portal-page .clips-cinematic-band .premium-select-trigger,
+html .clips-portal-page .clips-cinematic-band .clip-field input[type] { border-color: var(--cf-border); background: var(--cf-input); }
+html .clips-portal-page .clips-create-cta,
+html .clips-create-cta {
+  border: 1px solid var(--cf-primary);
+  border-radius: 6px;
+  background: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .clips-portal-page .clips-create-cta:hover:not(:disabled),
+html .clips-create-cta:hover:not(:disabled) { background: var(--cf-primary-hover); }
+html .clips-portal-page .clips-create-cta:disabled { opacity: 0.45; }
+
+/* ---------- Leftover glows and green lines ---------- */
+html .shell .topbar,
+html body .topbar {
+  border-top: 0;
+  background: color-mix(in srgb, var(--cf-bg) 92%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+}
+html .topbar::before,
+html .topbar::after { display: none; }
+html .topbar-avatar {
+  border: 1px solid var(--cf-border);
+  background: var(--cf-card);
+  color: var(--cf-text);
+  box-shadow: none;
+}
+html .caption-portal-page .caption-cinematic-title h1,
+html .clips-portal-page .clips-cinematic-title h1 { text-shadow: none; }
+html .caption-cinematic-title h1 span,
+html .clips-cinematic-title h1 span { color: var(--cf-text-muted); }
+
+/* The form card repeats the logo only where the story panel beside it is hidden (small screens). */
+@media (min-width: 901px) {
+  html .auth-split-page .auth-card .auth-brand { display: none; }
+}
+
+/* ---------- Editor ---------- */
+html .btn.topbar-upload-btn { white-space: nowrap; }
+html .btn.topbar-upload-btn svg { width: 1rem; height: 1rem; flex: none; }
+html .player-btn.play {
+  border-color: var(--cf-primary);
+  background: var(--cf-primary);
+  color: var(--cf-on-primary);
+  box-shadow: none;
+}
+html .player-btn.play:hover { background: var(--cf-primary-hover); color: var(--cf-on-primary); }
+html .rail-item.active {
+  border-color: var(--cf-border);
+  background: var(--cf-surface-2);
+  color: var(--cf-text);
+}

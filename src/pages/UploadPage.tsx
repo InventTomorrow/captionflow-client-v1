@@ -187,30 +187,6 @@ export function UploadPage() {
 
   return (
     <div className="up-page caption-page caption-cinematic-page caption-portal-page">
-      <div className="caption-glow caption-glow-a" aria-hidden="true" />
-      <div className="caption-glow caption-glow-b" aria-hidden="true" />
-      <div className="caption-portal-scene" aria-hidden="true">
-        <div className="caption-portal-backdrop" />
-        <div className="caption-filmstrip caption-filmstrip-left">
-          {[0, 1, 2, 3].map((frame) => <span key={frame} style={{ '--film-frame': frame } as React.CSSProperties} />)}
-        </div>
-        <div className="caption-filmstrip caption-filmstrip-right">
-          {[0, 1, 2, 3].map((frame) => <span key={frame} style={{ '--film-frame': frame + 4 } as React.CSSProperties} />)}
-        </div>
-        <div className="caption-portal-waves">
-          <svg viewBox="0 0 1600 320" preserveAspectRatio="none">
-            {[0, 1, 2, 3, 4, 5].map((line) => (
-              <path
-                key={line}
-                style={{ '--wave-line': line } as React.CSSProperties}
-                d={`M-40 ${178 + line * 8} C 120 ${36 + line * 5}, 235 ${298 - line * 6}, 425 ${190 + line * 4} S 720 ${118 + line * 7}, 905 ${194 - line * 3} S 1240 ${292 - line * 8}, 1640 ${128 + line * 6}`}
-              />
-            ))}
-          </svg>
-          <i />
-        </div>
-      </div>
-
       <div className="up-container caption-container caption-cinematic-container">
         <header className="caption-cinematic-header">
           <div className="caption-cinematic-title">

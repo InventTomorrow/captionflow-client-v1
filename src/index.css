@@ -1,5 +1,8 @@
-/* Core UI + caption fonts (regular & bold) */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&family=Poppins:wght@400;600;700&family=Oswald:wght@500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rajdhani:wght@600;700&family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Inter:wght@400;500;600;700;800;900&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Rubik:wght@400;700&family=Kanit:wght@400;700&family=Barlow:wght@400;700&family=Manrope:wght@400;700&family=Work+Sans:wght@400;700&family=DM+Sans:wght@400;700&family=Outfit:wght@400;700&family=Sora:wght@400;700&family=Exo+2:wght@400;700&display=swap');
+/* UI font (DM Sans, variable weights, as on the landing page) */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&display=swap');
+
+/* Caption fonts (regular & bold) */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&family=Poppins:wght@400;600;700&family=Oswald:wght@500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rajdhani:wght@600;700&family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Inter:wght@400;500;600;700;800;900&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Rubik:wght@400;700&family=Kanit:wght@400;700&family=Barlow:wght@400;700&family=Manrope:wght@400;700&family=Work+Sans:wght@400;700&family=Outfit:wght@400;700&family=Sora:wght@400;700&family=Exo+2:wght@400;700&display=swap');
 
 /* Display / condensed / serif caption fonts */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Teko:wght@400;700&family=Staatliches&family=Saira+Condensed:wght@400;700&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,700&family=Fjalla+One&family=Archivo:wght@400;700&family=Archivo+Black&family=Anton&family=Bebas+Neue&family=Bangers&family=Bungee&family=Luckiest+Guy&family=Titan+One&family=Righteous&family=Russo+One&family=Alfa+Slab+One&family=Concert+One&family=Secular+One&family=Passion+One:wght@400;700&display=swap');
@@ -11,28 +14,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Lobster&family=Pacifico&family=Permanent+Marker&family=Shadows+Into+Light&family=Dancing+Script:wght@400;700&family=Caveat:wght@400;700&family=Amatic+SC:wght@400;700&family=Comfortaa:wght@400;700&family=Quicksand:wght@400;700&family=Fredoka:wght@400;700&family=Baloo+2:wght@400;700&family=Josefin+Sans:wght@400;700&family=Merriweather:wght@400;700&family=Lora:wght@400;700&family=PT+Serif:wght@400;700&family=Crimson+Text:wght@400;700&family=Cinzel:wght@400;700&family=Cormorant+Garamond:wght@400;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Cairo:wght@400;700&family=Tajawal:wght@400;700&family=Amiri:wght@400;700&family=Noto+Sans+Arabic:wght@400;700&display=swap');
 
 :root {
-  /* Palette — NIGHT BLUE + KIWI */
-  --cf-bg: #0B141E; /* app background */
-  --cf-surface: #0E1A27; /* main panels */
-  --cf-surface-2: #263B52; /* raised surface, card hover */
-  --cf-card: #1F3046; /* cards */
-  --cf-border: #29405A; /* panel borders */
-  --cf-divider: #1F3247;
-  --cf-sidebar: #0E1926; /* icon rail + side drawer */
-  --cf-input: #182A3D; /* inputs, secondary surfaces */
-  --cf-timeline: #0B1828;
-  --cf-timeline-card: #13263A;
+  /* Palette — CHARCOAL + KIWI, matching the landing page: near-black surfaces,
+     soft white type, thin light lines, and the kiwi green only as a small accent. */
+  --cf-bg: #090A0C; /* app background */
+  --cf-surface: #0E1013; /* main panels */
+  --cf-surface-2: #181B20; /* raised surface, card hover */
+  --cf-card: #111419; /* cards */
+  --cf-border: #24262B; /* panel borders (the landing's 11% white line) */
+  --cf-divider: #1A1C20;
+  --cf-sidebar: #0C0D10; /* icon rail + side drawer */
+  --cf-input: #15181D; /* inputs, secondary surfaces */
+  --cf-timeline: #0B0C0F;
+  --cf-timeline-card: #15181D;
   --cf-accent: #89E900;
   --cf-accent-hover: #9AFF1A;
   --cf-accent-active: #74C700;
-  --cf-on-accent: #0B141E;
+  --cf-on-accent: #090A0C;
   --cf-success: #22C55E;
   --cf-warning: #FBBF24;
   --cf-danger: #EF4444;
-  --cf-text: #FFFFFF;
-  --cf-text-secondary: #B6BBC7;
-  --cf-text-muted: #8B9099;
-  --cf-text-disabled: #6A6D75;
+  --cf-text: #F3F4F5;
+  --cf-text-secondary: #B5B7BB;
+  --cf-text-muted: #8D9096;
+  --cf-text-disabled: #5E6167;
+  /* Primary actions are white, as on the landing page (green is for accents). */
+  --cf-primary: #F3F4F5;
+  --cf-primary-hover: #E2E3E5;
+  --cf-on-primary: #121316;
+  --cf-font: 'DM Sans', -apple-system, 'Segoe UI', sans-serif;
+  --cf-mono: 'Courier New', ui-monospace, monospace;
 
   /* Legacy aliases → palette (keep existing class/var names) */
   --bg: var(--cf-bg);
@@ -63,12 +73,13 @@
   --audio-wave: var(--cf-accent);
   --playhead: var(--cf-accent-hover);
   --cursor: var(--cf-accent);
-  --radius: 12px;
-  --shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --radius: 10px;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  font-family: var(--cf-font);
   color: var(--text);
   background: var(--bg);
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -175,7 +186,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--cf-font);
   font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -1029,7 +1040,7 @@ a.lp-brand:hover {
 h1,
 h2,
 h3 {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--cf-font);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -1061,7 +1072,7 @@ h3 {
   background: var(--bg-soft);
   color: var(--text);
   padding: 0.55rem 1.05rem;
-  border-radius: 10px;
+  border-radius: 6px;
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   font-weight: 600;
@@ -1073,34 +1084,35 @@ h3 {
   border-color: var(--line-hover);
 }
 
+/* Primary = white with dark type, like the landing page's buttons. */
 .btn.primary {
-  background: var(--gold);
-  border: 1px solid var(--gold);
-  color: var(--gold-ink);
-  font-weight: 700;
+  background: var(--cf-primary);
+  border: 1px solid var(--cf-primary);
+  color: var(--cf-on-primary);
+  font-weight: 650;
 }
 
 .btn.primary:hover {
-  background: var(--gold-bright);
-  border-color: var(--gold-bright);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--cf-accent) 35%, transparent);
+  background: var(--cf-primary-hover);
+  border-color: var(--cf-primary-hover);
+  color: var(--cf-on-primary);
 }
 
 .btn.primary:active {
-  background: var(--gold-deep);
-  border-color: var(--gold-deep);
+  background: #d4d5d8;
+  border-color: #d4d5d8;
 }
 
-/* Export is the only gradient button in the app */
 .btn.export {
-  background: linear-gradient(135deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
-  border: 1px solid var(--gold);
-  color: var(--gold-ink);
-  font-weight: 700;
+  background: var(--cf-primary);
+  border: 1px solid var(--cf-primary);
+  color: var(--cf-on-primary);
+  font-weight: 650;
 }
 
 .btn.export:hover {
-  box-shadow: 0 0 16px color-mix(in srgb, var(--cf-accent) 40%, transparent);
+  background: var(--cf-primary-hover);
+  border-color: var(--cf-primary-hover);
 }
 
 .btn.ghost {
@@ -1126,7 +1138,7 @@ h3 {
 input,
 select,
 textarea {
-  border-radius: 10px;
+  border-radius: 6px;
   border: 1px solid var(--line);
   background: var(--bg-input);
   color: var(--text);
@@ -1290,7 +1302,7 @@ input[type='checkbox'] {
 
 .auth-forgot {
   font-size: 0.78rem;
-  color: #9aa0aa;
+  color: #9f9f9f;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -1667,8 +1679,8 @@ input[type='checkbox'] {
   color: #f7fbf8;
   background:
     radial-gradient(circle at 92% 92%, rgba(137, 233, 0, 0.045), transparent 31%),
-    radial-gradient(circle at 10% 4%, rgba(68, 111, 158, 0.15), transparent 28%),
-    linear-gradient(145deg, #07111b 0%, #0a1824 58%, #11192c 100%);
+    radial-gradient(circle at 10% 4%, rgba(105, 105, 105, 0.15), transparent 28%),
+    linear-gradient(145deg, #101010 0%, #161616 58%, #191919 100%);
 }
 
 .auth-showcase::after {
@@ -1681,7 +1693,7 @@ input[type='checkbox'] {
   height: 38rem;
   border: 1px solid rgba(137, 233, 0, 0.075);
   border-radius: 50%;
-  box-shadow: 0 0 0 5rem rgba(78, 117, 161, 0.025), 0 0 0 10rem rgba(78, 117, 161, 0.016);
+  box-shadow: 0 0 0 5rem rgba(112, 112, 112, 0.025), 0 0 0 10rem rgba(112, 112, 112, 0.016);
 }
 
 .auth-showcase-grid {
@@ -1690,8 +1702,8 @@ input[type='checkbox'] {
   inset: 0;
   opacity: 0.19;
   background-image:
-    linear-gradient(rgba(126, 162, 200, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(126, 162, 200, 0.11) 1px, transparent 1px);
+    linear-gradient(rgba(157, 157, 157, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157, 157, 157, 0.11) 1px, transparent 1px);
   background-size: 3.5rem 3.5rem;
   mask-image: linear-gradient(135deg, black, transparent 78%);
 }
@@ -1704,7 +1716,7 @@ input[type='checkbox'] {
   width: 32rem;
   height: 32rem;
   border-radius: 50%;
-  background: rgba(58, 104, 151, 0.14);
+  background: rgba(98, 98, 98, 0.14);
   filter: blur(110px);
   pointer-events: none;
 }
@@ -1809,7 +1821,7 @@ input[type='checkbox'] {
 .auth-feature-item:first-child { padding-left: 0; }
 
 .auth-feature-item + .auth-feature-item {
-  border-left: 1px solid rgba(166, 188, 210, 0.13);
+  border-left: 1px solid rgba(185, 185, 185, 0.13);
 }
 
 .auth-feature-icon {
@@ -1820,7 +1832,7 @@ input[type='checkbox'] {
   height: 2.6rem;
   border: 1px solid rgba(137, 233, 0, 0.18);
   border-radius: 0.72rem;
-  background: linear-gradient(145deg, rgba(137, 233, 0, 0.14), rgba(45, 85, 117, 0.18));
+  background: linear-gradient(145deg, rgba(137, 233, 0, 0.14), rgba(79, 79, 79, 0.18));
   color: var(--cf-accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
@@ -1858,7 +1870,7 @@ input[type='checkbox'] {
   overflow: hidden;
   border: 1px solid rgba(197, 224, 204, 0.18);
   border-radius: 1rem;
-  background: rgba(18, 31, 40, 0.84);
+  background: rgba(29, 29, 29, 0.84);
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(16px);
   animation: auth-preview-in 0.7s 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -1950,7 +1962,7 @@ input[type='checkbox'] {
   height: 2.5rem;
   border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: 50%;
-  background: rgba(8, 19, 28, 0.72);
+  background: rgba(17, 17, 17, 0.72);
   color: #fff;
   backdrop-filter: blur(7px);
 }
@@ -1964,7 +1976,7 @@ input[type='checkbox'] {
   bottom: 0.82rem;
   padding: 0.22rem 0.38rem;
   border-radius: 0.3rem;
-  background: rgba(5, 13, 18, 0.76);
+  background: rgba(12, 12, 12, 0.76);
   color: #fff;
   font-size: 0.58rem;
   font-weight: 700;
@@ -2092,9 +2104,9 @@ input[type='checkbox'] {
   width: 1.55rem;
   height: 1.55rem;
   margin-left: -0.35rem;
-  border: 2px solid #0a1722;
+  border: 2px solid #151515;
   border-radius: 50%;
-  background: linear-gradient(145deg, #637d91, #273e52);
+  background: linear-gradient(145deg, #797979, #3b3b3b);
   color: #fff;
   font-size: 0.55rem;
   font-style: normal;
@@ -2155,7 +2167,7 @@ input[type='checkbox'] {
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 46%, rgba(137, 233, 0, 0.035), transparent 34%),
-    radial-gradient(circle at 92% 10%, rgba(76, 109, 159, 0.1), transparent 24%),
+    radial-gradient(circle at 92% 10%, rgba(106, 106, 106, 0.1), transparent 24%),
     linear-gradient(145deg, #fafbfe, #eef2f7);
 }
 
@@ -2171,7 +2183,7 @@ input[type='checkbox'] {
   position: absolute;
   top: 50%;
   left: 50%;
-  border: 1px solid rgba(72, 98, 134, 0.12);
+  border: 1px solid rgba(95, 95, 95, 0.12);
   border-radius: 50%;
   transform: translate(-50%, -50%);
 }
@@ -2184,14 +2196,14 @@ input[type='checkbox'] {
 .auth-orbit-two {
   width: min(34vw, 34rem);
   aspect-ratio: 1;
-  border-color: rgba(75, 111, 153, 0.09);
+  border-color: rgba(106, 106, 106, 0.09);
 }
 
 .auth-orbit-three {
   width: min(25vw, 25rem);
   aspect-ratio: 1;
   border-style: dashed;
-  border-color: rgba(81, 120, 160, 0.12);
+  border-color: rgba(115, 115, 115, 0.12);
 }
 
 .auth-orbit-node {
@@ -2199,8 +2211,8 @@ input[type='checkbox'] {
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
-  background: #9caebe;
-  box-shadow: 0 0 0 5px rgba(100, 125, 147, 0.06);
+  background: #ababab;
+  box-shadow: 0 0 0 5px rgba(121, 121, 121, 0.06);
   animation: auth-node-pulse 4.5s ease-in-out infinite;
 }
 
@@ -2211,7 +2223,7 @@ input[type='checkbox'] {
 
 .auth-orbit-spark {
   position: absolute;
-  color: #aab8c5;
+  color: #b6b6b6;
   font-size: 1.05rem;
   font-weight: 400;
   line-height: 1;
@@ -2232,11 +2244,11 @@ input[type='checkbox'] {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  border: 1px solid rgba(52, 75, 104, 0.09);
+  border: 1px solid rgba(72, 72, 72, 0.09);
   border-radius: 0.85rem;
   background: rgba(255, 255, 255, 0.76);
-  color: #516274;
-  box-shadow: 0 16px 42px rgba(34, 52, 75, 0.09);
+  color: #606060;
+  box-shadow: 0 16px 42px rgba(50, 50, 50, 0.09);
   backdrop-filter: blur(10px);
   transform: rotate(var(--rotation));
   animation: auth-float-soft 8s ease-in-out infinite;
@@ -2249,7 +2261,7 @@ input[type='checkbox'] {
 
 .auth-floating-item svg {
   flex: 0 0 auto;
-  color: #6e8497;
+  color: #818181;
 }
 
 .auth-floating-item p {
@@ -2258,12 +2270,12 @@ input[type='checkbox'] {
 }
 
 .auth-floating-item strong {
-  color: #26384a;
+  color: #353535;
   font-size: 0.67rem;
 }
 
 .auth-floating-item small {
-  color: #8593a1;
+  color: #919191;
   font-size: 0.53rem;
 }
 
@@ -2301,7 +2313,7 @@ input[type='checkbox'] {
 .floating-video-card > svg {
   width: 2rem;
   height: 2rem;
-  color: #6d7f8e;
+  color: #7c7c7c;
 }
 
 .floating-video-card small {
@@ -2310,7 +2322,7 @@ input[type='checkbox'] {
   bottom: 0.35rem;
   padding: 0.15rem 0.28rem;
   border-radius: 0.3rem;
-  background: #6e7d8a;
+  background: #7b7b7b;
   color: #fff;
   font-weight: 700;
 }
@@ -2347,7 +2359,7 @@ input[type='checkbox'] {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 0.5rem;
-  background: #6f8292;
+  background: #7f7f7f;
   color: #fff;
   font-size: 0.62rem;
   font-weight: 800;
@@ -2358,7 +2370,7 @@ input[type='checkbox'] {
   display: block;
   height: 0.27rem;
   border-radius: 99px;
-  background: #d8dfe5;
+  background: #dedede;
 }
 
 .floating-document-card i:nth-of-type(2) { width: 72%; }
@@ -2434,7 +2446,7 @@ input[type='checkbox'] {
 
 .floating-clean-audio > svg {
   width: 1.2rem;
-  color: #657e92;
+  color: #7a7a7a;
 }
 
 .floating-clean-audio > span {
@@ -2494,11 +2506,11 @@ input[type='checkbox'] {
   z-index: 4;
   width: min(30.5rem, 100%);
   padding: clamp(1.65rem, 3vw, 2.4rem);
-  border: 1px solid rgba(37, 55, 78, 0.1);
+  border: 1px solid rgba(53, 53, 53, 0.1);
   border-radius: 1.35rem;
   background: rgba(255, 255, 255, 0.92);
-  color: #121b26;
-  box-shadow: 0 34px 90px rgba(28, 44, 67, 0.14), 0 8px 24px rgba(28, 44, 67, 0.06);
+  color: #1a1a1a;
+  box-shadow: 0 34px 90px rgba(42, 42, 42, 0.14), 0 8px 24px rgba(42, 42, 42, 0.06);
   backdrop-filter: blur(22px);
 }
 
@@ -2522,7 +2534,7 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-brand-wordmark-text > strong {
-  color: #111a25;
+  color: #191919;
   font-size: 1.55rem;
   font-weight: 850;
   letter-spacing: -0.035em;
@@ -2538,7 +2550,7 @@ input[type='checkbox'] {
 
 .auth-split-page .auth-brand-tagline {
   margin-top: 0.22rem;
-  color: #6d7888;
+  color: #777777;
   font-size: 0.72rem;
 }
 
@@ -2547,14 +2559,14 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-heading h2 {
-  color: #111a25;
+  color: #191919;
   font-size: 1.7rem;
   font-weight: 760;
   letter-spacing: -0.035em;
 }
 
 .auth-split-page .auth-heading p {
-  color: #687384;
+  color: #727272;
   font-size: 0.86rem;
 }
 
@@ -2564,25 +2576,25 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-field label {
-  color: #536071;
+  color: #5e5e5e;
   font-size: 0.68rem;
   font-weight: 750;
 }
 
 .auth-split-page .auth-input-wrap > svg {
-  color: #788596;
+  color: #838383;
 }
 
 .auth-split-page .auth-input-wrap input {
   height: 3.15rem;
-  border-color: #d6dde7;
+  border-color: #dcdcdc;
   background: #f8fafd;
-  color: #111a25;
+  color: #191919;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .auth-split-page .auth-input-wrap input::placeholder {
-  color: #929dad;
+  color: #9c9c9c;
 }
 
 .auth-split-page .auth-input-wrap input:focus {
@@ -2592,16 +2604,16 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-eye {
-  color: #7b8797;
+  color: #868686;
 }
 
 .auth-split-page .auth-eye:hover {
-  color: #172130;
-  background: rgba(38, 55, 78, 0.06);
+  color: #202020;
+  background: rgba(53, 53, 53, 0.06);
 }
 
 .auth-split-page .auth-forgot {
-  color: #657183;
+  color: #707070;
 }
 
 .auth-split-page .auth-forgot:hover {
@@ -2624,7 +2636,7 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-footer {
-  color: #6c7787;
+  color: #767676;
   font-size: 0.82rem;
 }
 
@@ -2634,7 +2646,7 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-pw-rules li {
-  color: #758090;
+  color: #7f7f7f;
 }
 
 .auth-split-page .auth-pw-rules li.is-met {
@@ -2646,12 +2658,12 @@ input[type='checkbox'] {
 }
 
 .auth-split-page .auth-email {
-  color: #172130;
+  color: #202020;
 }
 
 .auth-split-page .auth-note {
-  border-top-color: rgba(35, 52, 75, 0.1);
-  color: #6c7787;
+  border-top-color: rgba(50, 50, 50, 0.1);
+  color: #767676;
 }
 
 .auth-split-page .ok-banner {
@@ -2679,7 +2691,7 @@ input[type='checkbox'] {
   align-items: center;
   gap: 0.42rem;
   margin: 0;
-  color: #778292;
+  color: #818181;
   font-size: 0.65rem;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -3250,7 +3262,7 @@ input[type='checkbox'] {
   font-weight: 800;
   letter-spacing: 0.06em;
   color: var(--cf-accent-hover);
-  background: rgba(6, 17, 27, 0.72);
+  background: rgba(15, 15, 15, 0.72);
   border: 1px solid color-mix(in srgb, var(--cf-accent) 40%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -3556,7 +3568,7 @@ input[type='checkbox'] {
   padding: 0.6rem 0.75rem;
   border-radius: 0.8rem;
   text-align: left;
-  background: rgba(8, 20, 30, 0.9);
+  background: rgba(18, 18, 18, 0.9);
   border: 1px solid color-mix(in srgb, var(--cf-accent) 42%, transparent);
   box-shadow:
     0 18px 40px rgba(0, 0, 0, 0.6),
@@ -3663,7 +3675,7 @@ input[type='checkbox'] {
   color: var(--cf-text);
   white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--cf-accent) 26%, transparent);
-  background: rgba(8, 20, 30, 0.55);
+  background: rgba(18, 18, 18, 0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
@@ -3952,7 +3964,7 @@ input[type='checkbox'] {
   margin: 1.5rem auto 0;
   border: 1px solid color-mix(in srgb, var(--cf-border) 75%, transparent);
   border-radius: 1.25rem;
-  background: rgba(13, 26, 38, 0.5);
+  background: rgba(24, 24, 24, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   padding: 1.6rem 1.75rem 1.75rem;
@@ -4096,7 +4108,7 @@ input[type='checkbox'] {
   right: 0.45rem;
   padding: 0.12rem 0.45rem;
   border-radius: 0.5rem;
-  background: rgba(10, 16, 24, 0.82);
+  background: rgba(15, 15, 15, 0.82);
   color: #fff;
   font-size: 0.78rem;
   font-weight: 600;
@@ -6276,7 +6288,7 @@ legend {
   cursor: pointer;
   z-index: 6;
   transition: transform 0.12s ease, background 0.12s ease;
-  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--cf-font);
 }
 
 .capw-delete:hover {
@@ -7035,7 +7047,7 @@ legend {
      textTransform to whatever the active caption template uses (script
      fonts, uppercase, etc.) — this toolbar is app UI, not caption text, so
      it must never inherit that and always render in the app's own font. */
-  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--cf-font);
   text-transform: none;
 }
 
@@ -16938,7 +16950,7 @@ legend {
   isolation: isolate;
   min-height: calc(100dvh - 4.75rem);
   padding: clamp(1.2rem, 2.2vw, 2rem) 0 4rem;
-  background: #06121b;
+  background: #101010;
 }
 
 .caption-portal-scene {
@@ -16953,8 +16965,8 @@ legend {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(4, 15, 23, 0.82) 0%, rgba(4, 15, 23, 0.48) 45%, rgba(4, 15, 23, 0.84) 100%),
-    linear-gradient(90deg, rgba(4, 15, 23, 0.45), transparent 30%, transparent 70%, rgba(4, 15, 23, 0.45)),
+    linear-gradient(180deg, rgba(13, 13, 13, 0.82) 0%, rgba(13, 13, 13, 0.48) 45%, rgba(13, 13, 13, 0.84) 100%),
+    linear-gradient(90deg, rgba(13, 13, 13, 0.45), transparent 30%, transparent 70%, rgba(13, 13, 13, 0.45)),
     url('/media/caption-portal-landscape.png') center 52% / cover no-repeat;
   filter: saturate(0.82) contrast(1.06);
   transform: scale(1.035);
@@ -16967,7 +16979,7 @@ legend {
   inset: 0;
   background:
     radial-gradient(circle at 50% 50%, rgba(59, 205, 177, 0.08), transparent 30rem),
-    linear-gradient(180deg, rgba(2, 9, 14, 0.05), rgba(2, 9, 14, 0.55));
+    linear-gradient(180deg, rgba(8, 8, 8, 0.05), rgba(8, 8, 8, 0.55));
 }
 
 .caption-portal-page .caption-glow {
@@ -16996,7 +17008,7 @@ legend {
 .caption-portal-page .caption-cinematic-eyebrow {
   display: block;
   margin: 1.65rem 0 0.55rem;
-  color: rgba(206, 218, 230, 0.72);
+  color: rgba(216, 216, 216, 0.72);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0;
@@ -17033,7 +17045,7 @@ legend {
   align-content: start;
   justify-items: center;
   gap: 0.5rem;
-  color: rgba(178, 196, 210, 0.55);
+  color: rgba(193, 193, 193, 0.55);
   font-size: 0.67rem;
 }
 
@@ -17047,8 +17059,8 @@ legend {
 .caption-portal-page .caption-cinematic-steps li > span {
   width: 1.75rem;
   height: 1.75rem;
-  border-color: rgba(151, 181, 199, 0.35);
-  background: rgba(5, 18, 27, 0.78);
+  border-color: rgba(176, 176, 176, 0.35);
+  background: rgba(16, 16, 16, 0.78);
   backdrop-filter: blur(10px);
 }
 
@@ -17097,7 +17109,7 @@ legend {
   border: 1px solid rgba(99, 216, 198, 0.78);
   border-radius: 1.15rem;
   background:
-    linear-gradient(180deg, rgba(4, 17, 25, 0.48), rgba(4, 18, 25, 0.6)),
+    linear-gradient(180deg, rgba(15, 15, 15, 0.48), rgba(16, 16, 16, 0.6)),
     url('/media/caption-portal-landscape.png') center 56% / cover no-repeat;
   box-shadow:
     0 32px 80px rgba(0, 0, 0, 0.36),
@@ -17114,14 +17126,14 @@ legend {
   z-index: 0;
   opacity: 0.72;
   background:
-    linear-gradient(#9dc4ca, #9dc4ca) left top / 1.7rem 1px no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) left top / 1px 1.7rem no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) right top / 1.7rem 1px no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) right top / 1px 1.7rem no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) left bottom / 1.7rem 1px no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) left bottom / 1px 1.7rem no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) right bottom / 1.7rem 1px no-repeat,
-    linear-gradient(#9dc4ca, #9dc4ca) right bottom / 1px 1.7rem no-repeat;
+    linear-gradient(#bcbcbc, #bcbcbc) left top / 1.7rem 1px no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) left top / 1px 1.7rem no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) right top / 1.7rem 1px no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) right top / 1px 1.7rem no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) left bottom / 1.7rem 1px no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) left bottom / 1px 1.7rem no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) right bottom / 1.7rem 1px no-repeat,
+    linear-gradient(#bcbcbc, #bcbcbc) right bottom / 1px 1.7rem no-repeat;
   pointer-events: none;
 }
 
@@ -17213,7 +17225,7 @@ legend {
 }
 
 .caption-portal-page .caption-wizard-panel .caption-cinematic-drop-state > p {
-  color: rgba(204, 217, 228, 0.64);
+  color: rgba(215, 215, 215, 0.64);
 }
 
 .caption-portal-page .caption-cinematic-drop:not(.has-file) .caption-cinematic-drop-state > p {
@@ -17230,9 +17242,9 @@ legend {
 }
 
 .caption-portal-page .caption-wizard-panel .caption-formats span {
-  border-color: rgba(158, 195, 208, 0.25);
-  background: rgba(4, 18, 27, 0.45);
-  color: rgba(207, 220, 230, 0.66);
+  border-color: rgba(188, 188, 188, 0.25);
+  background: rgba(16, 16, 16, 0.45);
+  color: rgba(218, 218, 218, 0.66);
   backdrop-filter: blur(8px);
 }
 
@@ -17240,7 +17252,7 @@ legend {
   justify-content: center;
   width: 100%;
   padding-top: 1.35rem;
-  color: rgba(191, 208, 220, 0.62);
+  color: rgba(205, 205, 205, 0.62);
 }
 
 .caption-portal-page .caption-source-foot strong {
@@ -17265,9 +17277,9 @@ legend {
 .caption-portal-page .caption-cinematic-submit {
   margin-top: 1rem;
   overflow: hidden;
-  border: 1px solid rgba(106, 177, 176, 0.22);
+  border: 1px solid rgba(162, 162, 162, 0.22);
   border-radius: 0.85rem;
-  background: rgba(5, 18, 27, 0.78);
+  background: rgba(16, 16, 16, 0.78);
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
   opacity: 1;
   transform: translateY(0);
@@ -17279,15 +17291,15 @@ legend {
   border: 1px solid rgba(99, 216, 198, 0.5);
   border-radius: 1.15rem;
   background:
-    linear-gradient(135deg, rgba(5, 20, 29, 0.88), rgba(6, 25, 32, 0.74)),
+    linear-gradient(135deg, rgba(17, 17, 17, 0.88), rgba(21, 21, 21, 0.74)),
     url('/media/caption-portal-landscape.png') center / cover no-repeat;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.36), 0 0 38px rgba(69, 211, 185, 0.08);
   backdrop-filter: blur(18px);
 }
 
 .caption-portal-page .caption-language-layout {
-  border-color: rgba(105, 183, 181, 0.22);
-  background: rgba(3, 14, 22, 0.66);
+  border-color: rgba(166, 166, 166, 0.22);
+  background: rgba(12, 12, 12, 0.66);
 }
 
 .caption-portal-page .caption-container .rv-panel {
@@ -17303,9 +17315,9 @@ legend {
   height: 8.5rem;
   padding: 1.05rem 0.65rem;
   overflow: hidden;
-  border-top: 0.72rem solid rgba(3, 12, 18, 0.84);
-  border-bottom: 0.72rem solid rgba(3, 12, 18, 0.84);
-  background: rgba(3, 12, 18, 0.72);
+  border-top: 0.72rem solid rgba(11, 11, 11, 0.84);
+  border-bottom: 0.72rem solid rgba(11, 11, 11, 0.84);
+  background: rgba(11, 11, 11, 0.72);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
   opacity: 0.52;
   backdrop-filter: blur(3px);
@@ -17318,7 +17330,7 @@ legend {
   right: 0;
   left: 0;
   height: 0.42rem;
-  background: repeating-linear-gradient(90deg, transparent 0 0.68rem, rgba(80, 112, 127, 0.48) 0.68rem 1.05rem, transparent 1.05rem 1.55rem);
+  background: repeating-linear-gradient(90deg, transparent 0 0.68rem, rgba(106, 106, 106, 0.48) 0.68rem 1.05rem, transparent 1.05rem 1.55rem);
 }
 
 .caption-filmstrip::before { top: -0.62rem; }
@@ -17326,10 +17338,10 @@ legend {
 
 .caption-filmstrip span {
   flex: 0 0 8.2rem;
-  border: 1px solid rgba(139, 187, 198, 0.18);
+  border: 1px solid rgba(178, 178, 178, 0.18);
   border-radius: 0.35rem;
   background:
-    linear-gradient(rgba(4, 15, 23, 0.2), rgba(4, 15, 23, 0.2)),
+    linear-gradient(rgba(13, 13, 13, 0.2), rgba(13, 13, 13, 0.2)),
     url('/media/caption-portal-landscape.png') calc(20% + var(--film-frame) * 9%) 54% / 34rem auto no-repeat;
 }
 

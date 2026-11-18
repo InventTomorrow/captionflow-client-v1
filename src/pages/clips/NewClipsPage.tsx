@@ -302,29 +302,6 @@ export function NewClipsPage() {
 
   return (
     <div className="clips-page clips-new clips-create-page clips-portal-page">
-      <div className="clips-create-glow clips-create-glow-a" aria-hidden="true" />
-      <div className="clips-create-glow clips-create-glow-b" aria-hidden="true" />
-      <div className="caption-portal-scene clips-portal-scene" aria-hidden="true">
-        <div className="caption-portal-backdrop" />
-        <div className="caption-filmstrip caption-filmstrip-left">
-          {[0, 1, 2, 3].map((frame) => <span key={frame} style={{ '--film-frame': frame } as React.CSSProperties} />)}
-        </div>
-        <div className="caption-filmstrip caption-filmstrip-right">
-          {[0, 1, 2, 3].map((frame) => <span key={frame} style={{ '--film-frame': frame + 4 } as React.CSSProperties} />)}
-        </div>
-        <div className="caption-portal-waves">
-          <svg viewBox="0 0 1600 320" preserveAspectRatio="none">
-            {[0, 1, 2, 3, 4, 5].map((line) => (
-              <path
-                key={line}
-                d={`M-40 ${178 + line * 8} C 120 ${36 + line * 5}, 235 ${298 - line * 6}, 425 ${190 + line * 4} S 720 ${118 + line * 7}, 905 ${194 - line * 3} S 1240 ${292 - line * 8}, 1640 ${128 + line * 6}`}
-              />
-            ))}
-          </svg>
-          <i />
-        </div>
-      </div>
-
       <header className="clips-cinematic-header">
         <div className="clips-cinematic-title">
           <span className="clips-cinematic-eyebrow"><WandSparkles size={13} /> Viral Clips Studio</span>

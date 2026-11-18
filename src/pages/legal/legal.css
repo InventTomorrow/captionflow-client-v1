@@ -4,7 +4,7 @@
   min-height: 100vh;
   background: var(--cf-bg);
   color: var(--cf-text);
-  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--cf-font);
 }
 
 .legal-bar {
