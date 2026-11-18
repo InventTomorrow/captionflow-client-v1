@@ -564,3 +564,17 @@
   .lp2.no-offer .site-header { top: calc(var(--maint-height) + 12px); }
   .lp2 .site-header.is-scrolled, .lp2.no-offer .site-header.is-scrolled { top: 12px; }
 }
+/* Entrance: once the loading screen fades (LandingPage adds .is-ready), the nav and hero ease in. */
+.lp2 .site-header { opacity: 0; transition: opacity 0.6s ease; }
+.lp2 .hero-topline,
+.lp2 .hero-content,
+.lp2 .hero-footer { opacity: 0; transform: translateY(16px); transition: opacity 0.8s ease, transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.lp2.is-ready .site-header,
+.lp2.is-ready .hero-topline,
+.lp2.is-ready .hero-content,
+.lp2.is-ready .hero-footer { opacity: 1; transform: none; }
+.lp2.is-ready .hero-content { transition-delay: 0.08s; }
+.lp2.is-ready .hero-footer { transition-delay: 0.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .lp2 .hero-topline, .lp2 .hero-content, .lp2 .hero-footer { transform: none; }
+}

@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <title>Asaan Caption — Built for the way Pakistan speaks.</title>
     <meta
       name="description"
@@ -23,6 +25,29 @@
     />
   </head>
   <body>
+    <!-- Loading screen: shown at once (inline styles, before the app code arrives) and removed by
+         src/lib/bootLoader.ts when the first page is ready; the landing waits for its hero. -->
+    <div id="boot-loader" role="status" aria-label="Loading Asaan Caption">
+      <style>
+        #boot-loader { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; background: #090a0c; transition: opacity 0.45s ease, visibility 0.45s ease; }
+        #boot-loader.is-done { opacity: 0; visibility: hidden; }
+        #boot-loader .bl-logo { display: flex; align-items: center; gap: 10px; opacity: 0; animation: bl-in 0.5s ease 0.1s forwards; }
+        #boot-loader .bl-logo img { display: block; width: auto; }
+        #boot-loader .bl-track { position: relative; width: 148px; height: 2px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
+        #boot-loader .bl-track i { position: absolute; inset: 0 auto 0 0; width: 38%; background: #89e900; animation: bl-slide 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+        @keyframes bl-slide { from { transform: translateX(-100%); } to { transform: translateX(265%); } }
+        @keyframes bl-in { to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+          #boot-loader .bl-logo { animation: none; opacity: 1; }
+          #boot-loader .bl-track i { animation: none; width: 100%; opacity: 0.45; }
+        }
+      </style>
+      <div class="bl-logo">
+        <img src="/brand/loader-mark.webp" alt="" width="44" height="48" />
+        <img src="/brand/loader-wordmark.webp" alt="Asaan Caption" width="117" height="40" />
+      </div>
+      <div class="bl-track"><i></i></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

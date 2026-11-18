@@ -15,6 +15,7 @@ import { discountedPrice, type ApiPlan } from '../components/PricingCards';
 import { usePlans } from '../lib/usePlans';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { BrandLogo } from '../components/BrandLogo';
+import { bootLoaderVisible, hideBootLoader, landingAssetsReady } from '../lib/bootLoader';
 import './landing/landing.css';
 
 const NAV = [
@@ -127,6 +128,8 @@ export function LandingPage() {
   const [videoPaused, setVideoPaused] = useState(false);
   const [paymentSlug, setPaymentSlug] = useState('');
   const [paymentOpen, setPaymentOpen] = useState(false);
+  /** The hero is shown (and eases in) once the loading screen is gone. */
+  const [ready, setReady] = useState(() => !bootLoaderVisible());
 
   const headerRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLElement>(null);
@@ -139,6 +142,25 @@ export function LandingPage() {
   useEffect(() => {
     void loadFlags();
   }, [loadFlags]);
+
+  // First visit: the loading screen (index.html) stays until the font and hero image are ready
+  // (at most 3 s), then fades while the hero eases in. Arriving from inside the app, it is long gone.
+  useEffect(() => {
+    if (!bootLoaderVisible()) return;
+    let cancelled = false;
+    const started = performance.now();
+    void landingAssetsReady('/landing-v2/hero-poster.jpg').then(() => {
+      // Up for at least a moment, so a fast load doesn't flash it.
+      window.setTimeout(() => {
+        if (cancelled) return;
+        hideBootLoader();
+        setReady(true);
+      }, Math.max(0, 400 - (performance.now() - started)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Anchor links scroll smoothly and land below the floating nav (page-wide, while this page is open).
   useEffect(() => {
@@ -321,7 +343,7 @@ export function LandingPage() {
 
   return (
     <>
-      <div className={`lp2${showOffer ? '' : ' no-offer'}${flags.maintenanceMode ? ' has-maintenance' : ''}`}>
+      <div className={`lp2${showOffer ? '' : ' no-offer'}${flags.maintenanceMode ? ' has-maintenance' : ''}${ready ? ' is-ready' : ''}`}>
         <a className="skip-link" href="#main">Skip to content</a>
         {flags.maintenanceMode && (
           <div className="maintenance-banner" role="status">
