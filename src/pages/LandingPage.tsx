@@ -17,6 +17,7 @@ import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { BrandLogo } from '../components/BrandLogo';
 import { bootLoaderVisible, hideBootLoader, landingAssetsReady } from '../lib/bootLoader';
 import { TemplateCarousel, type CarouselTemplate } from './landing/TemplateCarousel';
+import { ShortsScrollStory } from './landing/ShortsScrollStory';
 import './landing/landing.css';
 
 const NAV = [
@@ -34,12 +35,6 @@ const TEMPLATES: CarouselTemplate[] = [
   { name: 'Bold Impact', video: '/landing-v2/templates/tpl-3.mp4', poster: '/landing-v2/templates/tpl-3-poster.jpg' },
   { name: 'Clean Single Line', video: '/landing-v2/templates/tpl-4.mp4', poster: '/landing-v2/templates/tpl-4-poster.jpg' },
   { name: 'Minimal Sub', video: '/landing-v2/templates/tpl-5.mp4', poster: '/landing-v2/templates/tpl-5-poster.jpg' },
-];
-
-const CLIPS = [
-  { title: 'The idea that changed everything', meta: '00:38', score: 96, caption: <>The idea that<br /><span>changed everything.</span></> },
-  { title: 'Nobody tells you this at the start', meta: '00:27', score: 91, caption: <>Nobody tells you this<br /><span>at the start.</span></> },
-  { title: 'The one habit that actually worked', meta: '00:44', score: 88, caption: <>The one habit<br /><span>that actually worked.</span></> },
 ];
 
 const STEPS: { title: string; text: string; preview: ReactNode }[] = [
@@ -124,7 +119,6 @@ export function LandingPage() {
   const { plans, failed: plansFailed, retry: retryPlans } = usePlans();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [clip, setClip] = useState(0);
   const [step, setStep] = useState(0);
   const [videoPaused, setVideoPaused] = useState(false);
   const [paymentSlug, setPaymentSlug] = useState('');
@@ -514,41 +508,7 @@ export function LandingPage() {
                 <button type="button" className="inline-link" onClick={startClipping}>Create Viral Clips <span>↗</span></button>
               </div>
             </div>
-            <div className="clips-workspace">
-              <div className="workspace-toolbar">
-                <span><span className="status-dot" /> creator-podcast-07.mp4</span>
-                <span className="analyzed">✓ Analyzed</span>
-              </div>
-              <div className="clips-demo">
-                <div className="source-video">
-                  <div className="source-meta"><span>LONG VIDEO</span><span>1:12:48</span></div>
-                  <div className="source-wave" aria-hidden="true" />
-                  <div className="source-caption">{CLIPS[clip].caption}</div>
-                  <div className="source-timeline"><span>00:00</span><div><i /></div><span>1:12:48</span></div>
-                </div>
-                <div className="clips-arrow" aria-hidden="true">→</div>
-                <div className="clips-results">
-                  <div className="clips-results-heading"><span>8 clips found</span><span>Best moments first ↗</span></div>
-                  <div className="clip-list">
-                    {CLIPS.map((c, i) => (
-                      <button
-                        key={c.title}
-                        type="button"
-                        className={`clip-row${i === clip ? ' is-active' : ''}`}
-                        aria-pressed={i === clip}
-                        onClick={() => setClip(i)}
-                      >
-                        <span className="clip-number">{two(i + 1)}</span>
-                        <span className="clip-info"><strong>{c.title}</strong><span>{c.meta} · Vertical · Captioned</span></span>
-                        <span className="clip-score">{c.score}<span>HOOK SCORE</span></span>
-                        <span className="clip-arrow">↗</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="demo-label">ILLUSTRATIVE WORKFLOW PREVIEW</div>
-                </div>
-              </div>
-            </div>
+            <ShortsScrollStory />
             <div className="feature-columns clip-features">
               <article><span className="small-label">01 / FIND</span><h3>Find the moments</h3><p>AI ranks the strongest hooks and ideas in your video.</p></article>
               <article><span className="small-label">02 / FRAME</span><h3>Frame for vertical</h3><p>Keep the speaker in shot with a ready-made 9:16 crop.</p></article>
