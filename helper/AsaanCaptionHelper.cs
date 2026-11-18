@@ -40,14 +40,14 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("Asaan Caption Helper")]
 [assembly: AssemblyCompany("Asaan Caption")]
 [assembly: AssemblyCopyright("Asaan Caption")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
 
 namespace AsaanCaption
 {
     static class App
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
         public const string Name = "Asaan Caption Helper";
         public const string SiteUrl = "https://www.asaancaption.com";
         public const string Protocol = "asaancaption-helper";
@@ -124,24 +124,58 @@ namespace AsaanCaption
 
         /* ------------------------------------------------- the running helper */
 
-        /** Ask a running helper to quit and wait (up to `ms`) until it has. */
+        /** Ask a running helper to quit; one that doesn't within `ms` (stuck) is ended. */
         public static void StopRunningHelper(int ms)
         {
             try
             {
                 using (EventWaitHandle quit = EventWaitHandle.OpenExisting(QuitEventName)) quit.Set();
             }
-            catch (WaitHandleCannotBeOpenedException) { return; }
+            catch (WaitHandleCannotBeOpenedException) { }
             catch (Exception e) { Log("stop helper: " + e.Message); }
-            DateTime until = DateTime.UtcNow.AddMilliseconds(ms);
-            while (DateTime.UtcNow < until)
+            if (!HelperGone(ms))
             {
-                try { using (Mutex.OpenExisting(MutexName)) { } }
-                catch (WaitHandleCannotBeOpenedException) { break; }
-                catch (Exception) { break; }
-                Thread.Sleep(150);
+                Log("the old helper didn't quit in time: ending it");
+                int self = Process.GetCurrentProcess().Id;
+                foreach (Process p in Process.GetProcessesByName("AsaanCaptionHelper"))
+                {
+                    try
+                    {
+                        if (p.Id != self && string.Equals(p.MainModule.FileName, Exe, StringComparison.OrdinalIgnoreCase))
+                        {
+                            p.Kill();
+                            p.WaitForExit(3000);
+                        }
+                    }
+                    catch (Exception e) { Log("end old helper: " + e.Message); }
+                    finally { p.Dispose(); }
+                }
+                HelperGone(3000);
             }
             Thread.Sleep(300); // Let the process release its files.
+        }
+
+        /** True once no helper holds the single-instance lock (waits up to `ms`). */
+        static bool HelperGone(int ms)
+        {
+            DateTime until = DateTime.UtcNow.AddMilliseconds(ms);
+            for (;;)
+            {
+                try { using (Mutex.OpenExisting(MutexName)) { } }
+                catch (WaitHandleCannotBeOpenedException) { return true; }
+                catch (Exception) { return true; }
+                if (DateTime.UtcNow >= until) return false;
+                Thread.Sleep(150);
+            }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool DeleteFile(string path);
+
+        /** Drop the "downloaded from the internet" mark the copy inherits, so Windows doesn't stop it at sign-in. */
+        public static void StripDownloadMark(string path)
+        {
+            try { DeleteFile(path + ":Zone.Identifier"); } catch (Exception) { }
         }
 
         /** The running helper's /ping answer, or null. */
@@ -374,15 +408,17 @@ namespace AsaanCaption
                 Percent(-1);
                 Status("Starting…");
                 App.Register();
-                Process.Start(new ProcessStartInfo(App.Exe, "--installed") { UseShellExecute = false, WorkingDirectory = App.Dir });
-                DateTime until = DateTime.UtcNow.AddSeconds(15);
-                bool up = false;
-                while (!up && DateTime.UtcNow < until)
+                DateTime began = DateTime.Now;
+                bool up = StartAndWait(30);
+                if (!up)
                 {
-                    up = App.PingLocal(800);
-                    if (!up) Thread.Sleep(400);
+                    // Slow to answer or stuck (antivirus scanning it, a port still closing): start it afresh, once.
+                    App.Log("the helper didn't answer: starting it again");
+                    Status("Still starting…");
+                    App.StopRunningHelper(3000);
+                    up = StartAndWait(30);
                 }
-                if (!up) throw new IOException("The helper didn't start. Restart your computer and run this file again.");
+                if (!up) throw new IOException(WhyNotStarted(began));
 
                 Ui(delegate
                 {
@@ -417,15 +453,49 @@ namespace AsaanCaption
             }
         }
 
+        /** Start the installed helper and wait (up to `seconds`) for it to answer. */
+        static bool StartAndWait(int seconds)
+        {
+            Process.Start(new ProcessStartInfo(App.Exe, "--installed") { UseShellExecute = false, WorkingDirectory = App.Dir });
+            DateTime until = DateTime.UtcNow.AddSeconds(seconds);
+            while (DateTime.UtcNow < until)
+            {
+                if (App.PingLocal(2000)) return true;
+                Thread.Sleep(500);
+            }
+            return false;
+        }
+
+        /** A reason the user can act on, from what the helper logged since `began`. */
+        static string WhyNotStarted(DateTime began)
+        {
+            try
+            {
+                string stamp = began.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                foreach (string line in File.ReadAllLines(Path.Combine(App.Dir, "helper.log")))
+                {
+                    if (line.Length > 19 && string.CompareOrdinal(line.Substring(0, 19), stamp) >= 0 && line.Contains(" port "))
+                        return "Windows wouldn't let the helper open its connection (another program may be using it). Close other apps and click Try again.";
+                }
+            }
+            catch (Exception) { }
+            return "The helper didn't answer. If your antivirus asked about Asaan Caption Helper, allow it, then click Try again.";
+        }
+
         static void CopySelf()
         {
             string self = Application.ExecutablePath;
             for (int attempt = 0; ; attempt++)
             {
-                try { File.Copy(self, App.Exe, true); return; }
+                try
+                {
+                    File.Copy(self, App.Exe, true);
+                    App.StripDownloadMark(App.Exe);
+                    return;
+                }
                 catch (IOException)
                 {
-                    if (attempt >= 10) throw new IOException("An old copy of the helper is still running. Restart your computer and run this file again.");
+                    if (attempt >= 10) throw new IOException("The old helper is still closing. Wait a few seconds, then click Try again.");
                     Thread.Sleep(500);
                 }
             }
@@ -468,14 +538,24 @@ namespace AsaanCaption
             icon.DoubleClick += delegate { OpenSite(); };
             icon.Visible = true;
 
-            if (!server.Start())
+            // Open the connection off the UI thread, retrying for a while: an old helper that is
+            // just closing can still hold the port for a moment.
+            Thread serve = new Thread(delegate()
             {
-                icon.ShowBalloonTip(8000, App.Name, "The helper couldn't start its connection. Restart your computer and try again.", ToolTipIcon.Error);
-            }
-            else if (justInstalled)
-            {
-                icon.ShowBalloonTip(6000, "Asaan Caption Helper is ready", "Go back to your browser. Your video carries on by itself.", ToolTipIcon.Info);
-            }
+                bool ok = false;
+                for (int attempt = 0; attempt < 15 && !ok; attempt++)
+                {
+                    ok = server.Start();
+                    if (!ok) Thread.Sleep(2000);
+                }
+                Ui(delegate
+                {
+                    if (!ok) icon.ShowBalloonTip(8000, App.Name, "The helper couldn't open its connection. Right-click this icon, choose Quit, then start it again from the website.", ToolTipIcon.Error);
+                    else if (justInstalled) icon.ShowBalloonTip(6000, "Asaan Caption Helper is ready", "Go back to your browser. Your video carries on by itself.", ToolTipIcon.Info);
+                });
+            });
+            serve.IsBackground = true;
+            serve.Start();
 
             Thread watcher = new Thread(WaitForQuit);
             watcher.IsBackground = true;
@@ -490,13 +570,21 @@ namespace AsaanCaption
             try { Process.Start(App.SiteUrl); } catch (Exception) { }
         }
 
+        void Ui(Action a)
+        {
+            try { invoker.BeginInvoke(a); } catch (Exception) { }
+        }
+
         void WaitForQuit()
         {
             using (EventWaitHandle quit = new EventWaitHandle(false, EventResetMode.AutoReset, App.QuitEventName))
             {
                 quit.WaitOne();
             }
-            try { invoker.BeginInvoke(new Action(ExitThread)); } catch (Exception) { }
+            Ui(new Action(ExitThread));
+            // Backstop: if closing hangs, leave anyway so a new version can take over.
+            Thread.Sleep(4000);
+            Environment.Exit(0);
         }
 
         protected override void ExitThreadCore()
@@ -543,20 +631,23 @@ namespace AsaanCaption
 
         public static bool Ready { get { return File.Exists(App.YtDlp); } }
 
-        public static string ToolVersion
+        /** yt-dlp's version once known (null until then). Never runs yt-dlp: /ping must answer at once. */
+        public static string ToolVersion { get { return version; } }
+
+        static readonly object versionLock = new object();
+
+        /** Ask yt-dlp its version, in the background (it takes seconds, longer while antivirus scans it). */
+        public static void RefreshVersion()
         {
-            get
+            if (!Ready) return;
+            lock (versionLock)
             {
-                if (version == null && Ready)
+                try
                 {
-                    try
-                    {
-                        string output, error;
-                        if (Run("--version", 30000, out output, out error) == 0) version = output.Trim();
-                    }
-                    catch (Exception) { }
+                    string output, error;
+                    if (Run("--version", 120000, out output, out error) == 0) version = output.Trim();
                 }
-                return version;
+                catch (Exception e) { App.Log("yt-dlp version: " + e.Message); }
             }
         }
 
@@ -752,7 +843,7 @@ namespace AsaanCaption
                 int code = Run("-U --no-warnings", 180000, out output, out error);
                 bool updated = code == 0 && output.Contains("Updated yt-dlp");
                 App.Log("yt-dlp update: " + output.Trim().Replace(Environment.NewLine, " | "));
-                if (updated) version = null;
+                if (updated) RefreshVersion();
                 return updated;
             }
             catch (Exception e)
@@ -772,6 +863,7 @@ namespace AsaanCaption
         /** Background upkeep: get the JavaScript runtime yt-dlp prefers, and keep yt-dlp up to date. */
         public static void Upkeep()
         {
+            RefreshVersion();
             Thread.Sleep(20000);
             for (;;)
             {
@@ -859,9 +951,10 @@ namespace AsaanCaption
             return false;
         }
 
+        /** Stop at once, dropping requests in flight (Close would wait for them). */
         public void Stop()
         {
-            try { if (listener != null) listener.Close(); } catch (Exception) { }
+            try { if (listener != null) listener.Abort(); } catch (Exception) { }
         }
 
         void Loop()
