@@ -16,6 +16,8 @@ export interface AppFlags {
   urlImportEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  /** False when the server has no mail (MAIL_TRANSPORT=off): forgot-password resets by email match instead of a link. */
+  emailEnabled: boolean;
 }
 
 export interface LaunchOffer {
@@ -41,6 +43,7 @@ const DEFAULT_FLAGS: AppFlags = {
   urlImportEnabled: false,
   maintenanceMode: false,
   maintenanceMessage: '',
+  emailEnabled: true,
 };
 
 const DEFAULT_LAUNCH_OFFER: LaunchOffer = { enabled: false, text: '' };

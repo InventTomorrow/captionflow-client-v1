@@ -9,6 +9,8 @@ type Row = {
   id: string;
   name: string;
   email: string;
+  /** Only `false` is unconfirmed; older accounts have no value. */
+  emailVerified?: boolean;
   /** "Free trial", or the plan's name. */
   planLabel?: string;
   planState?: 'trial' | 'active' | 'ended';
@@ -145,7 +147,15 @@ export function AdminUsersPage() {
                 <td>
                   <Link to={`/admin/users/${u.id}`}>{u.name}</Link>
                 </td>
-                <td>{u.email}</td>
+                <td>
+                  {u.email}
+                  {u.emailVerified === false && (
+                    <>
+                      {' '}
+                      <span className="admin-badge email-unverified">Not verified</span>
+                    </>
+                  )}
+                </td>
                 <td>
                   <span className={`admin-badge plan-${u.planState ?? 'trial'}`}>
                     {u.planLabel || 'Free trial'}

@@ -14474,7 +14474,8 @@ legend {
 
 .admin-badge.active,
 .admin-badge.ready,
-.admin-badge.done {
+.admin-badge.done,
+.admin-badge.email-verified {
   background: color-mix(in srgb, var(--cf-success) 18%, transparent);
   color: var(--cf-success);
 }
@@ -14488,7 +14489,8 @@ legend {
 }
 
 .admin-badge.past_due,
-.admin-badge.processing {
+.admin-badge.processing,
+.admin-badge.email-unverified {
   background: color-mix(in srgb, var(--cf-warning) 18%, transparent);
   color: var(--cf-warning);
 }
