@@ -292,11 +292,6 @@ export function LandingPage() {
     navigate(user ? '/projects/upload' : '/login');
   };
 
-  const startClipping = () => {
-    if (loading) return;
-    navigate(user ? '/clips' : '/login', user ? undefined : { state: { from: '/clips' } });
-  };
-
   /** Free plans start right away; paid plans and passes open the bank-transfer popup. */
   const choosePlan = (plan: ApiPlan) => {
     if (plan.priceMonthlyPkr <= 0) {
@@ -394,10 +389,6 @@ export function LandingPage() {
             <video ref={videoRef} className="hero-video" poster="/landing-v2/hero-poster.jpg" muted loop playsInline preload="metadata" aria-hidden="true">
               <source src="/landing-v2/hero.mp4" type="video/mp4" />
             </video>
-            <div className="hero-topline page-width">
-              <span>URDU. ENGLISH. EVERYTHING IN BETWEEN.</span>
-              <span>MADE IN PAKISTAN <span className="tiny-star">✳</span></span>
-            </div>
             <div className="hero-content page-width">
               <p className="eyebrow"><span className="status-dot" /> BUILT FOR THE WAY PAKISTAN SPEAKS</p>
               <h1 id="hero-title">Need Urdish captions?<br /><span className="brand-underline">We got it.</span></h1>
@@ -409,31 +400,20 @@ export function LandingPage() {
                     <a href="#templates" className="button button-glass">Browse Templates <span>↓</span></a>
                   </div>
                 </div>
-                <div className="hero-meta">
-                  <div className="sound-wave" aria-hidden="true">
-                    {Array.from({ length: 11 }, (_, i) => <i key={i} />)}
-                  </div>
-                  <p>Your voice. Finally understood.</p>
-                </div>
               </div>
             </div>
             <div className="hero-footer page-width">
-              <span>Trusted by thousands of Pakistani creators</span>
-              <a href="#templates">SCROLL TO EXPLORE <span>↓</span></a>
               <button type="button" onClick={toggleVideo} aria-label={videoPaused ? 'Play background video' : 'Pause background video'} aria-pressed={videoPaused}>
                 <span className="video-control-icon">{videoPaused ? '▷' : 'Ⅱ'}</span>
-                <span className="video-control-label">{videoPaused ? 'PLAY MOTION' : 'PAUSE MOTION'}</span>
               </button>
             </div>
           </section>
 
           <div className="language-strip">
             <div className="page-width">
-              <span>ONE VOICE. EVERY WAY YOU SPEAK.</span>
               <div>
                 <span>Urdu</span><b>+</b><span>English</span><b>+</b><span>Roman Urdu</span><b>=</b><span className="language-end">Asaan.</span>
               </div>
-              <span className="strip-note">NOTHING LOST IN TRANSLATION. ↗</span>
             </div>
           </div>
 
@@ -458,13 +438,6 @@ export function LandingPage() {
                 </div>
               </div>
               <div className="comparison">
-                <div className="comparison-intro">
-                  <div className="audio-symbol" aria-hidden="true">
-                    {Array.from({ length: 9 }, (_, i) => <span key={i} />)}
-                  </div>
-                  <span>THE SAME VOICE.<br />A DIFFERENT UNDERSTANDING.</span>
-                  <span className="comparison-duration">00:06</span>
-                </div>
                 <div className="transcript transcript-other">
                   <span className="small-label">OTHER TOOLS <span>×</span></span>
                   <p>“Super super chai tea ke calm pay nick low”</p>
@@ -488,7 +461,7 @@ export function LandingPage() {
                   <p>Fix spelling, adjust word timing, and style captions your way, with zero hassle.</p>
                 </article>
                 <article>
-                  <span className="feature-icon">[↗]</span>
+                  <span className="feature-icon">[↓]</span>
                   <h3>Ready to export</h3>
                   <p>Download crisp 4K video with captions burned in, or take an SRT into your editor.</p>
                   <span className="format-tags">4K <i>·</i> SRT <i>·</i> MP4</span>
@@ -497,22 +470,9 @@ export function LandingPage() {
             </div>
           </section>
 
-          <section className="section page-width viral-section" id="viral-clips">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow"><span className="section-index">03 /</span><span className="new-label">NEW</span> VIRAL CLIPS</p>
-                <h2>One long video.<br /><span className="muted">A week of content.</span></h2>
-              </div>
-              <div className="heading-aside">
-                <p>Upload a podcast, interview, vlog, or stream. We find the strongest moments, reframe them for vertical, and add captions.</p>
-                <button type="button" className="inline-link" onClick={startClipping}>Create Viral Clips <span>↗</span></button>
-              </div>
-            </div>
-            <ShortsScrollStory />
-            <div className="feature-columns clip-features">
-              <article><span className="small-label">01 / FIND</span><h3>Find the moments</h3><p>AI ranks the strongest hooks and ideas in your video.</p></article>
-              <article><span className="small-label">02 / FRAME</span><h3>Frame for vertical</h3><p>Keep the speaker in shot with a ready-made 9:16 crop.</p></article>
-              <article><span className="small-label">03 / CAPTION</span><h3>Caption every clip</h3><p>Start with your favourite style, then fine-tune before export.</p></article>
+          <section className="viral-section" id="viral-clips">
+            <div className="page-width">
+              <ShortsScrollStory />
             </div>
           </section>
 
@@ -545,14 +505,12 @@ export function LandingPage() {
                     >
                       <span>{two(i + 1)}</span>
                       <div><strong>{s.title}</strong><p>{s.text}</p></div>
-                      <b>↗</b>
                     </button>
                   ))}
                 </div>
                 <div className="workflow-panel" id="workflow-panel" role="tabpanel" aria-labelledby={`step-${step}`} tabIndex={0}>
-                  <div className="panel-chrome"><span><i /><i /><i /></span><span>ASAAN / WORKSPACE</span><span>↗</span></div>
+                  <div className="panel-chrome"><span><i /><i /><i /></span><span>ASAAN / WORKSPACE</span></div>
                   <div className="step-preview">{STEPS[step].preview}</div>
-                  <span className="workspace-preview-label">WORKFLOW PREVIEW</span>
                 </div>
               </div>
             </div>
@@ -567,21 +525,6 @@ export function LandingPage() {
                 afterthought. Asaan Caption is trained for real local speech patterns, so captions sound natural, accurate, and actually
                 usable.
               </p>
-              <span className="made-in">MADE IN PAKISTAN. <strong>BUILT FOR CREATORS LIKE YOU.</strong><span>↗</span></span>
-            </div>
-            <div className="about-list">
-              {[
-                ['Built for Pakistan', 'Trained on real Pakistani speech, accents, and everyday phrasing.'],
-                ['More Accurate', 'Understands Urdu, English, Roman Urdu, and mixed speech naturally.'],
-                ['Saves You Time', 'Turn hours of caption work into minutes so you can publish faster.'],
-                ['Ready for Export', 'Export 4K videos or SRT subtitle files for any platform.'],
-              ].map(([title, text], i) => (
-                <article key={title}>
-                  <span>{two(i + 1)}</span>
-                  <div><h3>{title}</h3><p>{text}</p></div>
-                  <span>↗</span>
-                </article>
-              ))}
             </div>
           </section>
 
@@ -610,21 +553,25 @@ export function LandingPage() {
                 </p>
               ) : (
                 <div className="pricing-grid">
-                  {subscriptions.map((p, i) => {
+                  {subscriptions.map((p) => {
                     const featured = p.slug === featuredSlug;
                     const free = p.priceMonthlyPkr <= 0;
                     const discounted = discountedPrice(p.priceMonthlyPkr, p);
                     return (
                       <article key={p._id} className={`price-card${featured ? ' price-featured' : ''}`}>
-                        {featured && <div className="popular-label">THE CREATOR&apos;S CHOICE <span>POPULAR ↗</span></div>}
+                        {featured && <div className="popular-label">MOST POPULAR</div>}
                         <div className="plan-top">
                           <h3>{p.name}</h3>
-                          {discounted != null ? <span className="discount">{p.discountPercent}% OFF</span> : <span>{two(i + 1)} /</span>}
+                          {discounted != null && <span className="discount">{p.discountPercent}% OFF</span>}
                         </div>
                         {p.description && <p className="plan-description">{p.description}</p>}
                         <div className="price">
                           {free ? (
-                            <span>Free</span>
+                            <>
+                              <span className="currency">PKR</span>
+                              <span>0</span>
+                              <span className="per">/mo</span>
+                            </>
                           ) : (
                             <>
                               <span className="currency">PKR</span>
@@ -671,7 +618,7 @@ export function LandingPage() {
                     <ul>
                       {p.features.map((f) => <li key={f}>{f}</li>)}
                     </ul>
-                    <button type="button" className="inline-link" onClick={() => choosePlan(p)}>Get {p.name} <span>↗</span></button>
+                    <button type="button" className="button button-outline" onClick={() => choosePlan(p)}>Get {p.name} <span>↗</span></button>
                   </article>
                 );
               })}
@@ -689,7 +636,6 @@ export function LandingPage() {
                   <span>No card needed. First exports on us.</span>
                 </div>
               </div>
-              <div className="cta-watermark" aria-hidden="true">[ a ]</div>
             </div>
           </section>
         </main>
@@ -701,7 +647,6 @@ export function LandingPage() {
                 <BrandLogo />
               </a>
               <p>Automatic captions engineered for the way Pakistan speaks — Urdu, Roman Urdu, and everything in between.</p>
-              <div className="footer-tags"><span>Pakistan-first</span><span>AI-powered</span></div>
             </div>
             <div className="footer-links">
               <span className="small-label">PRODUCT</span>
@@ -722,12 +667,10 @@ export function LandingPage() {
               <Link to="/privacy">Privacy Policy</Link>
               <Link to="/terms">Terms of Service</Link>
               <Link to="/cookies">Cookie Policy</Link>
-              <button type="button" onClick={goSignIn}>{signInLabel} ↗</button>
             </div>
           </div>
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} Asaan Caption</span>
-            <span>Built for the way Pakistan speaks.</span>
             <a href="#top">BACK TO TOP ↑</a>
           </div>
         </footer>

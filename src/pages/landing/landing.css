@@ -718,37 +718,41 @@
   .lp2 .tpl-stage { --stage-h: clamp(340px, calc(100svh - 320px), 560px); }
 }
 
-/* ---- Long video → reels scroll story (ShortsScrollStory.tsx) ---- */
-.lp2 .shorts-story { position: relative; height: 260vh; margin-top: 8px; }
-.lp2 .shorts-stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
-.lp2 .shorts-steps {
-  position: absolute;
-  top: 96px;
-  left: 0;
-  z-index: 3;
+/* ---- Viral Clips: long video → reels scroll story (ShortsScrollStory.tsx) ----
+   The pinned screen is heading + step line + a canvas that takes the rest; the
+   component sizes the video and reels from the canvas, so it fits any screen. */
+.lp2 .viral-section { padding-block: 0; }
+.lp2 .shorts-story { position: relative; height: 250vh; }
+.lp2 .shorts-stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
   display: flex;
-  gap: 22px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  flex-direction: column;
+  padding: 104px 0 28px;
+  overflow: hidden;
 }
+.lp2 .shorts-head { text-align: center; }
+.lp2 .shorts-head .eyebrow { justify-content: center; margin-bottom: 12px; }
+.lp2 .shorts-head h2 { margin: 0; font-size: clamp(28px, 3.4vw, 48px); }
+.lp2 .shorts-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 26px; margin: 16px 0 20px; padding: 0; list-style: none; }
 .lp2 .shorts-steps li { display: flex; gap: 8px; align-items: center; font: 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: #5f6267; transition: color 0.3s; }
-.lp2 .shorts-steps li span { color: inherit; }
 .lp2 .shorts-steps li.is-on { color: var(--white); }
 .lp2 .shorts-steps li.is-on span { color: var(--accent); }
+.lp2 .shorts-canvas { position: relative; flex: 1; min-height: 0; }
 .lp2 .shorts-media { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lp2 .shorts-frame {
   position: absolute;
-  top: 52%;
+  top: 50%;
   left: 50%;
-  width: min(880px, 92%);
+  width: 80%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
   transform: translate(-50%, -50%);
-  transform-origin: 50% 50%;
   will-change: transform;
   --dim: 0;
 }
@@ -760,23 +764,14 @@
   right: 0;
   display: flex;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: linear-gradient(to bottom, rgba(9, 10, 12, 0.7), transparent);
   font: 10px var(--mono);
   letter-spacing: 0.08em;
   color: #c9cacc;
 }
 .lp2 .shorts-frame-top span:first-child { display: flex; align-items: center; gap: 8px; }
-.lp2 .shorts-timeline {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.22);
-}
-/* A best moment: a kiwi segment that grows in as it is found. */
+.lp2 .shorts-timeline { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.22); }
 .lp2 .shorts-timeline i {
   position: absolute;
   top: -3px;
@@ -794,7 +789,7 @@
   top: 50%;
   left: 50%;
   z-index: 2;
-  width: 220px;
+  width: 200px;
   aspect-ratio: 9 / 16;
   overflow: hidden;
   border-radius: 14px;
@@ -803,60 +798,174 @@
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.18);
   will-change: transform, opacity;
+  container-type: inline-size;
   --cap: 0;
 }
-.lp2 .shorts-reel-top {
+.lp2 .shorts-reel-top,
+.lp2 .shorts-reel-meta {
   position: absolute;
-  top: 0;
   left: 0;
   right: 0;
   display: flex;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 7% 8%;
   font: 9px var(--mono);
   letter-spacing: 0.06em;
   color: #e3e4e6;
-  background: linear-gradient(to bottom, rgba(9, 10, 12, 0.6), transparent);
 }
+.lp2 .shorts-reel-top { top: 0; background: linear-gradient(to bottom, rgba(9, 10, 12, 0.6), transparent); }
 .lp2 .shorts-reel-top span:last-child { color: var(--accent); }
+.lp2 .shorts-reel-meta { bottom: 0; color: #b9bbbe; background: linear-gradient(to top, rgba(9, 10, 12, 0.75), transparent); }
+/* Caption size follows the reel's own width (container units), so it reads at every reel size. */
 .lp2 .shorts-reel-caption {
   position: absolute;
-  left: 8%;
-  right: 8%;
+  left: 7%;
+  right: 7%;
   bottom: 22%;
   margin: 0;
   text-align: center;
-  font-size: clamp(12px, 1.15vw, 16px);
+  font-size: clamp(9px, 7.4cqw, 17px);
   font-weight: 700;
   line-height: 1.35;
-  letter-spacing: -0.01em;
   color: #fff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
   opacity: var(--cap);
   transform: translateY(calc((1 - var(--cap)) * 10px));
 }
 .lp2 .shorts-reel-caption mark { background: var(--accent); color: #101608; padding: 0 4px; border-radius: 3px; }
-.lp2 .shorts-reel-meta {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 10px 12px;
-  font: 9px var(--mono);
-  letter-spacing: 0.06em;
-  color: #b9bbbe;
-  background: linear-gradient(to top, rgba(9, 10, 12, 0.75), transparent);
-}
-.lp2 .viral-section .clip-features { padding-top: 24px; }
+
+/* ---- Fit every section to the screen ---- */
+/* Nothing may widen the page (3D template cards, the watermark): clip at the window edge.
+   `clip` (unlike hidden) keeps the sticky story working. */
+.lp2, .lp2 main { overflow-x: clip; }
+/* The hero fills the screen at every size (it used to stop at 880px). */
+.lp2 .hero { min-height: calc(100svh - var(--offer-height) - var(--maint-height)); }
+/* Language strip: just the equation, centred. */
+.lp2 .language-strip > .page-width { justify-content: center; }
+/* Why us: one centred statement. */
+.lp2 .about-section { display: block; }
+.lp2 .about-heading { max-width: 760px; margin-inline: auto; text-align: center; }
+.lp2 .about-heading .eyebrow { justify-content: center; }
+.lp2 .about-intro { margin-inline: auto; }
+.lp2 .made-in { justify-content: center; }
+
 @media (max-width: 720px) {
-  .lp2 .shorts-story { height: 230vh; }
-  .lp2 .shorts-steps { top: 84px; gap: 12px; flex-wrap: wrap; }
-  .lp2 .shorts-steps li { font-size: 10px; }
-  .lp2 .shorts-frame { width: 100%; top: 46%; }
-  .lp2 .shorts-reel-caption { font-size: 10px; }
+  .lp2 .shorts-story { height: 220vh; }
+  .lp2 .shorts-stage { padding: 88px 0 20px; }
+  .lp2 .shorts-head h2 { font-size: 26px; }
+  .lp2 .shorts-steps { gap: 6px 14px; margin: 12px 0 14px; }
+  .lp2 .shorts-steps li { font-size: 9px; }
+  .lp2 .shorts-reel-top, .lp2 .shorts-reel-meta { font-size: 7px; }
+  /* Templates: heading, phones, names and the button fit one phone screen. */
+  .lp2 .tpl-stage { --stage-h: clamp(300px, calc(100svh - 430px), 470px); }
+  .lp2 .tpl-stage-cta { align-self: stretch; justify-content: center; gap: 14px; }
+  .lp2 .templates-section .tpl-head { margin-bottom: 18px; }
 }
-/* Reduced motion: the finished picture, not pinned. */
 @media (prefers-reduced-motion: reduce) {
   .lp2 .shorts-story { height: auto; }
-  .lp2 .shorts-stage { position: relative; height: 92vh; }
+  .lp2 .shorts-stage { position: relative; }
+}
+@media (max-width: 720px) {
+  /* The names scroll inside their own row; the bar and the button stay at screen width. */
+  .lp2 .tpl-stage-bar { width: 100%; min-width: 0; }
+  .lp2 .tpl-stage-rail { width: 100%; max-width: 100%; min-width: 0; }
+  .lp2 .tpl-stage-cta { width: 100%; }
+}
+@media (max-width: 720px) {
+  .lp2 .templates-section { padding-top: 36px; }
+  .lp2 .tpl-stage { --stage-h: clamp(250px, calc(100svh - 500px), 460px); }
+  .lp2 .tpl-stage-bar { margin-top: 14px; gap: 10px; }
+}
+.lp2 .shorts-nowrap { white-space: nowrap; }
+
+/* ---- Fit pass 2: review fixes ---- */
+/* Section rhythm follows the screen height too, so laptops (768px tall) aren't overfilled and wide screens aren't sparse. */
+.lp2 { --section-space: clamp(56px, 10vh, 120px); }
+
+/* Viral Clips story: heading, steps and picture move as one block, centred in the pinned screen (--shift is set by the component). */
+.lp2 .shorts-head, .lp2 .shorts-steps, .lp2 .shorts-canvas { transform: translateY(var(--shift, 0px)); }
+.lp2 .shorts-step-more { font-style: normal; }
+.lp2 .shorts-frame-top, .lp2 .shorts-timeline { opacity: var(--chrome, 1); }
+.lp2 .shorts-reel-caption { font-size: clamp(10px, 8cqw, 17px); }
+@container (max-width: 150px) {
+  .lp2 .shorts-reel-meta { display: none; }
+  .lp2 .shorts-reel-caption { left: 5%; right: 5%; bottom: 12%; }
+}
+
+/* Templates: arrows sit at the window edges (never over the side phones); the stage shrinks to fit 768px-tall laptops. */
+.lp2 .tpl-stage { --stage-h: clamp(300px, calc(100svh - 440px), 620px); }
+.lp2 .tpl-stage-arrow-prev { left: calc(50% - 50vw + 32px); }
+.lp2 .tpl-stage-arrow-next { right: calc(50% - 50vw + 32px); }
+
+/* Features: the comparison is two even halves; icons share one line box so the three columns align. */
+.lp2 .comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lp2 .transcript { padding: 26px 28px; gap: 16px; }
+.lp2 .feature-columns { padding-top: 36px; }
+.lp2 .feature-icon { height: 28px; line-height: 28px; margin-bottom: 18px; }
+
+/* How it works: tighter rows; the active step is marked by its number and a kiwi edge, not an arrow. */
+.lp2 .workflow-step { min-height: 0; padding: 14px 14px; }
+.lp2 .workflow-step:not(.is-active) { color: #a3a6ab; }
+.lp2 .workflow-step.is-active { box-shadow: inset 2px 0 0 var(--accent); }
+.lp2 .workflow-panel { min-height: 0; }
+.lp2 .step-preview { padding: 28px; min-height: 300px; }
+
+/* Why us: a statement that holds its own screen-ish band instead of a thin strip. */
+.lp2 .about-section { display: flex; flex-direction: column; justify-content: center; min-height: min(72svh, 720px); }
+.lp2 .about-heading h2 { font-size: clamp(34px, 4vw, 56px); }
+.lp2 .about-intro { max-width: 560px; font-size: 16px; line-height: 1.75; }
+
+/* Pricing: check marks align with the first line of a wrapped feature. */
+.lp2 .price-card li { align-items: flex-start; }
+.lp2 .price { margin-block: 24px 20px; }
+.lp2 .price-card ul { gap: 10px; }
+
+/* Day passes: intro centred against the cards; the button matches the plans. */
+.lp2 .pass-intro { align-self: center; }
+.lp2 .pass-card .button { width: 100%; margin-top: auto; font-size: 14px; }
+
+/* Final call to action: one centred column. */
+.lp2 .final-cta > .page-width { text-align: center; padding-block: clamp(72px, 14vh, 150px); }
+.lp2 .final-cta .eyebrow { justify-content: center; }
+.lp2 .final-cta h2 { margin-inline: auto; }
+.lp2 .cta-bottom { flex-direction: column; align-items: center; gap: 24px; }
+.lp2 .cta-bottom > div { align-items: center; }
+.lp2 .cta-bottom > div > span { font: 13px var(--font); color: var(--muted); }
+
+/* Footer. */
+.lp2 .footer-links a, .lp2 .footer-links button { white-space: nowrap; }
+
+/* Hero motion toggle: a small round icon button at the right. */
+.lp2 .hero-footer { justify-content: flex-end; }
+.lp2 .hero-footer > button { width: 40px; height: 40px; justify-content: center; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 50%; }
+
+@media (max-width: 900px) {
+  /* Portrait screens: the hero copy sits in the middle of the video, not packed at the bottom. */
+  .lp2 .hero { justify-content: space-between; padding-top: 120px; }
+  .lp2 .hero-content { margin-block: auto; }
+  /* Sign in lives in the menu; the bar keeps the logo, Get Started and the menu button. */
+  .lp2 .nav-actions .sign-in { display: none; }
+  /* Workflow steps wrap as pills instead of a sideways-scrolling row that cuts labels. */
+  .lp2 .workflow-steps { flex-wrap: wrap; overflow: visible; gap: 8px; border-bottom: 0; }
+  .lp2 .workflow-step { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; box-shadow: none; }
+  .lp2 .workflow-step:first-child { border-top: 1px solid var(--line); }
+  .lp2 .workflow-step.is-active { border-color: var(--accent); box-shadow: none; }
+}
+@media (max-width: 600px) {
+  .lp2 .hero { padding-top: 104px; }
+  .lp2 .hero-footer { display: flex; }
+  .lp2 .cta-bottom .button { width: 100%; }
+  .lp2 .cta-bottom > div { width: 100%; }
+  .lp2 .about-section { min-height: 0; }
+  .lp2 .about-intro { font-size: 15px; }
+}
+@media (max-width: 720px) {
+  .lp2 .shorts-story { height: 190vh; }
+  .lp2 .tpl-stage-rail { mask-image: linear-gradient(to right, #000 82%, transparent); -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); }
+  .lp2 .tpl-stage-slide[data-o='-1'] .tpl-stage-dim, .lp2 .tpl-stage-slide[data-o='1'] .tpl-stage-dim { background: rgba(9, 10, 12, 0.74); }
+}
+@media (max-width: 560px) {
+  .lp2 .shorts-step-more { display: none; }
+  .lp2 .shorts-steps { gap: 6px 22px; }
+  .lp2 .shorts-steps li { font-size: 11px; }
 }
