@@ -16,6 +16,7 @@ import { usePlans } from '../lib/usePlans';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { BrandLogo } from '../components/BrandLogo';
 import { bootLoaderVisible, hideBootLoader, landingAssetsReady } from '../lib/bootLoader';
+import { TemplateCarousel, type CarouselTemplate } from './landing/TemplateCarousel';
 import './landing/landing.css';
 
 const NAV = [
@@ -26,12 +27,13 @@ const NAV = [
   { id: 'pricing', label: 'Pricing' },
 ];
 
-const TEMPLATES = [
-  { name: 'Word Pop', art: 'art-pop', top: 'WORD BY WORD', text: <>Apni <mark>kahani.</mark><br />Apne lafz.</> },
-  { name: 'Karaoke Fill', art: 'art-karaoke', top: 'FOLLOW YOUR VOICE', text: <>Har lafz<br /><mark>ke saath.</mark></> },
-  { name: 'Bold Impact', art: 'art-bold', top: 'MAKE IT LOUD', text: <>BAAT MEIN<br /><mark>DUM HAI.</mark></> },
-  { name: 'Clean Single Line', art: 'art-clean', top: 'LESS IS MORE', text: <>Bas, itni si baat.</> },
-  { name: 'Minimal Sub', art: 'art-minimal', top: 'LET THE STORY SPEAK', text: <>Chalo, shuru karte hain.</> },
+/** Template previews (9:16, 6 s loops). Swap the files in public/landing-v2/templates to change them. */
+const TEMPLATES: CarouselTemplate[] = [
+  { name: 'Word Pop', video: '/landing-v2/templates/tpl-1.mp4', poster: '/landing-v2/templates/tpl-1-poster.jpg' },
+  { name: 'Karaoke Fill', video: '/landing-v2/templates/tpl-2.mp4', poster: '/landing-v2/templates/tpl-2-poster.jpg' },
+  { name: 'Bold Impact', video: '/landing-v2/templates/tpl-3.mp4', poster: '/landing-v2/templates/tpl-3-poster.jpg' },
+  { name: 'Clean Single Line', video: '/landing-v2/templates/tpl-4.mp4', poster: '/landing-v2/templates/tpl-4-poster.jpg' },
+  { name: 'Minimal Sub', video: '/landing-v2/templates/tpl-5.mp4', poster: '/landing-v2/templates/tpl-5-poster.jpg' },
 ];
 
 const CLIPS = [
@@ -122,7 +124,6 @@ export function LandingPage() {
   const { plans, failed: plansFailed, retry: retryPlans } = usePlans();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [template, setTemplate] = useState(0);
   const [clip, setClip] = useState(0);
   const [step, setStep] = useState(0);
   const [videoPaused, setVideoPaused] = useState(false);
@@ -443,39 +444,12 @@ export function LandingPage() {
           </div>
 
           <section className="section page-width templates-section" id="templates">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow"><span className="section-index">01 /</span> STYLES MADE FOR YOUR VOICE</p>
-                <h2>All your favourite<br /><span className="brand-underline">templates.</span></h2>
-              </div>
-              <div className="heading-aside">
-                <p>Styles built for Roman Urdu. Tweak and save your preset.</p>
-                <button type="button" className="inline-link" onClick={getStarted}>Start with {TEMPLATES[template].name} <span>↗</span></button>
-              </div>
+            <div className="tpl-head">
+              <p className="eyebrow"><span className="section-index">01 /</span> STYLES MADE FOR YOUR VOICE</p>
+              <h2>All your favourite <span className="brand-underline">templates.</span></h2>
+              <p className="tpl-sub">Styles built for Roman Urdu. Tweak and save your preset.</p>
             </div>
-            <div className="template-grid" aria-label="Caption template previews">
-              {TEMPLATES.map((t, i) => (
-                <button
-                  key={t.name}
-                  type="button"
-                  className={`template-card${i === template ? ' is-selected' : ''}`}
-                  aria-pressed={i === template}
-                  onClick={() => setTemplate(i)}
-                >
-                  <span className={`template-art ${t.art}`}>
-                    <span className="preview-top">{t.top} <span>9:16</span></span>
-                    <span className="art-backdrop" aria-hidden="true">Aa</span>
-                    <span className="caption-text">{t.text}</span>
-                    <span className="preview-bottom"><span className="mini-play">▶</span> ROMAN URDU <span className="selected-check">✓</span></span>
-                  </span>
-                  <span className="template-name">{t.name} <span>{two(i + 1)} ↗</span></span>
-                </button>
-              ))}
-            </div>
-            <div className="template-footnote">
-              <span>YOUR CONTENT. YOUR STYLE.</span>
-              <span aria-live="polite">{TEMPLATES[template].name} selected</span>
-            </div>
+            <TemplateCarousel templates={TEMPLATES} initial={2} onUse={getStarted} />
           </section>
 
           <section className="features-section" id="features">

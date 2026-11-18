@@ -579,3 +579,141 @@
 @media (prefers-reduced-motion: reduce) {
   .lp2 .hero-topline, .lp2 .hero-content, .lp2 .hero-footer { transform: none; }
 }
+
+/* ---- Template carousel (TemplateCarousel.tsx): coverflow of phone previews, charcoal theme ---- */
+.lp2 .tpl-stage {
+  --stage-h: clamp(380px, calc(100svh - 330px), 640px);
+  --stage-w: calc(var(--stage-h) * 9 / 16);
+  /* Neighbours sit a full card-width out; the perspective pulls them back in a little. */
+  --stage-gap: calc(var(--stage-w) * 1.06);
+  position: relative;
+  outline: none;
+}
+.lp2 .tpl-stage-viewport {
+  position: relative;
+  height: calc(var(--stage-h) + 28px);
+  perspective: 1600px;
+  touch-action: pan-y;
+  user-select: none;
+}
+/* A faint pool of light under the active phone. */
+.lp2 .tpl-stage-floor {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: calc(var(--stage-w) * 2.4);
+  height: 140px;
+  margin-left: calc(var(--stage-w) * -1.2);
+  background: radial-gradient(ellipse at 50% 100%, rgba(137, 233, 0, 0.1) 0%, transparent 62%);
+  pointer-events: none;
+}
+.lp2 .tpl-stage-slide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  width: var(--stage-w);
+  aspect-ratio: 9 / 16;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 40px 90px -36px rgba(0, 0, 0, 0.9);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.75s ease;
+  cursor: pointer;
+  will-change: transform;
+}
+.lp2 .tpl-stage-slide.is-active {
+  cursor: default;
+  box-shadow: 0 0 0 1px rgba(137, 233, 0, 0.6), 0 0 48px -16px rgba(137, 233, 0, 0.32), 0 50px 110px -40px rgba(0, 0, 0, 0.95);
+}
+/* Ring offsets from the active slide; translateZ lets the perspective shrink the receding phones. */
+.lp2 .tpl-stage-slide[data-o='0'] { transform: translate(-50%, -50%) translateZ(0); z-index: 5; }
+.lp2 .tpl-stage-slide[data-o='-1'] { transform: translate(-50%, -50%) translateX(calc(var(--stage-gap) * -1)) translateZ(-150px) rotateY(18deg); z-index: 4; }
+.lp2 .tpl-stage-slide[data-o='1'] { transform: translate(-50%, -50%) translateX(var(--stage-gap)) translateZ(-150px) rotateY(-18deg); z-index: 4; }
+.lp2 .tpl-stage-slide[data-o='-2'] { transform: translate(-50%, -50%) translateX(calc(var(--stage-gap) * -2.02)) translateZ(-330px) rotateY(26deg); z-index: 3; }
+.lp2 .tpl-stage-slide[data-o='2'] { transform: translate(-50%, -50%) translateX(calc(var(--stage-gap) * 2.02)) translateZ(-330px) rotateY(-26deg); z-index: 3; }
+.lp2 .tpl-stage-video { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--panel); }
+/* Receding phones are dimmed with an overlay (cheap to fade), not a filter re-run on every video frame. */
+.lp2 .tpl-stage-dim { position: absolute; inset: 0; background: rgba(9, 10, 12, 0.6); opacity: 1; transition: opacity 0.75s ease; pointer-events: none; }
+.lp2 .tpl-stage-slide.is-active .tpl-stage-dim { opacity: 0; }
+.lp2 .tpl-stage-slide[data-o='-2'] .tpl-stage-dim,
+.lp2 .tpl-stage-slide[data-o='2'] .tpl-stage-dim { background: rgba(9, 10, 12, 0.82); }
+.lp2 .tpl-stage-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lp2 .tpl-stage-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+  width: 48px;
+  height: 48px;
+  margin-top: -24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(16, 18, 22, 0.82);
+  color: var(--white);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+.lp2 .tpl-stage-arrow:hover { border-color: rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.06); transform: scale(1.05); }
+.lp2 .tpl-stage-arrow-prev { left: 2%; }
+.lp2 .tpl-stage-arrow-next { right: 2%; }
+/* Name rail and the CTA share one row; on narrow screens the CTA wraps under the rail. */
+.lp2 .tpl-stage-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 18px; margin-top: 22px; }
+.lp2 .tpl-stage-rail { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.lp2 .tpl-stage-pill {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.lp2 .tpl-stage-pill:hover { color: var(--white); border-color: rgba(255, 255, 255, 0.3); }
+.lp2 .tpl-stage-pill.is-active { color: var(--white); border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.05); }
+.lp2 .tpl-stage-pill-label { position: relative; z-index: 1; }
+/* Autoplay progress along the active name's bottom edge; remounted per slide, paused with the stage. */
+.lp2 .tpl-stage-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: tpl-stage-progress 4.5s linear forwards;
+}
+.lp2 .tpl-stage.is-paused .tpl-stage-progress { animation-play-state: paused; }
+@keyframes tpl-stage-progress { to { transform: scaleX(1); } }
+.lp2 .tpl-stage-cta { min-height: 42px; }
+.lp2 .tpl-stage .template-footnote { margin-top: 26px; }
+@media (max-width: 720px) {
+  .lp2 .tpl-stage { --stage-h: clamp(340px, calc(100svh - 320px), 560px); --stage-gap: calc(var(--stage-w) * 0.62); }
+  .lp2 .tpl-stage-bar { flex-direction: column; align-items: stretch; }
+  .lp2 .tpl-stage-cta { align-self: center; }
+  .lp2 .tpl-stage-arrow { display: none; }
+  .lp2 .tpl-stage-slide[data-o='-2'], .lp2 .tpl-stage-slide[data-o='2'] { opacity: 0; pointer-events: none; }
+  .lp2 .tpl-stage-rail { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding: 4px 2px; scrollbar-width: none; }
+  .lp2 .tpl-stage-rail::-webkit-scrollbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp2 .tpl-stage-slide, .lp2 .tpl-stage-dim { transition: none; }
+  .lp2 .tpl-stage-progress { animation: none; }
+}
+/* Templates section: centred, compact heading so heading + stage + names fit one screen (as on the old landing). */
+.lp2 .templates-section .tpl-head { margin-bottom: 26px; text-align: center; }
+.lp2 .tpl-head .eyebrow { justify-content: center; margin-bottom: 16px; }
+.lp2 .tpl-head h2 { margin: 0; }
+.lp2 .tpl-sub { margin-top: 12px; color: var(--muted); }
+.lp2 .tpl-stage { --stage-h: clamp(360px, calc(100svh - 470px), 620px); }
+@media (max-width: 720px) {
+  .lp2 .tpl-stage { --stage-h: clamp(340px, calc(100svh - 320px), 560px); }
+}
