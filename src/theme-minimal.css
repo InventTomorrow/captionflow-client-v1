@@ -342,3 +342,66 @@ html .rail-item.active {
   background: var(--cf-surface-2);
   color: var(--cf-text);
 }
+
+/* ---------- App pages (Create, Projects, …): black wave backdrop + see-through header ----------
+   The image sits on a fixed layer behind the whole shell, so it stays put while the page scrolls.
+   The editor keeps its own chrome. */
+html .shell:not(.shell-editor) {
+  position: relative;
+  isolation: isolate;
+  background: #000;
+}
+html .shell:not(.shell-editor)::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0.45) 100%),
+    url('/brand/app-bg.webp') center / cover no-repeat;
+}
+html .shell:not(.shell-editor) .main,
+html .shell:not(.shell-editor) .main.main-creator { background: transparent; }
+html .shell:not(.shell-editor) .main.main-creator::before { display: none; }
+
+/* Header: fully transparent at the top of the page; once the page scrolls it picks up a light
+   frosted tint so content never runs into the nav (scroll-driven, no JS). */
+@keyframes cf-topbar-frost {
+  to {
+    background: rgba(6, 7, 9, 0.62);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(14px);
+  }
+}
+html .shell:not(.shell-editor) .topbar,
+html body .shell:not(.shell-editor) .topbar {
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@supports (animation-timeline: scroll()) {
+  html body .shell:not(.shell-editor) .topbar {
+    animation: cf-topbar-frost linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 72px;
+  }
+}
+/* Browsers without scroll-driven animation: the header scrolls away with the page instead. */
+@supports not (animation-timeline: scroll()) {
+  html body .shell:not(.shell-editor) .topbar { position: relative; }
+}
+/* Page wrappers stay see-through so the backdrop shows. */
+html .shell:not(.shell-editor) .main.main-create,
+html .shell:not(.shell-editor) .creation-page,
+html .shell:not(.shell-editor) .page { background: transparent; }
+/* Cards over the waves read as dark glass. */
+html .shell:not(.shell-editor) :is(.creation-workflow, .creation-uploader, .creation-source-summary, .creation-template-description, .creation-processing, .creation-project-row, .creation-project-empty) {
+  background: color-mix(in srgb, var(--cf-surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html .shell:not(.shell-editor) .creation-workflow:hover { background: color-mix(in srgb, var(--cf-card) 80%, transparent); }
+html .shell:not(.shell-editor) .creation-workflow.is-selected { background: color-mix(in srgb, var(--cf-accent) 6%, color-mix(in srgb, var(--cf-surface) 72%, transparent)); }
+html .shell:not(.shell-editor) .creation-uploader.is-dragging { background: color-mix(in srgb, var(--cf-card) 85%, transparent); }
