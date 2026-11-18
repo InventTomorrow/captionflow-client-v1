@@ -603,6 +603,7 @@ export function LandingPage() {
                 <h2>Short on time?<br /><span className="muted">Grab a Pass.</span></h2>
                 <p>One-time access, no auto-renewal — perfect for a single shoot or a quick campaign.</p>
               </div>
+              <div className="pass-cards">
               {passes.map((p) => {
                 const discounted = discountedPrice(p.priceMonthlyPkr, p);
                 return (
@@ -622,6 +623,7 @@ export function LandingPage() {
                   </article>
                 );
               })}
+              </div>
             </section>
           )}
 

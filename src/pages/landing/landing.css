@@ -969,3 +969,127 @@
   .lp2 .shorts-steps { gap: 6px 22px; }
   .lp2 .shorts-steps li { font-size: 11px; }
 }
+
+/* ---- One screen per section ----
+   Every section is exactly one screen tall (taller only if its content truly can't fit), with its
+   content centred in the space under the floating nav. The first screen is offer bar + hero +
+   language strip. Phones turn tall stacks (plans, passes, feature points) into swipe rows. */
+.lp2 { --nav-clear: 104px; --fit-bottom: 40px; --strip-h: 84px; }
+.lp2 .hero { min-height: calc(100svh - var(--offer-height) - var(--maint-height) - var(--strip-h)); }
+.lp2 .language-strip > .page-width { min-height: var(--strip-h); height: var(--strip-h); padding-block: 0; }
+
+.lp2 main > section:not(.hero):not(.viral-section) { min-height: 100vh; min-height: 100svh; }
+.lp2 .templates-section,
+.lp2 .about-section,
+.lp2 .features-section,
+.lp2 .workflow-section,
+.lp2 .pricing-section,
+.lp2 .final-cta { display: flex; flex-direction: column; justify-content: center; }
+.lp2 .templates-section,
+.lp2 .about-section,
+.lp2 .pass-section,
+.lp2 .features-section > .section,
+.lp2 .workflow-section > .section,
+.lp2 .pricing-section > .section,
+.lp2 .final-cta > .page-width { padding-block: var(--nav-clear) var(--fit-bottom); }
+.lp2 .features-section > .section,
+.lp2 .workflow-section > .section,
+.lp2 .pricing-section > .section,
+.lp2 .final-cta > .page-width { flex: 0 0 auto; }
+.lp2 .about-section { min-height: 100svh; }
+
+/* Day passes: intro on the left, the two cards on the right, centred in the screen. */
+.lp2 .pass-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 32px; align-content: center; align-items: center; }
+.lp2 .pass-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+
+/* Short laptop screens: trim the plan cards so the pricing screen fits 768px. */
+@media (min-width: 901px) and (max-height: 820px) {
+  .lp2 .pricing-section .section-heading { margin-bottom: 20px; }
+  .lp2 .pricing-grid { padding-top: 28px; }
+  .lp2 .price-card { padding: 22px 24px; }
+  .lp2 .price { margin-block: 14px 14px; }
+  .lp2 .price > span:not(.currency):not(.per) { font-size: 40px; }
+  .lp2 .price-card ul { margin-top: 16px; gap: 6px; }
+  .lp2 .price-card li { font-size: 13px; }
+  .lp2 .pricing-assurances { margin-top: 18px; }
+  .lp2 .feature-columns { padding-top: 24px; }
+  .lp2 .comparison .transcript { padding-block: 20px; }
+}
+
+/* Swipe rows (phones and tablets): one card at a time with the next one peeking. */
+@media (max-width: 900px) {
+  .lp2 .pricing-grid {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: calc(var(--page-gutter) * -1);
+    padding: 40px var(--page-gutter) 6px;
+    scroll-padding-inline: var(--page-gutter);
+    scrollbar-width: none;
+  }
+  .lp2 .pricing-grid::-webkit-scrollbar { display: none; }
+  .lp2 .price-card { flex: 0 0 min(360px, 82%); scroll-snap-align: start; }
+  .lp2 .pass-section { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .lp2 .pass-intro { padding: 0; }
+}
+@media (max-width: 600px) {
+  .lp2 { --nav-clear: 92px; --fit-bottom: 28px; --strip-h: 64px; }
+  .lp2 .language-strip > .page-width { flex-direction: row; align-items: center; }
+  /* Section intros keep the heading; the side paragraph is dropped where it only repeats it. */
+  .lp2 .features-section .heading-aside,
+  .lp2 .workflow-section .heading-aside p,
+  .lp2 .pricing-section .heading-aside p { display: none; }
+  .lp2 .section-heading { margin-bottom: 20px; }
+  /* Features: compact comparison, then the three points as a swipe row. */
+  .lp2 .comparison .transcript { padding: 16px 18px; gap: 8px; }
+  .lp2 .transcript-other p, .lp2 .transcript-asaan p { font-size: 19px; }
+  .lp2 .transcript-note { font-size: 12px; }
+  .lp2 .feature-columns {
+    display: flex;
+    gap: 12px;
+    padding: 20px var(--page-gutter) 4px;
+    margin-inline: calc(var(--page-gutter) * -1);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--page-gutter);
+    scrollbar-width: none;
+  }
+  .lp2 .feature-columns::-webkit-scrollbar { display: none; }
+  .lp2 .feature-columns article,
+  .lp2 .feature-columns article + article,
+  .lp2 .feature-columns article:last-child { flex: 0 0 78%; padding: 18px; border: 1px solid var(--line); border-radius: 12px; scroll-snap-align: start; }
+  .lp2 .feature-icon { margin-bottom: 10px; }
+  .lp2 .feature-columns h3 { font-size: 18px; }
+  .lp2 .feature-columns p { font-size: 14px; }
+  /* How it works: a shorter preview window. */
+  .lp2 .step-preview { min-height: 240px; padding: 20px; }
+  /* Plans: the card list is trimmed to fit the screen. */
+  .lp2 .price-card { flex-basis: 84%; padding: 22px; }
+  .lp2 .price { margin-block: 16px 14px; }
+  .lp2 .price-card ul { margin-top: 16px; gap: 6px; }
+  .lp2 .pricing-assurances { flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 11px; }
+  /* Passes: a swipe row too. */
+  .lp2 .pass-cards {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: calc(var(--page-gutter) * -1);
+    padding: 0 var(--page-gutter) 4px;
+    scroll-padding-inline: var(--page-gutter);
+    scrollbar-width: none;
+  }
+  .lp2 .pass-cards::-webkit-scrollbar { display: none; }
+  .lp2 .pass-card { flex: 0 0 84%; scroll-snap-align: start; }
+  .lp2 .pass-card ul { margin-block: 16px; gap: 8px; }
+  .lp2 .pass-intro > p:last-child { margin-top: 12px; }
+  /* Templates: the stage takes what the screen leaves after heading, names and button. */
+  .lp2 .templates-section { padding-top: var(--nav-clear); }
+}
+@media (min-width: 901px) and (max-height: 820px) {
+  .lp2 { --nav-clear: 96px; --fit-bottom: 24px; }
+}
+@media (max-width: 720px) {
+  .lp2 .tpl-stage { --stage-h: clamp(240px, calc(100svh - 520px), 460px); }
+}
