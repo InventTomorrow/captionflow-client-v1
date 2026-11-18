@@ -15,20 +15,22 @@
  * (no React re-render while scrolling). With reduced motion the finished
  * picture is shown, not pinned.
  *
- * Media: swap in real files via SHORTS_MEDIA (an image now; give a `video`
- * and it plays muted on loop instead).
+ * Media (SHORTS_MEDIA): each slot is a muted looping video with a poster frame. Videos only
+ * start downloading when the story comes near the screen and only play while it is on screen,
+ * so the landing's first load stays light. Reels with burned-in captions need no caption overlay.
  */
 import { useEffect, useRef } from 'react';
 
 type Media = { image: string; video?: string; position?: string };
+type Reel = Media & { caption?: [string, string]; length: string };
 
-/** Stand-ins until the real long video and its three reels are supplied (public/landing-v2/shorts). */
-const SHORTS_MEDIA: { long: Media; reels: (Media & { caption: [string, string]; length: string })[] } = {
-  long: { image: '/landing-v2/shorts/long-video.jpg' },
+/** The long video and the three reels cut from it (public/landing-v2/shorts); the reels carry their own captions. */
+const SHORTS_MEDIA: { long: Media; reels: Reel[] } = {
+  long: { image: '/landing-v2/shorts/long-poster.webp', video: '/landing-v2/shorts/long.mp4' },
   reels: [
-    { image: '/landing-v2/shorts/long-video.jpg', position: '52% 50%', caption: ['Consistency is the part', 'nobody talks about.'], length: '0:38' },
-    { image: '/landing-v2/shorts/long-video.jpg', position: '58% 40%', caption: ['Shuru mein koi', 'yeh nahi batata.'], length: '0:27' },
-    { image: '/landing-v2/shorts/long-video.jpg', position: '64% 55%', caption: ['The one habit that', 'actually worked.'], length: '0:44' },
+    { image: '/landing-v2/shorts/clip-1-poster.webp', video: '/landing-v2/shorts/clip-1.mp4', length: '0:30' },
+    { image: '/landing-v2/shorts/clip-2-poster.webp', video: '/landing-v2/shorts/clip-2.mp4', length: '0:20' },
+    { image: '/landing-v2/shorts/clip-3-poster.webp', video: '/landing-v2/shorts/clip-3.mp4', length: '0:29' },
   ],
 };
 
@@ -44,7 +46,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function MediaView({ media, className }: { media: Media; className: string }) {
   return media.video ? (
-    <video className={className} src={media.video} poster={media.image} muted loop playsInline autoPlay style={{ objectPosition: media.position }} />
+    <video className={className} src={media.video} poster={media.image} muted loop playsInline preload="none" style={{ objectPosition: media.position }} />
   ) : (
     <img className={className} src={media.image} alt="" loading="lazy" decoding="async" style={{ objectPosition: media.position }} />
   );
@@ -138,6 +140,20 @@ export function ShortsScrollStory() {
       schedule();
     });
     io.observe(wrap);
+    // Videos: fetch once the story is within about a screen of view, play only while it is showing.
+    const videos = [...wrap.querySelectorAll('video')];
+    const mediaIo = new IntersectionObserver(
+      ([entry]) => {
+        videos.forEach((v) => {
+          if (entry.isIntersecting && !reduce.matches) {
+            if (v.preload !== 'auto') v.preload = 'auto';
+            void v.play().catch(() => undefined);
+          } else v.pause();
+        });
+      },
+      { rootMargin: '100% 0px' },
+    );
+    mediaIo.observe(wrap);
     const ro = new ResizeObserver(schedule);
     ro.observe(canvas);
     window.addEventListener('scroll', schedule, { passive: true });
@@ -145,6 +161,7 @@ export function ShortsScrollStory() {
     schedule();
     return () => {
       io.disconnect();
+      mediaIo.disconnect();
       ro.disconnect();
       window.removeEventListener('scroll', schedule);
       cancelAnimationFrame(frameId);
@@ -178,7 +195,7 @@ export function ShortsScrollStory() {
           <div className="shorts-frame" ref={frameRef}>
             <MediaView media={SHORTS_MEDIA.long} className="shorts-media" />
             <div className="shorts-frame-dim" aria-hidden="true" />
-            <div className="shorts-frame-top"><span><i className="status-dot" /> LONG VIDEO · 16:9</span><span>1:12:48</span></div>
+            <div className="shorts-frame-top"><span><i className="status-dot" /> LONG VIDEO · 16:9</span><span>2:58:49</span></div>
             <div className="shorts-timeline" aria-hidden="true">
               {MOMENTS.map((m, i) => (
                 <i
@@ -201,11 +218,13 @@ export function ShortsScrollStory() {
               }}
             >
               <MediaView media={r} className="shorts-media" />
-              <p className="shorts-reel-caption">
-                {r.caption[0]}
-                <br />
-                <mark>{r.caption[1]}</mark>
-              </p>
+              {r.caption && (
+                <p className="shorts-reel-caption">
+                  {r.caption[0]}
+                  <br />
+                  <mark>{r.caption[1]}</mark>
+                </p>
+              )}
               <div className="shorts-reel-meta">CLIP {String(i + 1).padStart(2, '0')} · {r.length}</div>
             </div>
           ))}
