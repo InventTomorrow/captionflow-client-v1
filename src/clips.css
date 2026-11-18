@@ -4482,3 +4482,78 @@
     animation: none;
   }
 }
+
+/* ---------- Asaan Caption Helper install modal (HelperInstallModal.tsx) ---------- */
+.helper-modal { width: min(480px, calc(100vw - 2rem)); }
+.helper-intro { margin: 0 0 0.9rem; line-height: 1.5; color: var(--cf-text-secondary); }
+.helper-steps {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.helper-step {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--cf-border);
+  border-radius: 12px;
+  opacity: 0.72;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+.helper-step.is-current {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--cf-accent) 55%, var(--cf-border));
+}
+.helper-step.is-done { opacity: 1; }
+.helper-step-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: color-mix(in srgb, var(--cf-accent) 14%, transparent);
+  color: var(--cf-accent);
+}
+.helper-step.is-done .helper-step-num { color: var(--cf-success, #22c55e); background: color-mix(in srgb, var(--cf-success, #22c55e) 14%, transparent); }
+.helper-step-body { display: grid; gap: 0.3rem; min-width: 0; }
+.helper-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  justify-self: start;
+  text-decoration: none;
+}
+.helper-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cf-border) 35%, transparent);
+  color: var(--cf-text-secondary);
+  font-size: 0.85rem;
+}
+.helper-status.is-connected {
+  color: var(--cf-success, #22c55e);
+  background: color-mix(in srgb, var(--cf-success, #22c55e) 12%, transparent);
+}
+.helper-spin { animation: helper-spin 1s linear infinite; }
+@keyframes helper-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .helper-spin { animation: none; } }
+.helper-installed { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.75rem; }
+.helper-installed a { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--cf-accent); }
+.clips-helper-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--cf-success, #22c55e);
+  font-size: 0.67rem;
+}

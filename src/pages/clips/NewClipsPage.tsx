@@ -23,7 +23,9 @@ import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
 import { PremiumSelect } from '../../components/PremiumSelect';
-import { createClipsFromUrl, styleAllClips } from '../../lib/clips/api';
+import { HelperInstallModal } from '../../components/clips/HelperInstallModal';
+import { createClipsFromUrl, findLinkedClips, styleAllClips } from '../../lib/clips/api';
+import { HelperError, findHelper, helperFetch, helperVideoInfo, youtubeVideoId } from '../../lib/helper/helper';
 import type { ClipAspect } from '../../lib/clips/clipMath';
 import { clipOptionsFrom, type LengthPresetId } from '../../lib/clips/clipOptions';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
@@ -34,7 +36,7 @@ import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../../lib/lan
 import { templateByKey } from '../../lib/templateCatalog';
 import { refusedByServer } from '../../lib/clips/refused';
 import { deleteSource } from '../../lib/media/localMedia';
-import { ClipsDeviceError, uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
+import { ClipsDeviceError, uploadLinkedAudio, uploadProjectMedia, validateVideoFile, type UploadProgress } from '../../lib/uploader';
 import { useFlagsStore } from '../../stores/flagsStore';
 
 function formatSize(bytes: number) {
@@ -68,6 +70,46 @@ export function NewClipsPage() {
   const useUrl = urlImportOn && trimmedUrl.length > 0;
   const urlInvalid = useUrl && !/^https?:\/\/\S+/i.test(trimmedUrl);
   const canSubmit = !busy && !urlInvalid && (useUrl || !!file);
+  /** A YouTube link goes through Asaan Caption Helper on this computer, not our server. */
+  const youtubeId = useUrl && !urlInvalid ? youtubeVideoId(trimmedUrl) : null;
+  const [helperOk, setHelperOk] = useState(false);
+  const [helperModal, setHelperModal] = useState<'missing' | 'outdated' | null>(null);
+  /** "Create" was pressed while the helper was missing: carry on once it connects. */
+  const resumeAfterHelper = useRef(false);
+  const poppedFor = useRef('');
+  const startRef = useRef<() => void>(() => undefined);
+
+  // A pasted YouTube link: look for the helper, and offer it straight away when it isn't there.
+  useEffect(() => {
+    setHelperOk(false);
+    if (!youtubeId) return;
+    let stale = false;
+    const timer = setTimeout(async () => {
+      const status = await findHelper();
+      if (stale) return;
+      if (status?.ready && !status.outdated) return setHelperOk(true);
+      if (poppedFor.current === youtubeId) return;
+      poppedFor.current = youtubeId;
+      setHelperModal(status?.outdated ? 'outdated' : 'missing');
+    }, 350);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [youtubeId]);
+
+  const onHelperConnected = useCallback(() => {
+    setHelperOk(true);
+    setHelperModal(null);
+    if (resumeAfterHelper.current) {
+      resumeAfterHelper.current = false;
+      startRef.current();
+    }
+  }, []);
+  const closeHelperModal = useCallback(() => {
+    resumeAfterHelper.current = false;
+    setHelperModal(null);
+  }, []);
 
   useEffect(() => {
     setPreviewReady(false);
@@ -134,9 +176,64 @@ export function NewClipsPage() {
     }
   }
 
+  const step = (percent: number, status: string): UploadProgress => ({
+    percent: Math.max(0, Math.min(100, Math.round(percent))),
+    uploadedBytes: 0,
+    totalBytes: 0,
+    speedMBps: 0,
+    etaSeconds: 0,
+    status,
+  });
+
+  /**
+   * A YouTube link through Asaan Caption Helper: the helper fetches only the
+   * audio on this computer, and only that goes up to be transcribed. Null when
+   * the link already has a Clips project (opened instead).
+   */
+  async function audioFromHelper(link: string, signal: AbortSignal): Promise<string | null> {
+    setProgress(step(1, 'Getting the video ready…'));
+    const existing = await findLinkedClips(link).catch(() => null);
+    if (existing) {
+      navigate(`/clips/${existing}`);
+      return null;
+    }
+    const info = await helperVideoInfo(link, signal);
+    const size = info.audio.size;
+    setProgress(step(5, 'Getting the audio…'));
+    const parts = await helperFetch(info.id, info.audio, 0, size - 1, {
+      signal,
+      onBytes: (got) => setProgress(step(5 + (got / size) * 65, 'Getting the audio…')),
+    });
+    const audio = new Blob(parts as BlobPart[], { type: 'audio/mp4' });
+    return uploadLinkedAudio(audio, info, link, (p) => setProgress({ ...p, percent: Math.round(70 + p.percent * 0.3) }), signal);
+  }
+
   async function start() {
+    if (youtubeId) {
+      const status = await findHelper();
+      if (!status?.ready || status.outdated) {
+        resumeAfterHelper.current = true;
+        setHelperModal(status?.outdated ? 'outdated' : 'missing');
+        return;
+      }
+      const link = trimmedUrl;
+      return create((signal) => audioFromHelper(link, signal));
+    }
     if (useUrl) return startFromUrl();
-    if (!file) return;
+    const picked = file;
+    if (!picked) return;
+    return create(async (signal) => {
+      const uploaded = await uploadProjectMedia(picked, setProgress, signal, {
+        audioOnlyEnabled: flags.audioOnlyUploadEnabled,
+        // Clips: only the sound goes up; the video never leaves this device.
+        requireAudioOnly: true,
+      });
+      return uploaded.projectId;
+    });
+  }
+
+  /** Upload the sound (`upload` gives the new project, or null when there is nothing to make), then find clips. */
+  async function create(upload: (signal: AbortSignal) => Promise<string | null>) {
     setBusy(true);
     setError('');
     setPlanError(null);
@@ -145,12 +242,8 @@ export function NewClipsPage() {
     /** Set once the sound is uploaded: a later refusal (plan limits) removes it again. */
     let created: string | undefined;
     try {
-      const uploaded = await uploadProjectMedia(file, setProgress, abort.signal, {
-        audioOnlyEnabled: flags.audioOnlyUploadEnabled,
-        // Clips: only the sound goes up; the video never leaves this device.
-        requireAudioOnly: true,
-      });
-      const projectId = uploaded.projectId;
+      const projectId = await upload(abort.signal);
+      if (!projectId) return;
       created = projectId;
       const card = templateByKey(templateKey);
       if (card) {
@@ -187,6 +280,10 @@ export function NewClipsPage() {
       const plan = resolvePlanError(data);
       if (plan) setPlanError(plan);
       else if (err instanceof ClipsDeviceError) setError(err.message);
+      else if (err instanceof HelperError) {
+        setError(err.message);
+        if (err.code === 'missing') setHelperModal('missing');
+      }
       else if ((err as { name?: string }).name !== 'CanceledError' && (err as { name?: string }).name !== 'AbortError') {
         setError(errorMessage(err, 'Something went wrong — please try again'));
       }
@@ -196,6 +293,10 @@ export function NewClipsPage() {
       abortRef.current = null;
     }
   }
+
+  useEffect(() => {
+    startRef.current = () => void start();
+  });
 
   const durationLabel = preset === 'short' ? '15–30 sec' : preset === 'long' ? '45–90 sec' : '20–60 sec';
 
@@ -364,6 +465,10 @@ export function NewClipsPage() {
                   />
                   {urlInvalid ? (
                     <small className="clips-url-note is-error" role="alert">Enter a full link starting with https://</small>
+                  ) : youtubeId && helperOk ? (
+                    <small className="clips-helper-chip" role="status">
+                      <CheckCircle2 size={12} aria-hidden="true" /> Helper connected. Only the audio is fetched now, on this computer.
+                    </small>
                   ) : (
                     <small className="clips-url-note">YouTube, TikTok, Instagram, Vimeo or a direct MP4 — single videos, not playlists.</small>
                   )}
@@ -465,10 +570,11 @@ export function NewClipsPage() {
             disabled={!canSubmit}
             onClick={() => void start()}
           >
-            {busy ? (useUrl ? 'Importing your link…' : 'Preparing your video…') : <>Create Viral Clips <ArrowRight size={17} aria-hidden="true" /></>}
+            {busy ? (youtubeId ? 'Getting your video…' : useUrl ? 'Importing your link…' : 'Preparing your video…') : <>Create Viral Clips <ArrowRight size={17} aria-hidden="true" /></>}
           </button>
         </footer>
       </main>
+      {helperModal && <HelperInstallModal reason={helperModal} onConnected={onHelperConnected} onClose={closeHelperModal} />}
     </div>
   );
 }

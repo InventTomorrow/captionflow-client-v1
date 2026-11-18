@@ -61,6 +61,8 @@ interface MediaPayload {
   mimeType: string;
   mediaKind: UploadMode;
   sourceMeta?: SourceMeta;
+  /** Audio from a YouTube link fetched by Asaan Caption Helper: that link. */
+  sourceUrl?: string;
   /** Status line while bytes go up; chunk progress is appended for audio. */
   label: string;
 }
@@ -84,6 +86,7 @@ async function sendMedia(
     // Text fields first, so they are parsed before the file part.
     form.append('mediaKind', payload.mediaKind);
     if (payload.sourceMeta) form.append('sourceMeta', JSON.stringify(payload.sourceMeta));
+    if (payload.sourceUrl) form.append('sourceUrl', payload.sourceUrl);
     form.append('video', blob, fileName);
     onProgress(progress({ percent: 10, totalBytes: size, status: label }));
     const { data } = await api.post('/upload/single', form, {
@@ -107,6 +110,7 @@ async function sendMedia(
     totalChunks,
     mediaKind: payload.mediaKind,
     ...(payload.sourceMeta ? { sourceMeta: payload.sourceMeta } : {}),
+    ...(payload.sourceUrl ? { sourceUrl: payload.sourceUrl } : {}),
   }, { signal });
 
   const uploadId = init.uploadId as string;
@@ -356,6 +360,55 @@ export async function uploadProjectMedia(
   return { projectId, mode: 'video', localCopy, videoAttached: false };
 }
 
+/** What the helper knows about a linked YouTube video (helper/helper.ts HelperVideo). */
+export interface LinkedVideo {
+  title: string;
+  duration: number;
+  video: { size: number; codec: string; width?: number; height?: number; fps?: number };
+  audio: { size: number; codec: string };
+}
+
+/**
+ * Clips from a YouTube link through Asaan Caption Helper: only the sound goes
+ * up, fetched on this computer by the helper. The project keeps the link;
+ * reels play from YouTube and only picked clips' parts are ever fetched, here
+ * (clips/clipMedia.ts). Returns the new project's id.
+ */
+export async function uploadLinkedAudio(
+  audio: Blob,
+  video: LinkedVideo,
+  sourceUrl: string,
+  onProgress: (p: UploadProgress) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  // A readable file name; the server makes it safe for its disk anyway.
+  const title = video.title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 120) || 'YouTube video';
+  return sendMedia(
+    {
+      blob: audio,
+      fileName: `${title}.m4a`,
+      mimeType: 'audio/mp4',
+      mediaKind: 'audio',
+      sourceUrl,
+      sourceMeta: {
+        name: video.title.slice(0, 255),
+        size: video.video.size + video.audio.size,
+        mimeType: 'video/mp4',
+        width: video.video.width ?? 0,
+        height: video.video.height ?? 0,
+        rotation: 0,
+        fps: video.video.fps ?? 0,
+        duration: video.duration,
+        videoCodec: video.video.codec.slice(0, 40),
+        audioCodec: video.audio.codec.slice(0, 40),
+      },
+      label: 'Sending the audio…',
+    },
+    onProgress,
+    signal,
+  );
+}
+
 /** Why this device can't make Clips from a file (the video never leaves the device). */
 export type ClipsDeviceErrorCode = 'UNSUPPORTED' | 'NO_AUDIO' | 'EXTRACT_FAILED' | 'NO_LOCAL_COPY';
 
@@ -367,8 +420,10 @@ const CLIPS_DEVICE_MESSAGES: Record<ClipsDeviceErrorCode, string> = {
 };
 
 export class ClipsDeviceError extends Error {
-  constructor(public readonly code: ClipsDeviceErrorCode) {
+  readonly code: ClipsDeviceErrorCode;
+  constructor(code: ClipsDeviceErrorCode) {
     super(CLIPS_DEVICE_MESSAGES[code]);
+    this.code = code;
     this.name = 'ClipsDeviceError';
   }
 }

@@ -251,6 +251,12 @@ export function finishCaptions(projectId: string, ranges: TimeRange[] | 'all'): 
 }
 const finishing = new Map<string, Promise<Caption[]>>();
 
+/** The Clips project already made from this YouTube link through Asaan Caption Helper, or null. */
+export async function findLinkedClips(url: string): Promise<string | null> {
+  const { data } = await api.get('/clips/source', { params: { url } });
+  return (data?.projectId as string | null) ?? null;
+}
+
 /** A link-imported video's part being cut on the server for this device (clipMedia.ts). */
 export interface ClipSegmentView {
   id: string;

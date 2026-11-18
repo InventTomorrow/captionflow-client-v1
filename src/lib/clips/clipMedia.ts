@@ -2,13 +2,16 @@
  * clips/clipMedia.ts — the video a clip is previewed, framed and rendered
  * from on this device: the project's whole original (uploaded here), or, for
  * a video that came from a pasted link, just that clip's part of it — cut by
- * the server on request, fetched once and kept. Nothing else of a linked video
- * is ever downloaded.
+ * the server on request, or (a YouTube link fetched through Asaan Caption
+ * Helper) made on this computer from only the fragments it covers — fetched
+ * once and kept. Nothing else of a linked video is ever downloaded.
  *
  * `offset` is the source time at the file's 0:00, so a clip at [start, end]
  * is [start - offset, end - offset] in `file` (0 for a whole original).
  */
-import { API_URL } from '../api';
+import { api, API_URL } from '../api';
+import { fetchHelperPart } from '../helper/clipPart';
+import { HelperError } from '../helper/helper';
 import { findSegment, getSourceFile, getSourceRecord, storeSegmentFile } from '../media/localMedia';
 import { probeMediaFile, type MediaProbe } from '../media/probe';
 import { connectSocket } from '../socket';
@@ -152,6 +155,40 @@ export function fetchClipPart(
   return untilAborted(promise, signal).finally(() => onProgress && listeners.delete(onProgress));
 }
 
+/** Where a linked project's parts come from: the server, or this computer's helper. Asked once per project. */
+const sources = new Map<string, Promise<{ url?: string; helper: boolean }>>();
+
+function linkedSource(projectId: string) {
+  let source = sources.get(projectId);
+  if (!source) {
+    source = api.get(`/projects/${projectId}`).then((r) => {
+      const project = (r.data?.project ?? {}) as { sourceUrl?: string; sourceMedia?: string };
+      return { url: project.sourceUrl, helper: project.sourceMedia === 'helper' };
+    });
+    source.catch(() => sources.delete(projectId));
+    sources.set(projectId, source);
+  }
+  return source;
+}
+
+/** The part made on this computer through Asaan Caption Helper, then kept like a server cut. */
+async function fetchFromHelper(projectId: string, sourceUrl: string, range: TimeRange, report: (pct: number) => void): Promise<ClipMedia> {
+  const part = await fetchHelperPart(sourceUrl, range, (f) => report(f * 95)).catch((err: unknown) => {
+    throw new ClipMediaError(err instanceof HelperError ? err.message : 'This clip couldn’t be prepared — try again.');
+  });
+  const probe = await probeMediaFile(part.blob).catch(() => null);
+  const record = await storeSegmentFile(projectId, part.start, part.end, part.blob, probe);
+  const stored = await findSegment(projectId, { start: record.start, end: record.end });
+  report(100);
+  return {
+    file: stored?.file ?? new File([part.blob], 'clip.mp4', { type: 'video/mp4' }),
+    offset: part.start,
+    probe,
+    whole: false,
+    fetched: true,
+  };
+}
+
 function runFetch(projectId: string, clipId: string, range: TimeRange, listeners: Set<FetchProgress>): Promise<ClipMedia> {
   let shown = 0;
   const report = (pct: number) => {
@@ -161,6 +198,8 @@ function runFetch(projectId: string, clipId: string, range: TimeRange, listeners
   };
   return (async (): Promise<ClipMedia> => {
     report(0);
+    const source = await linkedSource(projectId);
+    if (source.helper && source.url) return fetchFromHelper(projectId, source.url, range, report);
     let view = await startCut(clipId, range);
     // Live percent over the socket; the long poll below is what decides.
     const socket = connectSocket();
