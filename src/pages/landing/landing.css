@@ -569,7 +569,8 @@
 .lp2 .hero-topline,
 .lp2 .hero-content,
 .lp2 .hero-footer { opacity: 0; transform: translateY(16px); transition: opacity 0.8s ease, transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
-.lp2.is-ready .site-header,
+/* The header only fades: its transform centres it (translateX(-50%)) and must never be reset. */
+.lp2.is-ready .site-header { opacity: 1; }
 .lp2.is-ready .hero-topline,
 .lp2.is-ready .hero-content,
 .lp2.is-ready .hero-footer { opacity: 1; transform: none; }
