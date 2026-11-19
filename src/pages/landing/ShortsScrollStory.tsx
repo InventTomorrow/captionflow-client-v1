@@ -26,11 +26,11 @@ type Reel = Media & { caption?: [string, string]; length: string };
 
 /** The long video and the three reels cut from it (public/landing-v2/shorts); the reels carry their own captions. */
 const SHORTS_MEDIA: { long: Media; reels: Reel[] } = {
-  long: { image: '/landing-v2/shorts/long-poster.webp', video: '/landing-v2/shorts/long.mp4' },
+  long: { image: '/landing-v2/shorts/long-v2-poster.webp', video: '/landing-v2/shorts/long-v2.mp4' },
   reels: [
-    { image: '/landing-v2/shorts/clip-1-poster.webp', video: '/landing-v2/shorts/clip-1.mp4', length: '0:30' },
-    { image: '/landing-v2/shorts/clip-2-poster.webp', video: '/landing-v2/shorts/clip-2.mp4', length: '0:20' },
-    { image: '/landing-v2/shorts/clip-3-poster.webp', video: '/landing-v2/shorts/clip-3.mp4', length: '0:29' },
+    { image: '/landing-v2/shorts/reel-1-poster.webp', video: '/landing-v2/shorts/reel-1.mp4', length: '0:30' },
+    { image: '/landing-v2/shorts/reel-2-poster.webp', video: '/landing-v2/shorts/reel-2.mp4', length: '0:20' },
+    { image: '/landing-v2/shorts/reel-3-poster.webp', video: '/landing-v2/shorts/reel-3.mp4', length: '0:29' },
   ],
 };
 
@@ -147,6 +147,7 @@ export function ShortsScrollStory() {
         videos.forEach((v) => {
           if (entry.isIntersecting && !reduce.matches) {
             if (v.preload !== 'auto') v.preload = 'auto';
+            v.muted = true;
             void v.play().catch(() => undefined);
           } else v.pause();
         });

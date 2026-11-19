@@ -30,11 +30,11 @@ const NAV = [
 
 /** Template previews (9:16, 6 s loops). Swap the files in public/landing-v2/templates to change them. */
 const TEMPLATES: CarouselTemplate[] = [
-  { name: 'TikTok Classic', video: '/landing-v2/templates/tpl-1.mp4', poster: '/landing-v2/templates/tpl-1-poster.webp' },
-  { name: 'Hero Word', video: '/landing-v2/templates/tpl-2.mp4', poster: '/landing-v2/templates/tpl-2-poster.webp' },
-  { name: 'Aura', video: '/landing-v2/templates/tpl-3.mp4', poster: '/landing-v2/templates/tpl-3-poster.webp' },
-  { name: 'Industrial Display', video: '/landing-v2/templates/tpl-4.mp4', poster: '/landing-v2/templates/tpl-4-poster.webp' },
-  { name: 'Swiss', video: '/landing-v2/templates/tpl-5.mp4', poster: '/landing-v2/templates/tpl-5-poster.webp' },
+  { name: 'TikTok Classic', video: '/landing-v2/templates/tiktok-classic.mp4', poster: '/landing-v2/templates/tiktok-classic-poster.webp' },
+  { name: 'Hero Word', video: '/landing-v2/templates/hero-word.mp4', poster: '/landing-v2/templates/hero-word-poster.webp' },
+  { name: 'Aura', video: '/landing-v2/templates/aura.mp4', poster: '/landing-v2/templates/aura-poster.webp' },
+  { name: 'Industrial Display', video: '/landing-v2/templates/industrial-display.mp4', poster: '/landing-v2/templates/industrial-display-poster.webp' },
+  { name: 'Swiss', video: '/landing-v2/templates/swiss.mp4', poster: '/landing-v2/templates/swiss-poster.webp' },
 ];
 
 const STEPS: { title: string; text: string; preview: ReactNode }[] = [

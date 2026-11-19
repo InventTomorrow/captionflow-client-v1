@@ -6,14 +6,15 @@
  * styled for the charcoal theme (landing.css, .tpl-stage*).
  *
  * Every slide is placed by its ring offset from the active one (data-o = -2 … 2)
- * and moved by CSS transforms only. Only the active slide and the next one carry
- * a real <video> (the next preloads so the hand-off is seamless); the others show
- * their poster. Exactly one video plays — the active one, and only on screen.
+ * and moved by CSS transforms only. Every visible phone plays its own muted, looping
+ * preview while the section is on screen. The active one loads first (from the top
+ * whenever it becomes active); the neighbours start once it can play, so the first
+ * frame shows fast. Phones skip the outer pair, which are hidden there.
  * Autoplay pauses while the mouse rests on the active phone, keyboard focus is
  * inside, the section is off screen, or the visitor prefers reduced motion.
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 export type CarouselTemplate = { name: string; video: string; poster: string };
 
@@ -67,18 +68,42 @@ export function TemplateCarousel({
     return () => window.clearInterval(id);
   }, [paused, visible, n, index]);
 
-  // One video at a time: the active slide, from the top, while on screen.
+  // Every visible phone plays while the section is on screen: the active one first (from the
+  // top), the neighbours as soon as it can play. Off screen, everything pauses.
   useEffect(() => {
-    videoRefs.current.forEach((video, i) => {
-      if (!video) return;
-      if (i === index && visible) {
-        if (video.currentTime > 0.25) video.currentTime = 0;
-        void video.play().catch(() => undefined);
-      } else {
-        video.pause();
-      }
-    });
-  }, [index, visible]);
+    const videos = videoRefs.current;
+    if (!visible) {
+      videos.forEach((v) => v?.pause());
+      return;
+    }
+    const narrow = window.matchMedia('(max-width: 720px)').matches;
+    const play = (v: HTMLVideoElement) => {
+      v.muted = true;
+      void v.play().catch(() => undefined);
+    };
+    const activeVideo = videos[index];
+    if (activeVideo) {
+      if (activeVideo.currentTime > 0.25) activeVideo.currentTime = 0;
+      play(activeVideo);
+    }
+    const startNeighbours = () =>
+      videos.forEach((v, i) => {
+        if (!v || i === index) return;
+        const o = Math.abs(ringOffset(index, i, n));
+        if (o > 2 || (narrow && o === 2)) {
+          v.pause();
+          return;
+        }
+        v.preload = 'auto';
+        play(v);
+      });
+    if (!activeVideo || activeVideo.readyState >= 3) {
+      startNeighbours();
+      return;
+    }
+    activeVideo.addEventListener('canplay', startNeighbours, { once: true });
+    return () => activeVideo.removeEventListener('canplay', startNeighbours);
+  }, [index, visible, n]);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     dragStart.current = e.clientX;
@@ -152,32 +177,28 @@ export function TemplateCarousel({
                 if (e.pointerType === 'mouse') setHover(false);
               }}
             >
-              {o === 0 || o === 1 ? (
-                <video
-                  ref={(el) => {
-                    videoRefs.current[i] = el;
-                  }}
-                  className="tpl-stage-video"
-                  src={t.video}
-                  poster={t.poster}
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                />
-              ) : (
-                <img className="tpl-stage-video" src={t.poster} alt="" loading="lazy" decoding="async" />
-              )}
+              <video
+                ref={(el) => {
+                  videoRefs.current[i] = el;
+                }}
+                className="tpl-stage-video"
+                src={t.video}
+                poster={t.poster}
+                muted
+                loop
+                playsInline
+                preload={isActive ? 'auto' : 'metadata'}
+              />
               <div className="tpl-stage-dim" aria-hidden="true" />
               <figcaption className="tpl-stage-sr">{t.name}</figcaption>
             </figure>
           );
         })}
         <button type="button" className="tpl-stage-arrow tpl-stage-arrow-prev" onClick={() => go(index - 1)} aria-label="Previous template">
-          <ChevronLeft size={20} strokeWidth={2} aria-hidden="true" />
+          <CaretLeft size={20} weight="bold" aria-hidden="true" />
         </button>
         <button type="button" className="tpl-stage-arrow tpl-stage-arrow-next" onClick={() => go(index + 1)} aria-label="Next template">
-          <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
+          <CaretRight size={20} weight="bold" aria-hidden="true" />
         </button>
       </div>
 
