@@ -40,35 +40,34 @@ const TEMPLATES: CarouselTemplate[] = [
 const STEPS: { title: string; text: string; preview: ReactNode }[] = [
   {
     title: 'Upload',
-    text: 'Upload your video or audio file.',
+    text: 'Drop in your video, a short reel or a long podcast.',
     preview: (
       <div className="upload-preview">
         <span className="upload-symbol">↥</span>
         <strong>Drag &amp; drop a video,<br />or click to browse</strong>
-        <span>MP4, MOV, AVI, MKV, WEBM</span>
+        <span>MP4, MOV, MKV, WEBM, AVI, FLV</span>
         <div className="upload-file"><span>▤</span><span>podcast-clip.mp4<small>Ready to upload</small></span><span>✓</span></div>
       </div>
     ),
   },
   {
-    title: 'Transcribe',
-    text: 'We transcribe your content in seconds.',
+    title: 'Choose Language',
+    text: 'Urdish, Urdu script, Roman Punjabi or a translation.',
     preview: (
       <div className="transcribe-preview">
-        <span className="preview-title">TRANSCRIPT / ROMAN URDU</span>
-        <div className="transcribe-line"><span>00:20</span>Subah subah chai peeyo,</div>
-        <div className="transcribe-line"><span>00:23</span>aur kaam pe niklo</div>
-        <div className="transcribe-line"><span>00:26</span>tension-free ho ke.</div>
-        <div className="transcribe-line"><span>00:28</span>Chalo, shuru karte hain.</div>
+        <span className="preview-title">LANGUAGE</span>
+        <div className="transcribe-line"><span>SPOKEN</span>Urdu (with English)</div>
+        <div className="transcribe-line"><span>CAPTIONS</span>Urdish, in English letters</div>
+        <div className="transcribe-line"><span>NAMES</span>Lahore, Dawood, Asaan Caption</div>
       </div>
     ),
   },
   {
     title: 'Generate Captions',
-    text: 'AI generates accurate captions instantly.',
+    text: 'AI writes and times them, and picks words to highlight.',
     preview: (
       <div className="caption-preview">
-        <span>CAPTIONS / WORD POP</span>
+        <span>CAPTIONS / HERO WORD</span>
         <strong>aur <mark>kaam</mark> pe niklo</strong>
         <span>00:23 — 00:26</span>
       </div>
@@ -76,21 +75,21 @@ const STEPS: { title: string; text: string; preview: ReactNode }[] = [
   },
   {
     title: 'Style',
-    text: 'Choose a style that fits your content.',
+    text: '30+ styles and 50+ fonts, including Urdu Nastaliq.',
     preview: (
       <div className="styles-preview">
         <span className="preview-title">CHOOSE YOUR STYLE</span>
         <div className="style-option">TikTok Classic <span>✓</span></div>
         <div className="style-option">Roboto Word Pop</div>
         <div className="style-option">TikTok Pill</div>
-        <div className="style-option">Clean White</div>
+        <div className="style-option">Aura</div>
         <div className="style-option">Poppins Bold</div>
       </div>
     ),
   },
   {
     title: 'Export',
-    text: 'Export and share your content.',
+    text: 'Captions burned in, up to 4K, or an SRT for your editor.',
     preview: (
       <div className="export-preview">
         <h3>Export Video</h3>
@@ -394,7 +393,7 @@ export function LandingPage() {
               <h1 id="hero-title">Need Urdish captions?<br /><span className="brand-underline">We got it.</span></h1>
               <div className="hero-bottom">
                 <div>
-                  <p className="hero-description">Other tools break when Urdu meets English. We don&apos;t.</p>
+                  <p className="hero-description">Captions for the way you really talk: Urdu, English and everything in between, written in Urdish, Urdu or English.</p>
                   <div className="hero-buttons">
                     <button type="button" className="button button-white" onClick={getStarted}>Get Started <span>↗</span></button>
                     <a href="#templates" className="button button-glass">Browse Templates <span>↓</span></a>
@@ -421,7 +420,7 @@ export function LandingPage() {
             <div className="tpl-head">
               <p className="eyebrow"><span className="section-index">01 /</span> STYLES MADE FOR YOUR VOICE</p>
               <h2>All your favourite <span className="brand-underline">templates.</span></h2>
-              <p className="tpl-sub">Styles built for Roman Urdu. Tweak and save your preset.</p>
+              <p className="tpl-sub">30+ caption styles, from clean subtitles to animated word-by-word. Pick one, then make it yours.</p>
             </div>
             <TemplateCarousel templates={TEMPLATES} initial={2} onUse={getStarted} />
           </section>
@@ -434,7 +433,7 @@ export function LandingPage() {
                   <h2>Speak in Urdu, English,<br /><span className="brand-underline">or both.</span></h2>
                 </div>
                 <div className="heading-aside">
-                  <p>Asaan Caption understands what others miss. Accurate, natural captions for real Pakistani speech, with no awkward guesses.</p>
+                  <p>Tell us how you speak, then choose how it reads: Urdish, proper Urdu script, Roman Punjabi or a translation. Add names and brand words so they come out spelled right.</p>
                 </div>
               </div>
               <div className="comparison">
@@ -446,24 +445,24 @@ export function LandingPage() {
                 <div className="transcript transcript-asaan">
                   <span className="small-label">ASAAN CAPTION <span>✓</span></span>
                   <p>“Subah subah chai peeyo, aur kaam pe niklo <span>tension-free ho ke.</span>”</p>
-                  <span className="transcript-note">Understands local pronunciation, code-switching, and everyday slang.</span>
+                  <span className="transcript-note">Written in Urdish, the way you would type it on WhatsApp. English words stay English.</span>
                 </div>
               </div>
               <div className="feature-columns">
                 <article>
                   <span className="feature-icon">[ا]</span>
-                  <h3>Built for Pakistani speech</h3>
-                  <p>Understands local accents, Urdu, Roman Urdu, and the way they mix mid-sentence.</p>
+                  <h3>Urdu, Punjabi and English</h3>
+                  <p>Urdu or Punjabi mixed with English, captioned in Urdish, Roman Punjabi, Urdu script, or translated into 8 languages.</p>
                 </article>
                 <article>
                   <span className="feature-icon">[↔]</span>
                   <h3>Edit before you post</h3>
-                  <p>Fix spelling, adjust word timing, and style captions your way, with zero hassle.</p>
+                  <p>Fix any word, make the key word pop, drag captions where you want them, and switch styles in one click.</p>
                 </article>
                 <article>
                   <span className="feature-icon">[↓]</span>
                   <h3>Ready to export</h3>
-                  <p>Download crisp 4K video with captions burned in, or take an SRT into your editor.</p>
+                  <p>Captions burned in, up to 4K on paid plans, in 9:16, 16:9, 1:1 or 4:5. Or take an SRT into your editor.</p>
                   <span className="format-tags">4K <i>·</i> SRT <i>·</i> MP4</span>
                 </article>
               </div>
@@ -481,7 +480,7 @@ export function LandingPage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow"><span className="section-index">04 /</span> THE WHOLE WORKFLOW. NOTHING MISSING.</p>
-                  <h2>Upload. Process. Export.<br /><span className="muted">Done within <span className="brand-underline">2 minutes.</span></span></h2>
+                  <h2>Upload. Choose. Export.<br /><span className="muted">No editing skills <span className="brand-underline">needed.</span></span></h2>
                 </div>
                 <div className="heading-aside"><p>One focused flow from your original video to a polished, captioned export.</p></div>
               </div>
@@ -522,8 +521,8 @@ export function LandingPage() {
               <h2>Most tools weren&apos;t built<br />for the way we speak.<br /><span className="muted">So we built one.</span></h2>
               <p className="about-intro">
                 <strong>Subtitling used to be the slowest part of our workflow.</strong> Other tools treated Pakistani speech like an
-                afterthought. Asaan Caption is trained for real local speech patterns, so captions sound natural, accurate, and actually
-                usable.
+                afterthought. Asaan Caption writes Urdish the way people actually type it, spells your names right, and lets you fix
+                anything in seconds, so your captions are ready to post.
               </p>
             </div>
           </section>
@@ -592,7 +591,7 @@ export function LandingPage() {
                   })}
                 </div>
               )}
-              <div className="pricing-assurances"><span>✓ No hidden fees</span><span>✓ Cancel any time</span><span>✓ First exports free</span></div>
+              <div className="pricing-assurances"><span>✓ No hidden fees</span><span>✓ No auto-renewal</span><span>✓ Free plan to start</span></div>
             </div>
           </section>
 
@@ -632,10 +631,10 @@ export function LandingPage() {
               <p className="eyebrow"><span className="status-dot" /> READY WHEN YOU ARE</p>
               <h2>The broken<br />transcript era <span>is over.</span></h2>
               <div className="cta-bottom">
-                <p>Your mix isn&apos;t the problem. Prove it in under 2 minutes.</p>
+                <p>Your mix isn&apos;t the problem. Try it free on your next video.</p>
                 <div>
                   <button type="button" className="button button-white" onClick={getStarted}>Get Started <span>↗</span></button>
-                  <span>No card needed. First exports on us.</span>
+                  <span>No card needed. Start on the free plan.</span>
                 </div>
               </div>
             </div>
@@ -648,7 +647,7 @@ export function LandingPage() {
               <a className="brand" href="#top" aria-label="Asaan Caption home">
                 <BrandLogo />
               </a>
-              <p>Automatic captions engineered for the way Pakistan speaks — Urdu, Roman Urdu, and everything in between.</p>
+              <p>Automatic captions and short clips for the way Pakistan speaks: Urdu, Roman Urdu, Punjabi and everything in between.</p>
             </div>
             <div className="footer-links">
               <span className="small-label">PRODUCT</span>

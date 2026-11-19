@@ -2,7 +2,7 @@
  * TemplateCarousel — the landing's template section: phone-sized previews in a
  * shallow 3D coverflow (the active one large and lit, neighbours receding),
  * arrows, a rail of template names with the autoplay progress, and a
- * "Start with …" button. Same behaviour as the previous landing's showcase,
+ * "Try it free" button. Same behaviour as the previous landing's showcase,
  * styled for the charcoal theme (landing.css, .tpl-stage*).
  *
  * Every slide is placed by its ring offset from the active one (data-o = -2 … 2)
@@ -219,7 +219,7 @@ export function TemplateCarousel({
           ))}
         </div>
         <button type="button" className="button button-white tpl-stage-cta" onClick={() => onUse(active)}>
-          Start with {active.name} <span>↗</span>
+          Try it free <span>↗</span>
         </button>
       </div>
     </div>
