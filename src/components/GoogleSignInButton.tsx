@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { api, API_URL } from '../lib/api';
+import { useGoogleEnabled } from '../lib/useGoogleEnabled';
 
 export function GoogleSignInButton() {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
+  const enabled = useGoogleEnabled();
 
   async function startGoogleSignIn() {
     setChecking(true);
@@ -21,6 +23,9 @@ export function GoogleSignInButton() {
       setChecking(false);
     }
   }
+
+  // Shown only when Google sign-in is set up on the server.
+  if (!enabled) return null;
 
   return (
     <div className="auth-google-group">

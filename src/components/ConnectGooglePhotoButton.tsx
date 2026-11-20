@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ImageSquare } from '@phosphor-icons/react';
 import { api, API_URL } from '../lib/api';
+import { useGoogleEnabled } from '../lib/useGoogleEnabled';
 
 /**
  * "Connect Google photo" for accounts without a profile photo. Once there is
@@ -19,6 +20,7 @@ export function ConnectGooglePhotoButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const enabled = useGoogleEnabled();
 
   async function connect() {
     setBusy(true);
@@ -37,7 +39,8 @@ export function ConnectGooglePhotoButton({
     }
   }
 
-  if (hasPhoto) return null;
+  // Nothing once there's a photo, or while Google sign-in isn't set up on the server.
+  if (hasPhoto || !enabled) return null;
 
   return (
     <>
