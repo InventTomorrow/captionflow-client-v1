@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useFlagsStore } from '../stores/flagsStore';
-import { discountedPrice, type ApiPlan } from '../components/PricingCards';
+import { discountedPrice, planFeatures, type ApiPlan } from '../components/PricingCards';
 import { usePlans } from '../lib/usePlans';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { BrandLogo } from '../components/BrandLogo';
@@ -584,7 +584,7 @@ export function LandingPage() {
                           Get Started <span>↗</span>
                         </button>
                         <ul>
-                          {p.features.map((f) => <li key={f}>{f}</li>)}
+                          {planFeatures(p, flags.clipsEnabled).map((f) => <li key={f}>{f}</li>)}
                         </ul>
                       </article>
                     );
@@ -616,7 +616,7 @@ export function LandingPage() {
                     </div>
                     {p.description && <p>{p.description}</p>}
                     <ul>
-                      {p.features.map((f) => <li key={f}>{f}</li>)}
+                      {planFeatures(p, flags.clipsEnabled).map((f) => <li key={f}>{f}</li>)}
                     </ul>
                     <button type="button" className="button button-outline" onClick={() => choosePlan(p)}>Get {p.name} <span>↗</span></button>
                   </article>

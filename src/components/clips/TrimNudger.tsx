@@ -3,7 +3,7 @@
  * starts and ends on a clean sentence boundary. The server recomputes the
  * exact padded times from the transcript; this only picks sentence indices.
  */
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 import { formatClipLength } from '../../lib/clips/clipMath';
 
@@ -45,29 +45,42 @@ export function TrimNudger({
       {glyph}
     </button>
   );
+  const point = (name: string, at: number | undefined, text: string | undefined, earlier: ReactNode, later: ReactNode) => (
+    <div className="clip-trim-point" role="group" aria-label={name}>
+      <div className="clip-trim-point-head">
+        <span className="clip-trim-name">{name}</span>
+        {at !== undefined && <span className="clip-trim-at">{formatClipLength(at)}</span>}
+        <span className="clip-trim-nudges">
+          {earlier}
+          {later}
+        </span>
+      </div>
+      {text && (
+        <q className="clip-trim-text" dir="auto" title={text}>
+          {text}
+        </q>
+      )}
+    </div>
+  );
   return (
     <div className="clip-trim" role="group" aria-label="Trim by sentence">
-      <div className="clip-trim-row">
-        <span className="clip-trim-name">Start</span>
-        {nudge('Start earlier (add the previous sentence)', <ChevronLeft size={18} aria-hidden="true" />, startIdx - 1, endIdx)}
-        {nudge('Start later (drop the first sentence)', <ChevronRight size={18} aria-hidden="true" />, startIdx + 1, endIdx)}
-        {startText && (
-          <q className="clip-trim-text" dir="auto">
-            {startText}
-          </q>
-        )}
-      </div>
-      <div className="clip-trim-row">
-        <span className="clip-trim-name">End</span>
-        {nudge('End earlier (drop the last sentence)', <ChevronLeft size={18} aria-hidden="true" />, startIdx, endIdx - 1)}
-        {nudge('End later (add the next sentence)', <ChevronRight size={18} aria-hidden="true" />, startIdx, endIdx + 1)}
-        {endText && (
-          <q className="clip-trim-text" dir="auto">
-            {endText}
-          </q>
-        )}
-      </div>
-      <p className="clip-trim-len">Length {formatClipLength(len(startIdx, endIdx))}</p>
+      {point(
+        'Start',
+        sentences[startIdx]?.[0],
+        startText,
+        nudge('Start earlier (add the previous sentence)', <CaretLeft size={16} weight="bold" aria-hidden="true" />, startIdx - 1, endIdx),
+        nudge('Start later (drop the first sentence)', <CaretRight size={16} weight="bold" aria-hidden="true" />, startIdx + 1, endIdx),
+      )}
+      {point(
+        'End',
+        sentences[endIdx]?.[1],
+        endText,
+        nudge('End earlier (drop the last sentence)', <CaretLeft size={16} weight="bold" aria-hidden="true" />, startIdx, endIdx - 1),
+        nudge('End later (add the next sentence)', <CaretRight size={16} weight="bold" aria-hidden="true" />, startIdx, endIdx + 1),
+      )}
+      <p className="clip-trim-len" aria-live="polite">
+        Length <strong>{formatClipLength(len(startIdx, endIdx))}</strong>
+      </p>
     </div>
   );
 }

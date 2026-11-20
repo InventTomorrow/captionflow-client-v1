@@ -6,7 +6,7 @@
  * screen readers, 44 px targets) that never wraps; the title opens the clip.
  * In selection mode the poster toggles the clip's checkbox instead.
  */
-import { Captions, Check, Clapperboard, Download, Film, SquarePen, Trash2 } from 'lucide-react';
+import { Check, ClosedCaptioning, DownloadSimple, FilmSlate, FilmStrip, PencilSimpleLine, Play, Trash } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getClipThumb } from '../../lib/clips/thumbs';
 import type { Clip } from '../../lib/clips/api';
@@ -28,6 +28,7 @@ interface ClipCardProps {
   fallbackPosters?: string[];
   showProject?: boolean;
   showReason?: boolean;
+  workspace?: boolean;
   render?: RenderState;
   /** Selection mode: undefined = off; true/false = this card's checkbox. */
   selected?: boolean;
@@ -50,6 +51,7 @@ export function ClipCard({
   fallbackPosters,
   showProject,
   showReason,
+  workspace,
   render,
   selected,
   onToggleSelect,
@@ -103,7 +105,7 @@ export function ClipCard({
   return (
     <li
       ref={ref}
-      className={`clip-card${preview ? ' is-playing' : ''}${selected ? ' is-selected' : ''}`}
+      className={`clip-card${workspace ? ' is-workspace-card' : ''}${preview ? ' is-playing' : ''}${selected ? ' is-selected' : ''}`}
       onMouseEnter={() => hasSource && !selecting && onActivate(clip._id)}
       onMouseLeave={() => onActivate(null)}
     >
@@ -113,7 +115,7 @@ export function ClipCard({
         onClick={onMediaClick}
         onFocus={() => hasSource && !selecting && onActivate(clip._id)}
         aria-pressed={selecting ? selected : undefined}
-        aria-label={selecting ? `Select ${name}` : `${name}, ${length}, score ${clip.score}. Play, then open`}
+        aria-label={selecting ? `Select ${name}` : preview ? `Open ${name}` : `Preview ${name}, ${length}, score ${clip.score}`}
       >
         {preview ??
           (thumb ? (
@@ -130,14 +132,15 @@ export function ClipCard({
             />
           ) : (
             <span className="clip-card-placeholder" aria-hidden="true">
-              <Film size={26} />
+              <FilmStrip size={26} />
             </span>
           ))}
-        <span className={`clip-score clip-score-${tone}`}>{clip.score}</span>
+        <span className={`clip-score clip-score-${tone}`} title="Clip score">{workspace ? `Score ${clip.score}` : clip.score}</span>
         <span className="clip-length">{length}</span>
+        {workspace && !selecting && <span className="clip-card-preview-cue"><Play size={14} weight="fill" aria-hidden="true" />{preview ? 'Open clip' : 'Preview'}</span>}
         {selecting && (
           <span className={`clip-check${selected ? ' is-on' : ''}`} aria-hidden="true">
-            {selected && <Check size={16} strokeWidth={3} />}
+            {selected && <Check size={16} weight="bold" />}
           </span>
         )}
         {rendered && !rendering && <span className="clip-rendered">Rendered</span>}
@@ -172,16 +175,19 @@ export function ClipCard({
         {render?.status === 'error' && <p className="clip-card-error" role="alert">{render.error}</p>}
         <div className="clip-card-actions">
           <button type="button" className="clip-act clip-act-wide" onClick={onOpen} aria-label={`Edit ${name}`} title="Edit clip">
-            <SquarePen size={18} aria-hidden="true" />
+            <PencilSimpleLine size={18} aria-hidden="true" />
+            {workspace && <span>Edit</span>}
           </button>
           {onEditCaptions && (
             <button type="button" className="clip-act" onClick={onEditCaptions} aria-label="Open in editor" title="Open in editor">
-              <Captions size={18} aria-hidden="true" />
+              <ClosedCaptioning size={18} aria-hidden="true" />
+              {workspace && <span>Captions</span>}
             </button>
           )}
           {rendered && !rendering && onDownload ? (
             <button type="button" className="clip-act" onClick={onDownload} aria-label="Download MP4" title="Download MP4">
-              <Download size={18} aria-hidden="true" />
+              <DownloadSimple size={18} aria-hidden="true" />
+              {workspace && <span>Download</span>}
             </button>
           ) : (
             onRender && (
@@ -193,13 +199,14 @@ export function ClipCard({
                 aria-label={rendering ? `Rendering ${Math.round(render?.percent ?? 0)}%` : 'Render clip'}
                 title="Render clip"
               >
-                {rendering ? <span className="clip-act-pct">{Math.round(render?.percent ?? 0)}%</span> : <Clapperboard size={18} aria-hidden="true" />}
+                {rendering ? <span className="clip-act-pct">{Math.round(render?.percent ?? 0)}%</span> : <FilmSlate size={18} aria-hidden="true" />}
+                {workspace && <span>{rendering ? 'Rendering' : 'Render'}</span>}
               </button>
             )
           )}
           {onDelete && (
             <button type="button" className="clip-act clip-act-danger" onClick={onDelete} aria-label="Delete clip" title="Delete clip">
-              <Trash2 size={18} aria-hidden="true" />
+              <Trash size={18} aria-hidden="true" />
             </button>
           )}
         </div>

@@ -69,6 +69,15 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             Reload page
           </button>
+          {/* Development only: the actual error, so a crash can be reported without opening DevTools. */}
+          {import.meta.env.DEV && (
+            <details style={{ maxWidth: '48rem', width: '100%', textAlign: 'left', color: '#B6BBC7', fontSize: '0.8rem' }}>
+              <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Technical details</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#060B11', padding: '0.75rem', borderRadius: '0.5rem', marginTop: '0.5rem' }}>
+                {`${this.state.error.message}\n\n${(this.state.error.stack ?? '').split('\n').slice(1, 8).join('\n')}`}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }

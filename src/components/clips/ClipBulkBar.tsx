@@ -2,7 +2,7 @@
  * ClipBulkBar — the sticky action bar of a clip grid in selection mode:
  * select all / none, how many are picked, and what to do with them.
  */
-import { Clapperboard, Palette, Trash2, X } from 'lucide-react';
+import { FilmSlate, Palette, Trash, X } from '@phosphor-icons/react';
 
 interface ClipBulkBarProps {
   total: number;
@@ -42,16 +42,16 @@ export function ClipBulkBar({ total, selectedCount, busy, onToggleAll, onStyle, 
         </button>
         {onRender && (
           <button type="button" className="btn ghost clip-bulk-btn" onClick={onRender} disabled={busy || none}>
-            <Clapperboard size={16} aria-hidden="true" />
+            <FilmSlate size={16} aria-hidden="true" />
             Render
           </button>
         )}
         <button type="button" className="btn ghost clip-bulk-btn clip-btn-danger" onClick={onDelete} disabled={busy || none}>
-          <Trash2 size={16} aria-hidden="true" />
+          <Trash size={16} aria-hidden="true" />
           Delete
         </button>
         <button type="button" className="clip-icon-btn" onClick={onDone} aria-label="Stop selecting">
-          <X size={18} aria-hidden="true" />
+          <X size={18} weight="bold" aria-hidden="true" />
         </button>
       </div>
     </div>

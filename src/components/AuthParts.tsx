@@ -6,6 +6,7 @@
  */
 
 import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { ArrowRight, CheckCircle, Circle, Eye, EyeSlash, LockSimple, ShieldCheck } from '@phosphor-icons/react';
 import { PASSWORD_RULES } from '../lib/passwordPolicy';
 import { BrandLogo } from './BrandLogo';
 
@@ -55,7 +56,10 @@ export function AuthSplitShell({ mode, children }: { mode: AuthMode; children: R
       <AuthShowcase mode={mode} />
       <section className="auth-entry-pane" aria-label={mode === 'login' ? 'Sign in' : 'Create account'}>
         <section className="auth-card">{children}</section>
-        <p className="auth-entry-assurance">Private, secure, and encrypted</p>
+        <p className="auth-entry-assurance">
+          <ShieldCheck size={14} aria-hidden="true" />
+          Private, secure, and encrypted
+        </p>
       </section>
     </main>
   );
@@ -70,60 +74,8 @@ export function AuthBrand() {
   );
 }
 
-function LockIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-function EyeIcon({ off }: { off: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
-      <circle cx="12" cy="12" r="3" />
-      {off && <path d="m3 3 18 18" />}
-    </svg>
-  );
-}
-
 export function ArrowRightIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.25"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="auth-submit-arrow"
-    >
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
-  );
+  return <ArrowRight size={17} weight="bold" aria-hidden="true" className="auth-submit-arrow" />;
 }
 
 /** Lock icon on the left, show/hide toggle on the right. */
@@ -131,7 +83,7 @@ export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>,
   const [visible, setVisible] = useState(false);
   return (
     <div className="auth-input-wrap has-toggle">
-      <LockIcon />
+      <LockSimple size={18} aria-hidden="true" />
       <input {...props} type={visible ? 'text' : 'password'} />
       <button
         type="button"
@@ -140,27 +92,17 @@ export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>,
         aria-pressed={visible}
         onClick={() => setVisible((v) => !v)}
       >
-        <EyeIcon off={visible} />
+        {visible ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
       </button>
     </div>
   );
 }
 
 function RuleIcon({ met }: { met: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.25" />
-      {met && <path d="m5.2 8.3 1.9 1.9 3.7-4" />}
-    </svg>
+  return met ? (
+    <CheckCircle size={15} weight="fill" aria-hidden="true" />
+  ) : (
+    <Circle size={15} weight="bold" aria-hidden="true" />
   );
 }
 

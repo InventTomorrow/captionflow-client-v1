@@ -5,7 +5,7 @@
 import type { Caption } from '../../src/stores/captionStore';
 import { sliceCaptionsToRange } from '../../src/lib/clips/sliceCaptions';
 import { buildExportStyle } from '../../src/lib/export/styleSnapshot';
-import { aspectDims, chunks, clipAspect, deferredIn, clipFrameTime, clipStyle, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
+import { aspectDims, chunks, clipAspect, clipLayout, deferredIn, clipFrameTime, clipStyle, exportFramingFor, thumbKey, cropTrackFor, expectedSource, needsFaceTrack, textInRange } from '../../src/lib/clips/clipMath';
 import { coverObjectPosition, cropRect, cropXAt, integerCrop, smoothTrack, type FaceSample } from '../../src/lib/clips/cropTrack';
 import { createLatestGate } from '../../src/lib/clips/latestGate';
 import { forgetsProject } from '../../src/lib/media/retentionRules';
@@ -14,6 +14,8 @@ import { clipChanges, clipEditBasis, clipProjectCaptions } from '../../src/lib/c
 import { clipClock, clipFontFactor, clipFraming, shiftCaptions } from '../../src/lib/clips/clipClock';
 import { feedHeightFor, formatSourceTime, playFallback, reelMountSet, sourceSpan, stepReel } from '../../src/lib/clips/reelFeed';
 import { refusedByServer } from '../../src/lib/clips/refused';
+import { MIN_REGION, clampRect, coverRatio, defaultFraming, framingKey, layoutRegions, layoutVideoType, panelAspect, readFraming, regionFit, splitOf, withRatio } from '../../src/lib/clips/framing';
+import { drawLayout, hasBars, panelDraw, panelsFor } from '../../src/lib/clips/layout';
 
 let passed = 0;
 function assert(cond: unknown, msg: string): void {
@@ -510,6 +512,137 @@ assert(near(cropXAt([[1, 0.7]], 0), 0.7), 'single key holds');
   assert(playFallback('NotAllowedError', true) === 'paused', 'even muted refused (low power mode) → show it paused, a tap plays');
   assert(playFallback('AbortError', false) === 'ignore', 'a pause/seek interrupting play() is not a failure');
   assert(playFallback(undefined, true) === 'ignore', 'unknown → leave it');
+}
+
+// ── framing layouts (clips/framing.ts + clips/layout.ts): one geometry for preview, posters and export ──
+{
+  type R = { x: number; y: number; w: number; h: number };
+  const inside = (r: R) => r.x >= -1e-9 && r.y >= -1e-9 && r.x + r.w <= 1 + 1e-9 && r.y + r.h <= 1 + 1e-9;
+  const SOURCES: Array<[number, number]> = [[1920, 1080], [1280, 720], [1440, 1080], [1080, 1920], [1918, 1078], [3840, 2160]];
+  const OUTS: Array<[number, number]> = [[1080, 1920], [720, 1280], [2160, 3840], [271, 481]];
+  const LAYOUTS = ['single', 'dual', 'full', 'stacked', 'pip', 'gameplay'] as const;
+
+  for (const [sw, sh] of SOURCES) {
+    for (const layout of LAYOUTS) {
+      const f = defaultFraming(layout, sw, sh);
+      assert(readFraming(f) !== null, `${layout} default is a drawable framing (${sw}x${sh})`);
+      for (const key of layoutRegions(layout)) {
+        const r = f[key]!;
+        assert(inside(r) && r.w >= MIN_REGION - 1e-9 && r.h >= MIN_REGION - 1e-9, `${layout}.${key} inside the frame (${sw}x${sh})`);
+        if (regionFit(f, key) === 'cover') {
+          // A Fill box has exactly its panel's shape: what the box shows is what the panel shows.
+          const want = coverRatio(panelAspect(f, key), sw, sh);
+          assert(near(r.w / r.h, want, 1e-6) || r.w >= 1 - 1e-9 || r.h >= 1 - 1e-9, `${layout}.${key} is locked to its panel shape (${sw}x${sh})`);
+        }
+      }
+      for (const [W, H] of OUTS) {
+        const panels = panelsFor(f, W, H);
+        assert(panels.length >= 1, `${layout} draws something`);
+        for (const p of panels) {
+          const d = panelDraw(p, sw, sh);
+          for (const n of [d.sx, d.sy, d.sw, d.sh, d.dx, d.dy, d.dw, d.dh]) assert(Number.isInteger(n), `${layout}: whole pixels (${n})`);
+          assert(d.sx >= 0 && d.sy >= 0 && d.sx + d.sw <= sw && d.sy + d.sh <= sh, `${layout}: source rect inside ${sw}x${sh}`);
+          assert(d.dx >= p.dst.x && d.dy >= p.dst.y && d.dx + d.dw <= p.dst.x + p.dst.w && d.dy + d.dh <= p.dst.y + p.dst.h, `${layout}: drawn inside its panel`);
+          assert(d.dw >= 1 && d.dh >= 1 && d.sw >= 1 && d.sh >= 1, `${layout}: nothing empty`);
+          if (p.fit === 'cover') assert(d.dw === p.dst.w && d.dh === p.dst.h, `${layout}: Fill covers the panel`);
+        }
+        if (layout === 'dual' || layout === 'stacked') {
+          const [top, bottom] = panels.map((p) => p.dst);
+          assert(top.y === 0 && top.h + bottom.h === H && bottom.y === top.h, `${layout}: panels meet with no gap or overlap at ${W}x${H}`);
+          assert(top.w === W && bottom.w === W, `${layout}: panels are full width`);
+        }
+      }
+    }
+  }
+
+  // Split, swap and PiP boxes.
+  {
+    const f = { ...defaultFraming('stacked', 1920, 1080), split: 0.7 };
+    const [top] = panelsFor(f, 1080, 1920);
+    assert(top.dst.h === 1344 && top.region === f.a, 'stacked: Gameplay on top at 70%');
+    const swapped = panelsFor({ ...f, swap: true }, 1080, 1920);
+    assert(swapped[0].region === f.b && swapped[0].dst.h === 1344, 'swap puts the Facecam on top, same split');
+    assert(splitOf({ v: 1, layout: 'dual', split: 0.95 }) === 0.8 && splitOf({ v: 1, layout: 'dual', split: 0.05 }) === 0.2, 'split is clamped');
+    const pip = defaultFraming('pip', 1920, 1080);
+    const box = panelsFor({ ...pip, pip: { x: 0.5, y: 0.6, w: 0.4, h: 0.25 } }, 1080, 1920)[1].dst;
+    assert(box.x === 540 && box.y === 1152 && box.w === 432 && box.h === 480, `PiP box in output pixels (got ${JSON.stringify(box)})`);
+    assert(panelsFor(pip, 1080, 1920)[0].dst.w === 1080, 'PiP: gameplay is the full frame behind the box');
+  }
+
+  // Fit (contain) letterboxes a 16:9 picture inside a 9:16 frame; a Fill crop never letterboxes.
+  {
+    const g = defaultFraming('gameplay', 1920, 1080);
+    const d = panelDraw(panelsFor(g, 1080, 1920)[0], 1920, 1080);
+    assert(d.dw === 1080 && d.dh === 608 && d.dy === 656 && d.sw === 1920 && d.sh === 1080, `gameplay fit keeps the whole frame (got ${JSON.stringify(d)})`);
+    assert(hasBars(g, 1080, 1920, 1920, 1080), 'gameplay fit has bars (the background shows)');
+    assert(!hasBars(defaultFraming('single', 1920, 1080), 1080, 1920, 1920, 1080), 'single fill has no bars');
+    const s = panelDraw(panelsFor(defaultFraming('single', 1920, 1080), 1080, 1920)[0], 1920, 1080);
+    assert(s.sw === 608 && s.sh === 1080 && s.sx === 656, `single default = centred 9:16 window of the full height (got ${JSON.stringify(s)})`);
+  }
+
+  // drawLayout draws black first, then each panel through drawRegion — the same calls preview and export make.
+  {
+    const calls: number[][] = [];
+    const ctx = { fillStyle: '' as unknown, globalAlpha: 1, imageSmoothingEnabled: false, fillRect: () => calls.push([-1]), drawImage: () => undefined };
+    const f = defaultFraming('dual', 1920, 1080);
+    drawLayout(ctx, 1080, 1920, { ...f, bg: 'black' }, 1920, 1080, (_c, ...r) => calls.push(r));
+    assert(calls[0][0] === -1 && calls.length === 3, 'black fill + two panels');
+    assert(calls[1][4] === 0 && calls[1][5] === 0 && calls[2][5] === 960, 'Speaker A on top, Speaker B from the middle down');
+    // Blurred backdrop: tiny cover draw, then the frame (stub canvas — Node has no OffscreenCanvas).
+    const g = globalThis as unknown as { OffscreenCanvas?: unknown };
+    const had = g.OffscreenCanvas;
+    g.OffscreenCanvas = class {
+      width: number;
+      height: number;
+      constructor(w: number, h: number) {
+        this.width = w;
+        this.height = h;
+      }
+      getContext() {
+        return ctx;
+      }
+    };
+    calls.length = 0;
+    drawLayout(ctx, 1080, 1920, defaultFraming('full', 1920, 1080), 1920, 1080, (_c, ...r) => calls.push(r));
+    const draws = calls.filter((c) => c.length > 1);
+    assert(draws.length === 2 && draws[0][6] < 60, 'blur: a tiny backdrop draw, then the fitted frame');
+    g.OffscreenCanvas = had;
+  }
+
+  // Helpers: aspect lock, clamping, keys, reading stored values, layout carry-over.
+  {
+    const r = withRatio({ x: 0.9, y: 0.9, w: 0.3, h: 0.3 }, 2);
+    assert(inside(r) && near(r.w / r.h, 2, 1e-9), 'withRatio keeps the shape and stays inside');
+    assert(near(clampRect({ x: -1, y: 2, w: 0.01, h: 3 }).w, MIN_REGION) && clampRect({ x: -1, y: 2, w: 0.01, h: 3 }).y === 0, 'clampRect');
+    const a = defaultFraming('dual', 1920, 1080);
+    const moved = { ...a, a: { ...a.a!, x: a.a!.x + 0.01 } };
+    assert(framingKey(a) !== framingKey(moved) && framingKey(a) === framingKey({ ...a }), 'framingKey follows the boxes');
+    assert(framingKey(null) === '', 'no framing → empty key');
+    assert(readFraming({ v: 2, layout: 'dual' }) === null && readFraming({ v: 1, layout: 'zoom' }) === null, 'unknown version / layout → original crop');
+    assert(readFraming({ v: 1, layout: 'dual', a: a.a }) === null, 'a dual without Speaker B is not drawable');
+    const kept = defaultFraming('stacked', 1920, 1080, { ...defaultFraming('pip', 1920, 1080), b: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } });
+    assert(near(kept.b!.x + kept.b!.w / 2, 0.2, 1e-6), 'switching gaming layouts keeps the Facecam box where the user put it');
+    const fresh = defaultFraming('stacked', 1920, 1080, defaultFraming('dual', 1920, 1080));
+    assert(near(fresh.a!.h, 1), 'a podcast box is not reused as gameplay');
+    assert(layoutVideoType('pip') === 'gaming' && layoutVideoType('full') === 'podcast', 'layout → video type');
+  }
+
+  // A clip's layout drives export, face tracking, caption size, posters and the editor copy.
+  {
+    const base = { _id: 'c1', start: 10, end: 40, crop: { mode: 'auto' as const, x: 0.5, track: [] as Array<[number, number]> } };
+    const dual = defaultFraming('dual', 1920, 1080);
+    assert(clipLayout({ ...base, framing: dual }) !== null && clipLayout({ ...base, aspect: '16:9', framing: dual }) === null, 'layouts are vertical only');
+    assert(exportFramingFor({ ...base, framing: dual }).mode === 'layout', 'a layout exports as a layout');
+    assert(exportFramingFor({ ...base, framing: null }).mode === 'cover', 'no layout → the crop, as before');
+    assert(exportFramingFor({ ...base, crop: { mode: 'none' as const, x: 0.5 } }).mode === 'contain', 'Fit, as before');
+    assert(!needsFaceTrack({ ...base, framing: dual }) && needsFaceTrack({ ...base, framing: null }), 'a hand-placed layout never waits for a face track');
+    const k1 = thumbKey({ ...base, framing: dual });
+    assert(k1 !== thumbKey({ ...base }) && k1 !== thumbKey({ ...base, framing: { ...dual, split: 0.6 } }), 'a new layout makes a new poster');
+    assert(clipEditBasis({ ...base, framing: dual }) !== clipEditBasis({ ...base }), 'a layout change refreshes the editor copy');
+    assert(clipChanges(clipEditBasis({ ...base }), clipEditBasis({ ...base, framing: dual })).frame, '… as a framing change');
+    const st = (look: Record<string, unknown>) => clipStyle({ fontSize: 80 }, { aspect: '9:16', crop: { mode: 'none' }, ...look }).fontSize;
+    assert(st({ framing: dual }) < st({}), 'captions are sized for a filled frame under a layout');
+  }
 }
 
 console.log(`All clips client checks passed (${passed} assertions)`);

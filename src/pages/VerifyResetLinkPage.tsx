@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { resetPasswordPath, type VerifiedResetState } from '../lib/resetLink';
 import { AuthBrand } from '../components/AuthParts';
+import { ArrowClockwise, CheckCircle, PaperPlaneTilt, WarningCircle, XCircle } from '@phosphor-icons/react';
 
 /** Long enough that "Verifying…" is read rather than flashed past. */
 const MIN_CHECK_MS = 700;
@@ -10,17 +11,6 @@ const MIN_CHECK_MS = 700;
 const VERIFIED_HOLD_MS = 900;
 
 type Phase = 'checking' | 'verified' | 'invalid' | 'error';
-
-const ICON_PROPS = {
-  xmlns: 'http://www.w3.org/2000/svg',
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2.25,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true,
-} as const;
 
 function SpinnerIcon() {
   return (
@@ -32,30 +22,11 @@ function SpinnerIcon() {
 }
 
 function CheckIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
+  return <CheckCircle size={26} aria-hidden="true" />;
 }
 
 function CrossIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v4.5" />
-      <path d="M12 16h.01" />
-    </svg>
-  );
+  return <XCircle size={26} aria-hidden="true" />;
 }
 
 /**
@@ -152,7 +123,7 @@ export function VerifyResetLinkPage() {
             }
           : {
               tone: ' is-bad',
-              icon: <AlertIcon />,
+              icon: <WarningCircle size={26} aria-hidden="true" />,
               title: "We couldn't verify your link",
               body: message,
             };
@@ -176,6 +147,7 @@ export function VerifyResetLinkPage() {
 
           {needsNewLink ? (
             <Link className="btn primary auth-submit auth-status-action" to="/forgot-password">
+              <PaperPlaneTilt size={17} aria-hidden="true" />
               Request a new link
             </Link>
           ) : phase === 'error' ? (
@@ -184,6 +156,7 @@ export function VerifyResetLinkPage() {
               className="btn primary auth-submit auth-status-action"
               onClick={retry}
             >
+              <ArrowClockwise size={17} aria-hidden="true" />
               Try again
             </button>
           ) : null}

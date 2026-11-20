@@ -10,24 +10,55 @@
  * its own part is fetched; the framed, captioned preview takes over when it
  * arrives (again after a trim reaches past it).
  */
-import { Captions, ChevronLeft, ChevronRight, Pause, PenLine, Play, Volume2, VolumeX } from 'lucide-react';
+import {
+  ArrowClockwise,
+  ArrowLeft,
+  CaretLeft,
+  CaretRight,
+  ClosedCaptioning,
+  DownloadSimple,
+  FilmSlate,
+  Pause,
+  PencilLine,
+  Play,
+  SpeakerHigh,
+  SpeakerSlash,
+  SquaresFour,
+  X,
+} from '@phosphor-icons/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ClipFormatToggle } from '../../components/clips/ClipFormatToggle';
+import { PremiumSelect } from '../../components/PremiumSelect';
 import { ClipPreview } from '../../components/clips/ClipPreview';
+import { ClipStyleBrowser } from '../../components/clips/ClipStyleBrowser';
 import { ClipTemplatePicker } from '../../components/clips/ClipTemplatePicker';
 import { LinkedVideo } from '../../components/clips/LinkedVideo';
 import { PageLoader } from '../../components/PageLoader';
 import { ReframeControl } from '../../components/clips/ReframeControl';
+import { FrameLayoutPicker } from '../../components/clips/FrameLayoutPicker';
+import { FramingEditor } from '../../components/clips/FramingEditor';
 import { TrimNudger } from '../../components/clips/TrimNudger';
 import { errorMessage } from '../../lib/api';
 import type { ClipCropMode, ClipPatch } from '../../lib/clips/api';
-import { clipAspect, clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
+import { clipAspect, clipLayout, clipStyle, cropTrackFor, formatClipLength, scoreTone, textInRange } from '../../lib/clips/clipMath';
+import {
+  defaultFraming,
+  framingKey,
+  layoutVideoType,
+  normalizeFraming,
+  type ClipFramingV1,
+  type FramingLayout,
+  type VideoType,
+} from '../../lib/clips/framing';
+import { needsReframe } from '../../lib/clips/reframe';
+import { resolveCaptionAnchor } from '../../lib/captionPosition';
+import { useFlagsStore } from '../../stores/flagsStore';
 import { cropXAt } from '../../lib/clips/cropTrack';
 import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipPart, useClipSource, useProjectCaptions, useProjectStyle } from '../../lib/clips/useClipMedia';
-import { getClipThumb } from '../../lib/clips/thumbs';
+import { getClipThumb, getSourceFrame, type SourceFrame } from '../../lib/clips/thumbs';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
 import { latestExportForClip } from '../../lib/media/localMedia';
 import type { ExportQuality } from '../../lib/render/frame';
@@ -55,6 +86,18 @@ export function ClipEditorPage() {
   const [quality, setQuality] = useState<ExportQuality>('1080p');
   const [reframeStatus, setReframeStatus] = useState('');
   const [poster, setPoster] = useState<string | undefined>(undefined);
+  const [browsing, setBrowsing] = useState(false);
+  // Framing layouts: the live (unsaved) layout while dragging, the clip's whole frame, the source size.
+  const framingOn = useFlagsStore((s) => s.flags.framingEnabled);
+  const styleAll = useClipsStore((s) => s.styleAllClips);
+  const stageVideo = useRef<HTMLVideoElement | null>(null);
+  const [draft, setDraft] = useState<ClipFramingV1 | null>(null);
+  const [sourceFrame, setSourceFrame] = useState<SourceFrame | null>(null);
+  const [videoDims, setVideoDims] = useState<[number, number] | null>(null);
+  const [typeChoice, setTypeChoice] = useState<VideoType | null>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [applyAsk, setApplyAsk] = useState(false);
+  const [applyBusy, setApplyBusy] = useState(false);
   const openEditor = useOpenInEditor();
   const [params, setParams] = useSearchParams();
   const timeBar = useRef<HTMLSpanElement | null>(null);
@@ -147,6 +190,40 @@ export function ClipEditorPage() {
     };
   }, [clip, onDevice, projectId, setClipLocal]);
 
+  // A saved framing replaces the live one; another clip starts fresh.
+  const savedKey = framingKey(clipLayout(clip ?? {}));
+  useEffect(() => setDraft(null), [clip?._id, savedKey]);
+  useEffect(() => {
+    setApplyAsk(false);
+    setTypeChoice(null);
+  }, [clip?._id]);
+
+  // The clip's whole frame, for the layout cards and the framing editor.
+  const wantsFrame = framingOn && !!clip && clipAspect(clip) === '9:16';
+  const clipNow = useRef(clip);
+  clipNow.current = clip;
+  useEffect(() => {
+    setSourceFrame(null);
+    const c = clipNow.current;
+    if (!wantsFrame || !c) return;
+    let live = true;
+    void getSourceFrame(projectId, c, project?.video?.kind).then((f) => live && setSourceFrame(f));
+    return () => {
+      live = false;
+    };
+    // A new frame only for a new clip, in-point or device copy.
+  }, [wantsFrame, projectId, clip?._id, clip?.start, onDevice, project?.video?.kind]);
+
+  // The playing video's real (rotated) size, once it loads.
+  useEffect(() => {
+    const v = stageVideo.current;
+    if (!v) return;
+    const read = () => v.videoWidth && setVideoDims([v.videoWidth, v.videoHeight]);
+    read();
+    v.addEventListener('loadedmetadata', read);
+    return () => v.removeEventListener('loadedmetadata', read);
+  }, [media?.src]);
+
   function setMode(mode: ClipCropMode) {
     if (!clip) return;
     // A new in/out point invalidates the old face track; Auto recomputes it.
@@ -177,6 +254,7 @@ export function ClipEditorPage() {
       <div className="clips-page">
         <p>This clip no longer exists.</p>
         <Link to={`/clips/${projectId}`} className="btn ghost">
+          <ArrowLeft size={16} weight="bold" aria-hidden="true" />
           Back to clips
         </Link>
       </div>
@@ -188,6 +266,7 @@ export function ClipEditorPage() {
       <div className="clips-page">
         <p>No clip to show.</p>
         <Link to="/clips" className="btn ghost">
+          <ArrowLeft size={16} weight="bold" aria-hidden="true" />
           Back to clips
         </Link>
       </div>
@@ -204,29 +283,89 @@ export function ClipEditorPage() {
   const track = cropTrackFor(clip);
   const cropX = track ? cropXAt(track, 0) : null;
 
+  // Framing layouts (vertical clips): what is drawn now, and on which source size.
+  const savedLayout = clipLayout(clip);
+  const layout = landscape ? null : (draft ?? savedLayout);
+  const rotated = project?.video?.rotation === 90 || project?.video?.rotation === 270;
+  const projDims: [number, number] | null =
+    project?.video?.width && project.video.height
+      ? rotated
+        ? [project.video.height, project.video.width]
+        : [project.video.width, project.video.height]
+      : null;
+  const [srcW, srcH] = videoDims ?? (sourceFrame ? [sourceFrame.width, sourceFrame.height] : (projDims ?? [16, 9]));
+  const knownDims = !!(videoDims || sourceFrame || projDims);
+  const showLayouts = framingOn && !landscape && (!knownDims || needsReframe(srcW, srcH));
+  const videoType: VideoType =
+    typeChoice ?? (savedLayout ? layoutVideoType(savedLayout.layout) : (data.status.videoType ?? 'podcast'));
+  const activeLayout: FramingLayout | null = layout?.layout ?? (videoType === 'podcast' ? 'single' : null);
+  const captionY = style ? resolveCaptionAnchor(style).offsetY / 100 : undefined;
+
+  const commitFraming = (f: ClipFramingV1) => {
+    const next = normalizeFraming(f, srcW, srcH);
+    setDraft(next);
+    void save({ framing: next });
+  };
+  const pickLayout = (l: FramingLayout) => {
+    // Single speaker is the original crop (Auto follows the face); every other card is a layout.
+    if (l === 'single') {
+      setDraft(null);
+      void save({ framing: null });
+      return;
+    }
+    setAdjustOpen(true);
+    commitFraming(defaultFraming(l, srcW, srcH, layout));
+  };
+  // Single speaker with a box of its own: starts where the crop window is now.
+  const startSingleBox = () => {
+    const base = defaultFraming('single', srcW, srcH);
+    const cx = cropX ?? 0.5;
+    const a = base.a!;
+    setAdjustOpen(true);
+    commitFraming({ ...base, a: { ...a, x: Math.min(1 - a.w, Math.max(0, cx - a.w / 2)) } });
+  };
+  const resetFraming = () => layout && commitFraming(defaultFraming(layout.layout, srcW, srcH));
+  async function applyFramingToAll() {
+    setApplyBusy(true);
+    setError('');
+    try {
+      await styleAll(projectId, { framing: savedLayout });
+      setApplyAsk(false);
+    } catch (err) {
+      setError(errorMessage(err, 'Couldn’t apply that framing to every clip'));
+    } finally {
+      setApplyBusy(false);
+    }
+  }
+
   return (
     <div className="clips-page clip-editor">
       <nav className="clips-crumbs" aria-label="Breadcrumb">
         <Link to="/clips">Viral Clips</Link>
         <span aria-hidden="true">/</span>
-        <Link to={`/clips/${projectId}`}>{project?.name}</Link>
+        <Link to={`/clips/${projectId}`} title={project?.name}>
+          {project?.name || 'Project clips'}
+        </Link>
         <span aria-hidden="true">/</span>
-        <span>{clip.title || 'Clip'}</span>
+        <span aria-current="page">Clip {index + 1}</span>
       </nav>
 
       <header className="clip-editor-head">
         <div className="clip-editor-heading">
-          <span className={`clip-score clip-score-${scoreTone(clip.score)} is-static`} title="AI score">
-            {clip.score}
-          </span>
-          <div className="clip-editor-heading-text">
-            <p className="clip-editor-kicker">
-              Clip {index + 1} of {clips.length} · {formatClipLength(length)}
-            </p>
-            <h1 className="clip-editor-title" dir="auto">
-              {clip.title || 'Untitled clip'}
-            </h1>
-          </div>
+          <h1 className="clip-editor-title" dir="auto" title={clip.title || undefined}>
+            {clip.title || 'Untitled clip'}
+          </h1>
+          <p className="clip-editor-kicker">
+            <span>
+              Clip {index + 1} of {clips.length}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{formatClipLength(length)}</span>
+            <span aria-hidden="true">·</span>
+            <span className={`clip-editor-score is-${scoreTone(clip.score)}`} title="Clip score">
+              Score {clip.score}
+            </span>
+          </p>
         </div>
         <div className="clip-editor-head-actions">
           <span className="clip-mode-nav">
@@ -236,8 +375,9 @@ export function ClipEditorPage() {
               disabled={!prev}
               onClick={() => prev && navigate(`/clips/${projectId}/${prev._id}`)}
               aria-label="Previous clip"
+              title="Previous clip"
             >
-              <ChevronLeft size={18} aria-hidden="true" />
+              <CaretLeft size={18} weight="bold" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -245,12 +385,13 @@ export function ClipEditorPage() {
               disabled={!next}
               onClick={() => next && navigate(`/clips/${projectId}/${next._id}`)}
               aria-label="Next clip"
+              title="Next clip"
             >
-              <ChevronRight size={18} aria-hidden="true" />
+              <CaretRight size={18} weight="bold" aria-hidden="true" />
             </button>
           </span>
-          <button type="button" className="btn primary clip-open-editor" onClick={() => openEditor.open(projectId, clip)}>
-            <Captions size={17} aria-hidden="true" />
+          <button type="button" className="btn ghost clip-open-editor" onClick={() => openEditor.open(projectId, clip)}>
+            <ClosedCaptioning size={17} aria-hidden="true" />
             Open in editor
           </button>
         </div>
@@ -276,6 +417,8 @@ export function ClipEditorPage() {
                 style={style}
                 track={cropTrackFor(clip)}
                 aspect={aspect}
+                framing={layout}
+                videoRef={stageVideo}
                 poster={poster}
                 playing={playing}
                 muted={muted}
@@ -300,6 +443,7 @@ export function ClipEditorPage() {
                     <>
                       <span>{part.error}</span>
                       <button type="button" className="btn ghost clip-part-retry" onClick={part.retry}>
+                        <ArrowClockwise size={16} weight="bold" aria-hidden="true" />
                         Try again
                       </button>
                     </>
@@ -326,7 +470,7 @@ export function ClipEditorPage() {
                   onClick={() => setPlaying((p) => !p)}
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
-                  {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+                  {playing ? <Pause size={18} weight="fill" aria-hidden="true" /> : <Play size={18} weight="fill" aria-hidden="true" />}
                 </button>
                 <span className="clip-stage-time">
                   <span ref={timeText}>0:00</span> / {formatClipLength(length)}
@@ -338,7 +482,7 @@ export function ClipEditorPage() {
                   aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
                   aria-pressed={!muted}
                 >
-                  {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+                  {muted ? <SpeakerSlash size={18} aria-hidden="true" /> : <SpeakerHigh size={18} aria-hidden="true" />}
                 </button>
               </div>
             )}
@@ -349,9 +493,9 @@ export function ClipEditorPage() {
         </section>
 
         <section className="clip-editor-side" aria-label="Clip settings">
-          <div className="clip-side-card">
+          <div className="clip-ws-section">
             <label className="clip-field">
-              <span>Title</span>
+              <span className="clip-ws-label">Title</span>
               <input
                 type="text"
                 dir="auto"
@@ -363,7 +507,13 @@ export function ClipEditorPage() {
             </label>
             {(clip.hook || clip.reason) && (
               <details className="clip-why">
-                <summary>Why this clip</summary>
+                <summary>
+                  <CaretRight size={13} weight="bold" className="clip-why-caret" aria-hidden="true" />
+                  <span className="clip-why-label">Why this clip</span>
+                  <span className="clip-why-summary-text" dir="auto">
+                    {clip.reason || clip.hook}
+                  </span>
+                </summary>
                 {clip.hook && (
                   <p className="clip-card-hook" dir="auto">
                     “{clip.hook}”
@@ -378,7 +528,7 @@ export function ClipEditorPage() {
             )}
           </div>
 
-          <div className="clip-side-card">
+          <div className="clip-ws-section">
             <h2 className="clip-side-h">Trim</h2>
             <TrimNudger
               startIdx={clip.startIdx}
@@ -394,17 +544,112 @@ export function ClipEditorPage() {
             />
           </div>
 
-          <div className="clip-side-card">
+          <div className="clip-ws-section">
             <h2 className="clip-side-h">Format</h2>
-            <ClipFormatToggle value={aspect} disabled={saving} onChange={(v) => v && v !== aspect && void save({ aspect: v })} />
-            <p className="clip-format-hint">
-              {landscape
-                ? 'The whole frame, as filmed — for YouTube, X or LinkedIn.'
-                : 'Vertical for Shorts, Reels and TikTok, cropped around the speaker.'}{' '}
-              Render it in both formats by switching and rendering again.
-            </p>
-            {!landscape && (
-              <>
+            <div className="clip-ws-row">
+              <ClipFormatToggle value={aspect} disabled={saving} onChange={(v) => v && v !== aspect && void save({ aspect: v })} />
+              <p className="clip-format-hint">
+                {landscape ? 'The whole frame — YouTube, X, LinkedIn.' : 'Cropped around the speaker — Shorts, Reels, TikTok.'}
+              </p>
+            </div>
+            {showLayouts && (
+              <div className="clip-ws-framing is-layouts">
+                <div className="frame-head">
+                  <h3 className="clip-side-sub">Frame layout</h3>
+                  <div className="clip-seg frame-type" role="radiogroup" aria-label="Video type">
+                    {(['podcast', 'gaming'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        role="radio"
+                        aria-checked={videoType === t}
+                        className={`clip-seg-btn${videoType === t ? ' is-on' : ''}`}
+                        onClick={() => setTypeChoice(t)}
+                      >
+                        {t === 'podcast' ? 'Podcast' : 'Gaming'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <FrameLayoutPicker
+                  videoType={videoType}
+                  active={activeLayout}
+                  framing={layout}
+                  frame={sourceFrame}
+                  srcW={srcW}
+                  srcH={srcH}
+                  disabled={saving}
+                  onPick={pickLayout}
+                />
+                {!layout && videoType === 'podcast' && (
+                  <ReframeControl
+                    mode={clip.crop.mode}
+                    x={clip.crop.x}
+                    busy={saving}
+                    status={reframeStatus}
+                    onMode={setMode}
+                    onX={(x) => void save({ crop: { mode: 'manual', x } })}
+                  />
+                )}
+                {layout ? (
+                  <details className="framing-disclosure" open={adjustOpen} onToggle={(e) => setAdjustOpen(e.currentTarget.open)}>
+                    <summary>
+                      <CaretRight size={13} weight="bold" className="clip-why-caret" aria-hidden="true" />
+                      Adjust framing
+                    </summary>
+                    <FramingEditor
+                      framing={layout}
+                      srcW={srcW}
+                      srcH={srcH}
+                      frame={sourceFrame}
+                      videoRef={stageVideo}
+                      captionY={captionY}
+                      disabled={saving}
+                      onDraft={setDraft}
+                      onCommit={commitFraming}
+                      onReset={resetFraming}
+                    />
+                  </details>
+                ) : videoType === 'podcast' ? (
+                  <button type="button" className="framing-btn framing-start" disabled={saving} onClick={startSingleBox}>
+                    Adjust framing
+                  </button>
+                ) : (
+                  <p className="framing-note">Pick a layout to place the gameplay and the facecam.</p>
+                )}
+                {layout?.layout === 'single' && (
+                  <button
+                    type="button"
+                    className="framing-link"
+                    disabled={saving}
+                    onClick={() => void save({ framing: null, crop: { mode: 'auto', track: [] } })}
+                  >
+                    Follow the speaker automatically instead
+                  </button>
+                )}
+                {clips.length > 1 && (
+                  <div className="framing-apply">
+                    {applyAsk ? (
+                      <>
+                        <span>Use this framing for all {clips.length} clips of this video?</span>
+                        <button type="button" className="framing-btn is-primary" disabled={applyBusy} onClick={() => void applyFramingToAll()}>
+                          {applyBusy ? 'Applying…' : 'Apply to all'}
+                        </button>
+                        <button type="button" className="framing-btn" disabled={applyBusy} onClick={() => setApplyAsk(false)}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="framing-btn" disabled={saving || !!draft} onClick={() => setApplyAsk(true)}>
+                        Apply to all clips
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {!landscape && !showLayouts && (
+              <div className="clip-ws-framing">
                 <h3 className="clip-side-sub">Framing</h3>
                 <ReframeControl
                   mode={clip.crop.mode}
@@ -414,70 +659,101 @@ export function ClipEditorPage() {
                   onMode={setMode}
                   onX={(x) => void save({ crop: { mode: 'manual', x } })}
                 />
-              </>
+              </div>
             )}
           </div>
 
-          <div className="clip-side-card">
+          <div className="clip-ws-section">
             <div className="clip-side-row">
               <h2 className="clip-side-h">Caption style</h2>
-              <button type="button" className="clip-customize" onClick={() => openEditor.open(projectId, clip)}>
-                <PenLine size={15} aria-hidden="true" />
-                Customize in editor
-              </button>
+              <span className="clip-style-actions">
+                <button type="button" className="clip-customize" onClick={() => openEditor.open(projectId, clip)}>
+                  <PencilLine size={14} weight="bold" aria-hidden="true" />
+                  Customize in editor
+                </button>
+                <button type="button" className="clip-browse-btn" onClick={() => setBrowsing(true)} aria-haspopup="dialog">
+                  <SquaresFour size={15} aria-hidden="true" />
+                  Browse all styles
+                </button>
+              </span>
             </div>
             <ClipTemplatePicker
+              key={clip._id}
               templateKey={clip.templateKey}
               custom={!!clip.style}
               disabled={saving}
+              max={6}
               onPick={(templateKey) => void save({ templateKey })}
             />
           </div>
 
           {(source.local || imported) && (
-          <div className="clip-side-card">
-            <h2 className="clip-side-h">Render</h2>
-            <div className="clip-render-row">
-              <label className="clip-field clip-field-inline">
-                <span>Quality</span>
-                <select value={quality} onChange={(e) => setQuality(e.target.value as ExportQuality)} disabled={rendering}>
-                  {allowedQualities.map((q) => (
-                    <option key={q} value={q}>
-                      {q}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {rendering ? (
-                <button type="button" className="btn ghost" onClick={() => cancelRender(clip._id)}>
-                  Cancel {Math.round(render?.percent ?? 0)}%
-                </button>
-              ) : (
-                <button type="button" className="btn primary" disabled={!projectStyle} onClick={() => void startRender()}>
-                  {rendered ? 'Render again' : 'Render clip'}
-                </button>
+            <div className={`clip-render-dock${rendering ? ' is-rendering' : ''}`}>
+              <div className="clip-render-row">
+                <label className="clip-field clip-field-inline">
+                  <span className="clip-ws-label">Quality</span>
+                  <PremiumSelect
+                    ariaLabel="Render quality"
+                    value={quality}
+                    onChange={(value) => setQuality(value as ExportQuality)}
+                    disabled={rendering}
+                    options={allowedQualities.map((q) => ({ value: q, label: q }))}
+                  />
+                </label>
+                <span className="clip-render-buttons">
+                  {rendered && !rendering && (
+                    <button type="button" className="btn ghost" onClick={() => void download()}>
+                      <DownloadSimple size={17} aria-hidden="true" />
+                      Download MP4
+                    </button>
+                  )}
+                  {rendering ? (
+                    <button type="button" className="btn ghost" onClick={() => cancelRender(clip._id)}>
+                      <X size={16} weight="bold" aria-hidden="true" />
+                      Cancel {Math.round(render?.percent ?? 0)}%
+                    </button>
+                  ) : (
+                    <button type="button" className="btn primary" disabled={!projectStyle} onClick={() => void startRender()}>
+                      {rendered ? <ArrowClockwise size={17} weight="bold" aria-hidden="true" /> : <FilmSlate size={17} aria-hidden="true" />}
+                      {rendered ? 'Render again' : 'Render clip'}
+                    </button>
+                  )}
+                </span>
+              </div>
+              {rendering && (
+                <div
+                  className="clip-render-progress"
+                  role="progressbar"
+                  aria-label="Render progress"
+                  aria-valuenow={Math.round(render?.percent ?? 0)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <span style={{ width: `${Math.max(2, render?.percent ?? 0)}%` }} />
+                </div>
               )}
-              {rendered && !rendering && (
-                <button type="button" className="btn ghost" onClick={() => void download()}>
-                  Download MP4
-                </button>
+              {rendering && render?.detail && <p className="clip-render-detail">{render.detail}</p>}
+              {render?.status === 'error' && (
+                <p className="clip-card-error" role="alert">
+                  {render.error}
+                </p>
               )}
             </div>
-            {rendering && (
-              <div className="clip-render-progress" role="progressbar" aria-valuenow={Math.round(render?.percent ?? 0)} aria-valuemin={0} aria-valuemax={100}>
-                <span style={{ width: `${Math.max(2, render?.percent ?? 0)}%` }} />
-              </div>
-            )}
-            {rendering && <p className="clips-sub">{render?.detail}</p>}
-            {render?.status === 'error' && (
-              <p className="clip-card-error" role="alert">
-                {render.error}
-              </p>
-            )}
-          </div>
           )}
         </section>
       </div>
+
+      <ClipStyleBrowser
+        open={browsing}
+        templateKey={clip.templateKey}
+        custom={!!clip.style}
+        disabled={saving}
+        onPick={(templateKey) => {
+          setBrowsing(false);
+          void save({ templateKey });
+        }}
+        onClose={() => setBrowsing(false)}
+      />
       {openEditor.dialog}
     </div>
   );

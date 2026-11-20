@@ -6,7 +6,8 @@
  */
 import type { Caption } from '../../stores/captionStore';
 import type { EditorStyle } from '../export/styleSnapshot';
-import { clipAspect, type ClipAspect } from './clipMath';
+import { clipAspect, clipLayout, type ClipAspect } from './clipMath';
+import { framingKey } from './framing';
 import { sliceCaptionsToRange } from './sliceCaptions';
 import type { CropTrack } from './cropTrack';
 
@@ -17,6 +18,8 @@ export interface ClipBasis {
   templateKey?: string | null;
   style?: Partial<EditorStyle> | Record<string, unknown> | null;
   crop: { mode: 'auto' | 'manual' | 'none'; x: number; track?: CropTrack };
+  /** A framing layout (clips/framing.ts); it replaces the crop for vertical clips. */
+  framing?: unknown;
 }
 
 /** Small stable string hash (djb2), base 36. */
@@ -32,8 +35,10 @@ function hash(text: string): string {
  * differs and reopening asks whether to keep the edited copy or start over.
  */
 export function clipEditBasis(clip: ClipBasis): string {
-  const framing =
-    clip.crop.mode === 'manual'
+  const layout = clipLayout(clip);
+  const framing = layout
+    ? `L${hash(framingKey(layout))}`
+    : clip.crop.mode === 'manual'
       ? `m${clip.crop.x.toFixed(3)}`
       : clip.crop.mode === 'none'
         ? 'fit'

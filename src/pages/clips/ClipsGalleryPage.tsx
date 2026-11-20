@@ -4,7 +4,18 @@
  * scrolls. Hover/tap a card to watch it with captions; Edit opens the clip.
  * Select picks clips (any videos) for one caption template or a delete.
  */
-import { ArrowRight, Check, Clock3, Film, ListChecks, Play, Sparkles, Trophy, UploadCloud } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Clock,
+  ClosedCaptioning,
+  CloudArrowUp,
+  FilmStrip,
+  ListChecks,
+  Play,
+  Sparkle,
+  Trophy,
+} from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
@@ -125,19 +136,19 @@ export function ClipsGalleryPage() {
 
       <header className="clips-library-hero">
         <div className="clips-library-hero-copy">
-          <div className="clips-library-kicker"><Sparkles size={14} aria-hidden="true" /> Content library</div>
+          <div className="clips-library-kicker"><Sparkle size={14} weight="fill" aria-hidden="true" /> Content library</div>
           <h1>Viral Clips</h1>
           <p>Find, refine, and publish the strongest moments from every long-form video.</p>
           <div className="clips-library-benefits" aria-label="Viral Clips benefits">
-            <span><Check size={13} /> AI-ranked highlights</span>
-            <span><Check size={13} /> Caption-ready</span>
-            <span><Check size={13} /> Built for every platform</span>
+            <span><Check size={13} weight="bold" aria-hidden="true" /> AI-ranked highlights</span>
+            <span><Check size={13} weight="bold" aria-hidden="true" /> Caption-ready</span>
+            <span><Check size={13} weight="bold" aria-hidden="true" /> Built for every platform</span>
           </div>
         </div>
         <Link to="/clips" className="btn primary clips-library-create">
-          <Sparkles size={17} aria-hidden="true" />
+          <Sparkle size={17} aria-hidden="true" />
           Create Viral Clips
-          <ArrowRight size={17} aria-hidden="true" />
+          <ArrowRight size={17} weight="bold" aria-hidden="true" />
         </Link>
       </header>
 
@@ -152,7 +163,7 @@ export function ClipsGalleryPage() {
               className={`clip-seg-btn${feed.sort === 'score' ? ' is-on' : ''}`}
               onClick={() => setFeedFilter({ sort: 'score' })}
             >
-              <Trophy size={15} aria-hidden="true" /> Best moments
+              <Trophy size={15} weight={feed.sort === 'score' ? 'fill' : 'duotone'} aria-hidden="true" /> Best moments
             </button>
             <button
               type="button"
@@ -161,7 +172,7 @@ export function ClipsGalleryPage() {
               className={`clip-seg-btn${feed.sort === 'recent' ? ' is-on' : ''}`}
               onClick={() => setFeedFilter({ sort: 'recent' })}
             >
-              <Clock3 size={15} aria-hidden="true" /> Newest
+              <Clock size={15} weight={feed.sort === 'recent' ? 'fill' : 'duotone'} aria-hidden="true" /> Newest
             </button>
           </div>
         </div>
@@ -239,7 +250,7 @@ export function ClipsGalleryPage() {
         !feed.loading && (
           <section className="clips-library-empty">
             <div className="clips-library-empty-copy">
-              <span className="clips-library-empty-label"><Film size={14} /> Your clip library</span>
+              <span className="clips-library-empty-label"><FilmStrip size={14} weight="bold" aria-hidden="true" /> Your clip library</span>
               <h2>{feed.rendered ? 'Nothing rendered yet.' : 'Your best moments are waiting.'}</h2>
               <p>
                 {feed.rendered
@@ -249,17 +260,19 @@ export function ClipsGalleryPage() {
               <div className="clips-library-empty-actions">
                 {feed.rendered ? (
                   <button type="button" className="btn primary" onClick={() => setFeedFilter({ rendered: false })}>
-                    Show all clips <ArrowRight size={16} aria-hidden="true" />
+                    Show all clips <ArrowRight size={16} weight="bold" aria-hidden="true" />
                   </button>
                 ) : (
                   <Link to="/clips" className="btn primary">
-                    <UploadCloud size={17} aria-hidden="true" /> Create your first clips
+                    <CloudArrowUp size={17} aria-hidden="true" /> Create your first clips
                   </Link>
                 )}
-                <Link to="/projects/upload" className="btn ghost">Open caption editor</Link>
+                <Link to="/projects/upload" className="btn ghost">
+                  <ClosedCaptioning size={17} aria-hidden="true" /> Open caption editor
+                </Link>
               </div>
               <div className="clips-library-empty-note">
-                <Check size={14} aria-hidden="true" /> Works best with videos that have at least one minute of speech.
+                <Check size={14} weight="bold" aria-hidden="true" /> Works best with videos that have at least one minute of speech.
               </div>
             </div>
 
@@ -275,20 +288,20 @@ export function ClipsGalleryPage() {
               <div className="clips-library-preview-card clips-library-preview-main">
                 <img src="/media/virsl-creator-woman.jpg" alt="" loading="eager" />
                 <div className="clips-library-preview-top">
-                  <span><Sparkles size={12} /> 94 score</span>
+                  <span><Sparkle size={12} weight="fill" /> 94 score</span>
                   <span>9:16</span>
                 </div>
                 <div className="clips-library-preview-caption">
                   Turn one long story into<br /><strong>moments people remember.</strong>
                 </div>
-                <span className="clips-library-preview-play"><Play size={18} fill="currentColor" /></span>
+                <span className="clips-library-preview-play"><Play size={18} weight="fill" /></span>
                 <div className="clips-library-preview-wave">
                   {[12, 22, 15, 31, 20, 36, 18, 27, 14, 23, 10, 19].map((height, index) => (
                     <span key={index} style={{ height }} />
                   ))}
                 </div>
               </div>
-              <div className="clips-library-preview-chip"><Sparkles size={13} /> AI finds the hook</div>
+              <div className="clips-library-preview-chip"><Sparkle size={13} weight="fill" /> AI finds the hook</div>
             </div>
           </section>
         )

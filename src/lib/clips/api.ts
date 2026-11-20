@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Caption } from '../../stores/captionStore';
 import type { ClipAspect, TimeRange } from './clipMath';
 import type { CropTrack } from './cropTrack';
+import type { ClipFramingV1, VideoType } from './framing';
 import type { EditorStyle } from '../export/styleSnapshot';
 
 export type ClipStatus = 'suggested' | 'edited' | 'rendered' | 'deleted';
@@ -58,6 +59,8 @@ export interface Clip {
   /** What that project was made from (clipProject.clipEditBasis). */
   editBasisKey?: string | null;
   crop: { mode: ClipCropMode; x: number; track?: CropTrack };
+  /** A framing layout (clips/framing.ts); null/absent = the crop above. */
+  framing?: ClipFramingV1 | null;
   renders: number;
   lastRenderedAt?: string;
   createdAt: string;
@@ -77,6 +80,10 @@ export interface ClipSetStatus {
   templateKey?: string | null;
   style?: Partial<EditorStyle> | null;
   aspect?: ClipAspect;
+  /** Podcast / Gaming, chosen on Create: which framing layouts the clip page offers. */
+  videoType?: VideoType;
+  /** Layout new clips start with ("Apply to all clips"); null = the original crop. */
+  framing?: ClipFramingV1 | null;
 }
 
 export interface ProjectClips {
@@ -96,6 +103,8 @@ export interface ClipOptions {
   maxClips?: number;
   minSec?: number;
   maxSec?: number;
+  /** "What kind of clips do you want?" — preferences for the clip finder (max 1000 chars, trimmed). */
+  instructions?: string;
 }
 
 export interface UrlImportBody {
@@ -106,6 +115,7 @@ export interface UrlImportBody {
   clipOptions?: ClipOptions;
   templateKey?: string | null;
   aspect?: ClipAspect;
+  videoType?: VideoType;
 }
 
 /** Create a New Clips project from a pasted link. Returns the project id to
@@ -147,6 +157,8 @@ export interface ClipPatch {
   templateKey?: string | null;
   style?: Partial<EditorStyle> | null;
   aspect?: ClipAspect;
+  /** A framing layout; null = back to the original crop. */
+  framing?: ClipFramingV1 | null;
   crop?: {
     mode?: ClipCropMode;
     x?: number;
@@ -173,6 +185,7 @@ export type ClipLookPatch = {
   templateKey?: string | null;
   style?: Partial<EditorStyle>;
   aspect?: ClipAspect;
+  framing?: ClipFramingV1 | null;
 };
 
 /** One look onto a selection of clips (all or nothing). */

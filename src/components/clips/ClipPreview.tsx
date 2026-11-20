@@ -4,6 +4,10 @@
  * inside [start, end], with the clip's captions drawn by the same overlay
  * components the editor uses. The caption layer covers the whole 9:16 box,
  * exactly like the export canvas, so preview and render place captions alike.
+ *
+ * With a framing layout (clips/framing.ts) the same <video> keeps playing out
+ * of sight and each frame is drawn onto a canvas by clips/layout.ts — the very
+ * function the export worker draws with — so the preview is the render.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CaptionOverlay } from '../CaptionOverlay';
@@ -13,6 +17,8 @@ import { isKineticTemplate } from '../../lib/kinetic/engine';
 import { sliceCaptionsToRange } from '../../lib/clips/sliceCaptions';
 import { aspectDims, type ClipAspect } from '../../lib/clips/clipMath';
 import { coverObjectPosition, cropXAt, type CropTrack } from '../../lib/clips/cropTrack';
+import { framingKey, type ClipFramingV1 } from '../../lib/clips/framing';
+import { drawLayout } from '../../lib/clips/layout';
 import { playFallback } from '../../lib/clips/reelFeed';
 import type { EditorStyle } from '../../lib/export/styleSnapshot';
 import type { Caption } from '../../stores/captionStore';
@@ -45,6 +51,8 @@ export interface ClipPreviewProps {
   track: CropTrack | null;
   /** Output frame of the clip (default vertical). */
   aspect?: ClipAspect;
+  /** A framing layout to draw instead of the crop (vertical clips only). */
+  framing?: ClipFramingV1 | null;
   /** Decoded poster to show instantly (and behind the video) while it loads. */
   poster?: string;
   playing: boolean;
@@ -67,6 +75,7 @@ export function ClipPreview({
   style,
   track,
   aspect = '9:16',
+  framing = null,
   poster,
   playing,
   muted = true,
@@ -90,6 +99,10 @@ export function ClipPreview({
   dimsRef.current = aspectDims(aspect);
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const framingRef = useRef(framing);
+  framingRef.current = framing;
+  const [drawn, setDrawn] = useState(false);
   const onPlayBlockedRef = useRef(onPlayBlocked);
   onPlayBlockedRef.current = onPlayBlocked;
 
@@ -108,10 +121,33 @@ export function ClipPreview({
     if (v.readyState >= 1) toStart();
     v.addEventListener('loadedmetadata', toStart);
     let raf = 0;
+    let lastDraw = '';
     const tick = () => {
       if (v.currentTime >= end || v.currentTime < start - 0.5) v.currentTime = start;
       const t = trackRef.current;
-      if (t && v.videoWidth && v.videoHeight) {
+      const layout = framingRef.current;
+      const canvas = canvasRef.current;
+      if (layout && canvas && v.videoWidth && v.videoHeight && v.readyState >= 2) {
+        // Redraw when the frame, the layout or the box size changed — not on every idle tick.
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const cw = Math.max(2, Math.round(canvas.clientWidth * dpr));
+        const ch = Math.max(2, Math.round(canvas.clientHeight * dpr));
+        const key = `${v.currentTime}|${cw}x${ch}|${framingKey(layout)}`;
+        if (key !== lastDraw) {
+          if (canvas.width !== cw || canvas.height !== ch) {
+            canvas.width = cw;
+            canvas.height = ch;
+          }
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            drawLayout(ctx, cw, ch, layout, v.videoWidth, v.videoHeight, (c, sx, sy, sw, sh, dx, dy, dw, dh) =>
+              (c as CanvasRenderingContext2D).drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh),
+            );
+            if (!lastDraw) setDrawn(true);
+            lastDraw = key;
+          }
+        }
+      } else if (t && v.videoWidth && v.videoHeight) {
         const [aw, ah] = dimsRef.current;
         v.style.objectPosition = coverObjectPosition(v.videoWidth, v.videoHeight, aw, ah, cropXAt(t, v.currentTime - start));
       }
@@ -163,8 +199,11 @@ export function ClipPreview({
   }, [videoRef, src]);
 
   const template = style.template;
+  const layout = aspect === '9:16' ? framing : null;
   return (
-    <div className={`clip-preview${aspect === '16:9' ? ' is-landscape' : ''}${ready ? '' : ' is-loading'}${className ? ` ${className}` : ''}`}>
+    <div
+      className={`clip-preview${aspect === '16:9' ? ' is-landscape' : ''}${ready ? '' : ' is-loading'}${layout ? ' is-framed' : ''}${className ? ` ${className}` : ''}`}
+    >
       <video
         ref={videoRef}
         src={src}
@@ -175,6 +214,12 @@ export function ClipPreview({
         preload="metadata"
         style={{ objectFit: track ? 'cover' : 'contain' }}
       />
+      {layout && (
+        <>
+          {poster && !drawn && <img className="clip-preview-poster" src={poster} alt="" aria-hidden="true" />}
+          <canvas ref={canvasRef} className="clip-preview-canvas" aria-hidden="true" />
+        </>
+      )}
       {!ready && <span className="clip-preview-skeleton" aria-hidden="true" />}
       <div className="clip-preview-captions" ref={boxRef} aria-hidden="true">
         {isKineticTemplate(template) ? (

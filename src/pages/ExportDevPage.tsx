@@ -14,6 +14,7 @@
 
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { PremiumSelect } from '../components/PremiumSelect';
 import type { Caption } from '../stores/captionStore';
 import { KINETIC_TEMPLATE_IDS, isKineticTemplate } from '../lib/kinetic/engine';
 import { probeMediaFile } from '../lib/media/probe';
@@ -233,25 +234,16 @@ export function ExportDevPage() {
         {blocker ? `Not available here: ${blocker}` : 'WebCodecs export worker - same code path as the editor.'}
       </p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={template} onChange={(e) => setTemplate(e.target.value)}>
-          {ALL_TEMPLATES.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-        <select value={quality} onChange={(e) => setQuality(e.target.value as ExportQuality)}>
-          {['720p', '1080p', '2K', '4K'].map((q) => (
-            <option key={q}>{q}</option>
-          ))}
-        </select>
-        <select value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)}>
-          <option>mp4</option>
-          <option>webm</option>
-        </select>
-        <select value={aspect} onChange={(e) => setAspect(e.target.value)}>
-          {['16:9', '9:16', '1:1', '4:5', '4:3', '21:9'].map((a) => (
-            <option key={a}>{a}</option>
-          ))}
-        </select>
+        <PremiumSelect ariaLabel="Template" value={template} onChange={setTemplate}
+          options={ALL_TEMPLATES.map((t) => ({ value: t, label: t }))} />
+        <PremiumSelect ariaLabel="Quality" value={quality}
+          onChange={(value) => setQuality(value as ExportQuality)}
+          options={['720p', '1080p', '2K', '4K'].map((q) => ({ value: q, label: q }))} />
+        <PremiumSelect ariaLabel="Format" value={format}
+          onChange={(value) => setFormat(value as ExportFormat)}
+          options={[{ value: 'mp4', label: 'mp4' }, { value: 'webm', label: 'webm' }]} />
+        <PremiumSelect ariaLabel="Aspect ratio" value={aspect} onChange={setAspect}
+          options={['16:9', '9:16', '1:1', '4:5', '4:3', '21:9'].map((a) => ({ value: a, label: a }))} />
         <input
           type="file"
           accept="video/*"

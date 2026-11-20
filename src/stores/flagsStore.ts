@@ -14,6 +14,8 @@ export interface AppFlags {
   clipsEnabled: boolean;
   /** Create clips from a pasted link (needs clipsEnabled too). */
   urlImportEnabled: boolean;
+  /** Clip framing layouts: Video type on Create, Frame layout in the clip page (on by default). */
+  framingEnabled: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
   /** False when the server has no mail (MAIL_TRANSPORT=off): forgot-password resets by email match instead of a link. */
@@ -41,6 +43,7 @@ const DEFAULT_FLAGS: AppFlags = {
   audioOnlyUploadEnabled: true,
   clipsEnabled: false,
   urlImportEnabled: false,
+  framingEnabled: true,
   maintenanceMode: false,
   maintenanceMessage: '',
   emailEnabled: true,

@@ -9,24 +9,7 @@ import {
   type VerifiedEmailState,
 } from '../lib/emailVerification';
 import { ArrowRightIcon, AuthBrand, AuthSplitShell, PasswordInput } from '../components/AuthParts';
-
-function MailIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m22 7-8.991 5.667a2 2 0 0 1-2.009 0L2 7" />
-      <rect x="2" y="4" width="20" height="16" rx="3" />
-    </svg>
-  );
-}
+import { EnvelopeSimple } from '@phosphor-icons/react';
 
 function SpinnerIcon() {
   return (
@@ -123,7 +106,7 @@ export function LoginPage() {
           <div className="auth-field">
             <label htmlFor="login-email">Email</label>
             <div className="auth-input-wrap">
-              <MailIcon />
+              <EnvelopeSimple size={18} aria-hidden="true" />
               <input
                 id="login-email"
                 type="email"

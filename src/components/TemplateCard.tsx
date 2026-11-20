@@ -2,6 +2,7 @@
  * Template picker cards (moved out of EditorPage.tsx). Each card draws its own
  * preview so its purpose is obvious at a glance.
  */
+import { CheckCircle } from '@phosphor-icons/react';
 import { KineticThumb } from './KineticThumb';
 import type { KineticTemplateId } from '../lib/kinetic/engine';
 import { TEMPLATE_BACKDROPS } from '../lib/templateBackdrops.generated';
@@ -362,7 +363,7 @@ export function TemplateCard({
       type="button"
       data-key={t.key}
       className={`display-card ${isActive ? 'active' : ''}`}
-      title={`${t.name} - ${t.purpose}`}
+      aria-pressed={isActive}
       onClick={onApply}
     >
       <span
@@ -378,16 +379,7 @@ export function TemplateCard({
         {t.tag && <span className="display-badge">{t.tag}</span>}
         {isActive && (
           <span className="display-check" aria-hidden>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="11" fill="currentColor" />
-              <path
-                d="M7.5 12.5 10.5 15.5 16.5 9"
-                stroke="#0B141E"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <CheckCircle size={14} weight="fill" />
           </span>
         )}
         <UnifiedPreview t={t} />

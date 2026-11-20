@@ -13,6 +13,7 @@
   "dependencies": {
     "@mediabunny/aac-encoder": "^1.56.3",
     "@mediapipe/tasks-vision": "^1.0.1",
+    "@phosphor-icons/react": "2.1.10",
     "@tanstack/react-virtual": "^3.14.6",
     "@types/three": "^0.186.0",
     "axios": "^1.18.1",

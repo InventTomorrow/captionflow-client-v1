@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { Check, Trash, X } from '@phosphor-icons/react';
 import type { Caption, WordStyle } from '../stores/captionStore';
 import type { DisplayCaption, DisplayMode } from '../lib/displayCaptions';
 import { resolveCaptionAnchor } from '../lib/captionPosition';
@@ -375,9 +376,7 @@ export function CaptionWords({
             onPointerDown={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
           >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <X size={9} weight="bold" aria-hidden="true" />
           </span>
         )}
       </motion.span>
@@ -1136,16 +1135,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                   setPendingPosition(null);
                 }}
               >
-                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-                  <path
-                    d="M3 8.5l3 3 7-7"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <Check size={12} weight="bold" aria-hidden="true" />
                 Current Preset
               </button>
               <button
@@ -1178,9 +1168,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                   setPendingPosition(null);
                 }}
               >
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 7h16M9 7V4h6v3m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
-                </svg>
+                <Trash size={12} weight="bold" aria-hidden="true" />
                 Delete
               </button>
             </div>

@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { PremiumSelect } from '../components/PremiumSelect';
 import type {
   MatteSnapshot,
   MatteTestLayout,
@@ -180,11 +181,13 @@ export function MatteDevPage() {
         </label>
         <label>
           delegate{' '}
-          <select value={delegate} onChange={(e) => setDelegate(e.target.value as 'auto' | MatteDelegate)}>
-            <option value="auto">auto (GPU → CPU)</option>
-            <option value="GPU">GPU</option>
-            <option value="CPU">CPU</option>
-          </select>
+          <PremiumSelect ariaLabel="Delegate" value={delegate}
+            onChange={(value) => setDelegate(value as 'auto' | MatteDelegate)}
+            options={[
+              { value: 'auto', label: 'auto (GPU → CPU)' },
+              { value: 'GPU', label: 'GPU' },
+              { value: 'CPU', label: 'CPU' },
+            ]} />
         </label>
         <label>
           max input edge{' '}

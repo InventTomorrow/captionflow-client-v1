@@ -3,12 +3,12 @@
  * speaker, see ReframeControl) or 16:9 landscape (the whole frame). With
  * `allowKeep`, a third choice leaves each clip's format as it is (bulk edits).
  */
-import { Minus, RectangleHorizontal, RectangleVertical } from 'lucide-react';
+import { DeviceMobile, Minus, Monitor } from '@phosphor-icons/react';
 import type { ClipAspect } from '../../lib/clips/clipMath';
 
-const OPTIONS: Array<{ value: ClipAspect; label: string; hint: string; Icon: typeof RectangleVertical }> = [
-  { value: '9:16', label: '9:16 Vertical', hint: 'Shorts, Reels, TikTok — follows the speaker', Icon: RectangleVertical },
-  { value: '16:9', label: '16:9 Landscape', hint: 'YouTube, X, LinkedIn — the whole frame', Icon: RectangleHorizontal },
+const OPTIONS: Array<{ value: ClipAspect; label: string; hint: string; Icon: typeof DeviceMobile }> = [
+  { value: '9:16', label: '9:16 Vertical', hint: 'Shorts, Reels, TikTok — follows the speaker', Icon: DeviceMobile },
+  { value: '16:9', label: '16:9 Landscape', hint: 'YouTube, X, LinkedIn — the whole frame', Icon: Monitor },
 ];
 
 interface ClipFormatToggleProps {
@@ -32,7 +32,7 @@ export function ClipFormatToggle({ value, allowKeep, disabled, onChange }: ClipF
           onClick={() => onChange(undefined)}
           title="Leave each clip's format as it is"
         >
-          <Minus size={16} aria-hidden="true" />
+          <Minus size={16} weight="bold" aria-hidden="true" />
           Keep
         </button>
       )}
@@ -47,7 +47,7 @@ export function ClipFormatToggle({ value, allowKeep, disabled, onChange }: ClipF
           onClick={() => onChange(v)}
           title={hint}
         >
-          <Icon size={16} aria-hidden="true" />
+          <Icon size={16} weight={value === v ? 'fill' : 'duotone'} aria-hidden="true" />
           {label}
         </button>
       ))}

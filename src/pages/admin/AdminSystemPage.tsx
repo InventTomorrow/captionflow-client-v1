@@ -14,6 +14,7 @@ export function AdminSystemPage() {
     audioOnlyUploadEnabled: true,
     clipsEnabled: false,
     urlImportEnabled: false,
+    framingEnabled: true,
     maintenanceMode: false,
     maintenanceMessage: '',
   });
@@ -79,6 +80,7 @@ export function AdminSystemPage() {
                   ['audioOnlyUploadEnabled', 'Audio-only uploads (video stays on the device)'],
                   ['clipsEnabled', 'Clips (AI highlight clips; each plan sets its clip runs / month)'],
                   ['urlImportEnabled', 'Clips from a link (paste a URL → yt-dlp download; needs Clips on)'],
+                  ['framingEnabled', 'Clip framing layouts (Video type on Create; Frame layout in the clip page)'],
                   ['maintenanceMode', 'Maintenance mode'],
                 ] as const
               ).map(([key, label]) => (

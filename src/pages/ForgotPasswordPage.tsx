@@ -1,27 +1,14 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
-import { AuthBrand, PasswordChecklist, PasswordInput } from '../components/AuthParts';
+import { CheckCircle, EnvelopeSimple, PaperPlaneTilt } from '@phosphor-icons/react';
+import { ArrowRightIcon, AuthBrand, PasswordChecklist, PasswordInput } from '../components/AuthParts';
 import { PageLoader } from '../components/PageLoader';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { useFlagsStore } from '../stores/flagsStore';
 
 function MailIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m22 7-8.991 5.667a2 2 0 0 1-2.009 0L2 7" />
-      <rect x="2" y="4" width="20" height="16" rx="3" />
-    </svg>
-  );
+  return <EnvelopeSimple size={18} aria-hidden="true" />;
 }
 
 function SpinnerIcon() {
@@ -29,14 +16,6 @@ function SpinnerIcon() {
     <svg className="auth-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
@@ -86,7 +65,7 @@ function DirectReset() {
     return (
       <div className="auth-status" role="status">
         <div className="auth-status-icon is-ok">
-          <CheckIcon />
+          <CheckCircle size={26} aria-hidden="true" />
         </div>
         <div className="auth-heading">
           <h2>Password updated</h2>
@@ -97,6 +76,7 @@ function DirectReset() {
         </div>
         <Link className="btn primary auth-submit auth-status-action" to="/login">
           Go to sign in
+          <ArrowRightIcon />
         </Link>
       </div>
     );
@@ -285,7 +265,10 @@ export function ForgotPasswordPage() {
                     Sending…
                   </>
                 ) : (
-                  'Send reset link'
+                  <>
+                    <PaperPlaneTilt size={17} aria-hidden="true" />
+                    Send reset link
+                  </>
                 )}
               </button>
             </form>

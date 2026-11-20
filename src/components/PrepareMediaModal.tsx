@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ArrowRight, CircleNotch, Sparkle, X } from '@phosphor-icons/react';
 import { api, API_URL } from '../lib/api';
 import { getSourceFile } from '../lib/media/localMedia';
 import { resolvePlanError, type ApiErrorPayload, type PlanErrorInfo } from '../lib/planErrors';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../lib/languageLabel';
 import { UpgradeBanner } from './UpgradeBanner';
+import { PremiumSelect } from './PremiumSelect';
 
 /**
  * What the preview plays: this device's copy of the source (OPFS) when it has
@@ -45,7 +47,6 @@ function usePreviewSource(projectId: string) {
   }, [projectId]);
   return [source, setSource] as const;
 }
-
 /**
  * "Prepare Your Media" popup shown on the editor right after upload.
  * Language options only — caption mode / Whisper settings use server defaults.
@@ -113,37 +114,14 @@ export function PrepareMediaModal({
         <header className="prepare-header">
           <div>
             <div className="prepare-chip">
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
-              </svg>
+              <Sparkle size={12} weight="fill" aria-hidden="true" />
               Step 1 of 2
             </div>
             <h1 id="prepare-title">Prepare your media</h1>
             <p className="prepare-sub">Select a language to transcribe your media.</p>
           </div>
           <button type="button" className="prepare-icon-btn" onClick={onClose} aria-label="Close">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X size={16} weight="bold" aria-hidden="true" />
           </button>
         </header>
 
@@ -189,27 +167,15 @@ export function PrepareMediaModal({
           <label>
             <span>What language is spoken?</span>
             <div className="prepare-select-wrap">
-              <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)}>
-                {SPOKEN_LANGUAGE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronIcon />
+              <PremiumSelect ariaLabel="Spoken language" value={sourceLanguage}
+                onChange={setSourceLanguage} options={SPOKEN_LANGUAGE_OPTIONS} />
             </div>
           </label>
           <label>
             <span>Script style</span>
             <div className="prepare-select-wrap">
-              <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
-                {CAPTION_LANGUAGE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronIcon />
+              <PremiumSelect ariaLabel="Script style" value={outputLanguage}
+                onChange={setOutputLanguage} options={CAPTION_LANGUAGE_OPTIONS} />
             </div>
           </label>
           <label className="prepare-field-wide">
@@ -237,6 +203,11 @@ export function PrepareMediaModal({
             disabled={busy || !!planError?.showUpgrade}
           >
             {busy ? 'Starting…' : 'Continue'}
+            {busy ? (
+              <CircleNotch size={16} weight="bold" className="prepare-spin" aria-hidden="true" />
+            ) : (
+              <ArrowRight size={16} weight="bold" aria-hidden="true" />
+            )}
           </button>
         </footer>
       </section>
@@ -256,22 +227,4 @@ function parseKeyterms(text: string): string[] {
     if (out.length === 50) break;
   }
   return out;
-}
-
-function ChevronIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
 }

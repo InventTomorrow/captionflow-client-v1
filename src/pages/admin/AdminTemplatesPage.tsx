@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DotsSixVertical, FloppyDisk } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
@@ -398,6 +399,7 @@ export function AdminTemplatesPage() {
                 </button>
               )}
               <button type="button" className="btn primary" onClick={() => void saveOrder()} disabled={!dirty || saving}>
+                <FloppyDisk size={16} aria-hidden="true" />
                 {saving ? 'Saving…' : 'Save order'}
               </button>
             </div>
@@ -445,14 +447,7 @@ export function AdminTemplatesPage() {
                   </span>
                   {isAdmin && (
                     <span className="template-tile-grip" aria-hidden="true">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="9" cy="6" r="1.6" />
-                        <circle cx="15" cy="6" r="1.6" />
-                        <circle cx="9" cy="12" r="1.6" />
-                        <circle cx="15" cy="12" r="1.6" />
-                        <circle cx="9" cy="18" r="1.6" />
-                        <circle cx="15" cy="18" r="1.6" />
-                      </svg>
+                      <DotsSixVertical size={14} weight="bold" />
                     </span>
                   )}
                 </div>

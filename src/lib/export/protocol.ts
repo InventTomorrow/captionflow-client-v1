@@ -6,6 +6,7 @@
 
 import type { KineticCaptionInput, KineticParams, KineticTemplateId } from '../kinetic/engine';
 import type { ExportFormat } from '../render/frame';
+import type { ClipFramingV1 } from '../clips/framing';
 import type { FontSource, LayoutTrack } from './layout/types';
 
 /** Captions drawn by the kinetic engine (the same engine as the preview). */
@@ -45,7 +46,11 @@ export type OverlaySpec = KineticOverlaySpec | LayoutOverlaySpec;
  * frame with a crop window whose horizontal centre follows `track`
  * ([clipTime, cx 0..1] keyframes — clips/cropTrack.ts).
  */
-export type ExportFraming = { mode: 'contain' } | { mode: 'cover'; track: Array<[number, number]> };
+export type ExportFraming =
+  | { mode: 'contain' }
+  | { mode: 'cover'; track: Array<[number, number]> }
+  /** A framing layout (clips/framing.ts), drawn by clips/layout.ts — the preview draws the same. */
+  | { mode: 'layout'; framing: ClipFramingV1 };
 
 export interface ExportJob {
   jobId: string;

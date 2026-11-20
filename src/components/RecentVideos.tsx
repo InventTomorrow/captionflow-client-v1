@@ -10,6 +10,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowRight,
+  DotsThreeVertical,
+  DownloadSimple,
+  FilmStrip,
+  FolderSimple,
+  PencilSimpleLine,
+  PlayCircle,
+  Trash,
+} from '@phosphor-icons/react';
 import { listExports, markExportDownloaded, type LocalExportRecord } from '../lib/media/localMedia';
 import { deleteVideo, expireOldLocalMedia, isLastVideoOfProject } from '../lib/media/retention';
 import { forgetsProject } from '../lib/media/retentionRules';
@@ -39,40 +49,21 @@ function displayTitle(title: string): string {
   return title.replace(/\.(mp4|m4v|mov|webm|mkv|avi|flv)$/i, '') || title;
 }
 
+// Sized by CSS (.rv-head-icon / .rv-view-all / .rv-menu-btn / .rv-saved svg).
 function PlayCircleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <path d="m10 8 6 4-6 4Z" />
-    </svg>
-  );
+  return <PlayCircle aria-hidden="true" />;
 }
 
 function ArrowRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
-  );
+  return <ArrowRight weight="bold" aria-hidden="true" />;
 }
 
 function DotsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <circle cx="12" cy="5" r="1.9" />
-      <circle cx="12" cy="12" r="1.9" />
-      <circle cx="12" cy="19" r="1.9" />
-    </svg>
-  );
+  return <DotsThreeVertical weight="bold" aria-hidden="true" />;
 }
 
 function FolderIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-    </svg>
-  );
+  return <FolderSimple aria-hidden="true" />;
 }
 
 function VideoCard({
@@ -141,6 +132,7 @@ function VideoCard({
                     onDownload();
                   }}
                 >
+                  <DownloadSimple size={16} aria-hidden="true" />
                   Download
                 </button>
                 <button
@@ -151,6 +143,7 @@ function VideoCard({
                     navigate(editorUrl);
                   }}
                 >
+                  <PencilSimpleLine size={16} aria-hidden="true" />
                   Open in editor
                 </button>
                 <button
@@ -162,6 +155,7 @@ function VideoCard({
                     onDelete();
                   }}
                 >
+                  <Trash size={16} aria-hidden="true" />
                   Delete
                 </button>
               </div>
@@ -259,7 +253,10 @@ export function RecentVideos() {
       {error && <div className="error-banner">{error}</div>}
 
       {items.length === 0 ? (
-        <p className="rv-empty">Your exported caption videos will show up here.</p>
+        <p className="rv-empty">
+          <FilmStrip size={28} aria-hidden="true" />
+          <span>Your exported caption videos will show up here.</span>
+        </p>
       ) : (
         <ul className="rv-grid">
           {visible.map((item) => (

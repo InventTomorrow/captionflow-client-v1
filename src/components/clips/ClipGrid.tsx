@@ -27,6 +27,7 @@ interface ClipGridProps {
   project?: { _id: string; sourceUrl?: string; video?: { kind?: string } };
   showProject?: boolean;
   showReason?: boolean;
+  workspace?: boolean;
   renders: Record<string, RenderState | undefined>;
   /** Selection mode: the ids picked so far (undefined = not selecting). */
   selected?: ReadonlySet<string>;
@@ -46,6 +47,7 @@ export function ClipGrid({
   project,
   showProject,
   showReason,
+  workspace,
   renders,
   selected,
   onToggleSelect,
@@ -146,6 +148,7 @@ export function ClipGrid({
             fallbackPosters={linkPosters(link)}
             showProject={showProject}
             showReason={showReason}
+            workspace={workspace}
             render={renders[clip._id]}
             selected={selected ? selected.has(clip._id) : undefined}
             onToggleSelect={onToggleSelect ? () => onToggleSelect(clip) : undefined}

@@ -5,7 +5,7 @@
  * and hands back as soon as it answers, so the page carries on by itself.
  */
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Download, Loader2, MonitorDown, Play } from 'lucide-react';
+import { CheckCircle, CircleNotch, Desktop, DownloadSimple, Play, X } from '@phosphor-icons/react';
 import {
   HELPER_DOWNLOAD_URL,
   HELPER_LAUNCH_URL,
@@ -94,7 +94,7 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
         <div className="modal-head">
           <h3 id="helper-modal-title">{title}</h3>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
-            ✕
+            <X size={16} weight="bold" aria-hidden="true" />
           </button>
         </div>
         <div className="modal-body">
@@ -123,7 +123,7 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
               <ol className="helper-steps">
                 <li className={`helper-step${downloaded ? ' is-done' : ' is-current'}`}>
                   <span className="helper-step-num" aria-hidden="true">
-                    {downloaded ? <CheckCircle2 size={18} /> : 1}
+                    {downloaded ? <CheckCircle size={18} weight="fill" /> : 1}
                   </span>
                   <div className="helper-step-body">
                     <a
@@ -133,7 +133,7 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
                       download="AsaanCaptionHelper.exe"
                       onClick={() => setDownloaded(true)}
                     >
-                      <Download size={16} aria-hidden="true" /> Download the helper
+                      <DownloadSimple size={16} weight="bold" aria-hidden="true" /> Download the helper
                     </a>
                     <span className="muted tiny">Free · Windows 10 or 11 · under 1 MB. If your browser asks, choose Keep.</span>
                   </div>
@@ -152,7 +152,7 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
                 </li>
                 <li className={`helper-step${connected ? ' is-done' : ''}`}>
                   <span className="helper-step-num" aria-hidden="true">
-                    {connected ? <CheckCircle2 size={18} /> : 3}
+                    {connected ? <CheckCircle size={18} weight="fill" /> : 3}
                   </span>
                   <div className="helper-step-body">
                     <strong>Come back here</strong>
@@ -164,11 +164,11 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
               <div className={`helper-status${connected ? ' is-connected' : ''}`} role="status" aria-live="polite">
                 {connected ? (
                   <>
-                    <CheckCircle2 size={16} aria-hidden="true" /> Helper connected. Carrying on…
+                    <CheckCircle size={16} weight="fill" aria-hidden="true" /> Helper connected. Carrying on…
                   </>
                 ) : (
                   <>
-                    <Loader2 size={16} className="helper-spin" aria-hidden="true" /> Waiting for the helper…
+                    <CircleNotch size={16} weight="bold" className="helper-spin" aria-hidden="true" /> Waiting for the helper…
                   </>
                 )}
               </div>
@@ -185,9 +185,9 @@ export function HelperInstallModal({ reason, onConnected, onClose }: Props) {
 
               {!connected && (
                 <p className="muted tiny helper-installed">
-                  <MonitorDown size={14} aria-hidden="true" /> Already installed?{' '}
+                  <Desktop size={14} weight="bold" aria-hidden="true" /> Already installed?{' '}
                   <a href={HELPER_LAUNCH_URL}>
-                    <Play size={12} aria-hidden="true" /> Start the helper
+                    <Play size={12} weight="fill" aria-hidden="true" /> Start the helper
                   </a>
                 </p>
               )}

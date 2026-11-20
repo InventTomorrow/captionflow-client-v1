@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Plus } from '@phosphor-icons/react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { AdminSelect } from '../../components/admin/AdminSelect';
@@ -161,6 +162,7 @@ export function AdminPlansPage() {
               })
             }
           >
+            <Plus size={16} weight="bold" aria-hidden="true" />
             New plan
           </button>
         )}

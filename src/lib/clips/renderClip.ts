@@ -6,7 +6,7 @@
  * Same pipeline as the editor's export (buildDeviceExportJob + export.worker):
  * the project's captions cut to the clip (sliceCaptionsToRange, inside the
  * job builder), the clip's style (clipMath.clipStyle), its framing
- * (cropTrackFor). The server only checks the plan and counts the render.
+ * (exportFramingFor: a framing layout, the crop track, or Fit). The server only checks the plan and counts the render.
  */
 import { api, errorMessage } from '../api';
 import { getAllForProject, replaceAllForProject } from '../captionDb';
@@ -28,7 +28,7 @@ import { authorizeClipRender, completeClipRender, failClipRender, finishCaptions
 import { ensureFaceTrack, needsFaceTrack } from './autoFrame';
 import { shiftCaptions } from './clipClock';
 import { clipMedia } from './clipMedia';
-import { clipAspect, clipStyle, cropTrackFor, deferredIn, type TimeRange } from './clipMath';
+import { clipAspect, clipStyle, deferredIn, exportFramingFor, nonLatinIn, type TimeRange } from './clipMath';
 
 export interface ClipRenderContext {
   projectId: string;
@@ -69,7 +69,9 @@ export class ClipRenderError extends Error {
  */
 export async function projectCaptions(projectId: string, ranges: TimeRange[] = []): Promise<Caption[]> {
   let caps = await getAllForProject(projectId).catch(() => [] as Caption[]);
-  if (caps.length && !deferredIn(caps, ranges)) return caps;
+  // A caption in a non-Latin script may be one a failed Roman Urdu conversion left behind:
+  // the server knows the project's caption language and flags those as waiting, so ask it.
+  if (caps.length && !deferredIn(caps, ranges) && !nonLatinIn(caps, ranges)) return caps;
   // Another browser / cleared storage, or a copy older than the finished one:
   // the server keeps a copy for exactly this.
   const { data } = await api.get<{ captions: Caption[] }>(`/projects/${projectId}/captions-cache`);
@@ -144,7 +146,6 @@ export function renderClip(
       }
     }
 
-    const track = cropTrackFor(clip);
     const job = await buildDeviceExportJob({
       exportId: `clip-${clip._id}-${Date.now().toString(36)}`,
       source,
@@ -156,7 +157,7 @@ export function renderClip(
       // A part of a linked video starts at `offset`: clip times and captions move onto its own timeline.
       captions: offset ? shiftCaptions(captions, -offset) : captions,
       trim: { start: clip.start - offset, end: clip.end - offset },
-      framing: track ? { mode: 'cover', track } : { mode: 'contain' },
+      framing: exportFramingFor(clip),
     });
     if (cancelled) throw new ClipRenderError('CANCELLED', 'Cancelled');
     const handle = startDeviceExport(job, report);

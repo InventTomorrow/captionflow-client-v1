@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CaretLeft, X } from '@phosphor-icons/react';
 import { usePlans } from '../lib/usePlans';
 import { PricingCards } from './PricingCards';
 import { ManualPaymentPanel } from './ManualPaymentPanel';
@@ -67,11 +68,12 @@ export function PricingModal({
       <div className="modal-backdrop" onClick={onClose}>
         <div className="modal-card payment-modal-card" onClick={(e) => e.stopPropagation()}>
           <button type="button" className="modal-close payment-modal-close" onClick={onClose} aria-label="Close">
-            ✕
+            <X size={16} weight="bold" aria-hidden="true" />
           </button>
           {subscriptionPlans && subscriptionPlans.length > 1 && (
             <button type="button" className="payment-modal-back" onClick={() => setPaymentSlug(null)}>
-              ‹ Change plan
+              <CaretLeft size={14} weight="bold" aria-hidden="true" />
+              Change plan
             </button>
           )}
           {reason?.message && <p className="muted pricing-modal-reason payment-modal-reason">{reason.message}</p>}
@@ -86,8 +88,8 @@ export function PricingModal({
       <div className="modal-card pricing-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3>{reason?.title || 'Upgrade your plan'}</h3>
-          <button type="button" className="modal-close" onClick={onClose}>
-            ✕
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+            <X size={16} weight="bold" aria-hidden="true" />
           </button>
         </div>
         <div className="modal-body">

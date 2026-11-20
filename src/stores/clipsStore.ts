@@ -191,6 +191,7 @@ export const useClipsStore = create<ClipsState>((set, get) => ({
             ? { templateKey: look.templateKey, style: null }
             : {}),
         ...(look.aspect ? { aspect: look.aspect } : {}),
+        ...(look.framing !== undefined ? { framing: look.framing } : {}),
       };
       return {
         ...merged,

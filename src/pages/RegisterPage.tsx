@@ -11,41 +11,10 @@ import {
   PasswordInput,
 } from '../components/AuthParts';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
-
-function UserIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
+import { EnvelopeSimple, PaperPlaneTilt, User } from '@phosphor-icons/react';
 
 function MailIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m22 7-8.991 5.667a2 2 0 0 1-2.009 0L2 7" />
-      <rect x="2" y="4" width="20" height="16" rx="3" />
-    </svg>
-  );
+  return <EnvelopeSimple size={18} aria-hidden="true" />;
 }
 
 function SpinnerIcon() {
@@ -130,7 +99,10 @@ function CheckYourEmail({
                 Sending…
               </>
             ) : (
-              'Send the email'
+              <>
+                <PaperPlaneTilt size={17} aria-hidden="true" />
+                Send the email
+              </>
             )}
           </button>
         )}
@@ -228,7 +200,7 @@ export function RegisterPage() {
               <div className="auth-field">
                 <label htmlFor="register-name">Name</label>
                 <div className="auth-input-wrap">
-                  <UserIcon />
+                  <User size={18} aria-hidden="true" />
                   <input
                     id="register-name"
                     autoComplete="name"

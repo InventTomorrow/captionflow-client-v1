@@ -8,9 +8,19 @@
  * puts one caption template on every clip (and on later runs); Select picks
  * some clips for one template, a render or a delete. Clips show as a reels
  * feed (one clip per screen, playing from the original on this device) or as
- * a grid; the choice is remembered on this browser.
+ * a grid; generated results open in Grid while Reels stays available.
  */
-import { Captions, GalleryVerticalEnd, LayoutGrid, ListChecks, Palette } from 'lucide-react';
+import {
+  Cards,
+  ClosedCaptioning,
+  FilmSlate,
+  FilmStrip,
+  ListChecks,
+  MagnifyingGlass,
+  Palette,
+  Sparkle,
+  SquaresFour,
+} from '@phosphor-icons/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipBulkBar } from '../../components/clips/ClipBulkBar';
@@ -28,7 +38,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
 import { errorMessage } from '../../lib/api';
 import { analyzeClips, type Clip, type ClipLookPatch } from '../../lib/clips/api';
-import { readClipsView, writeClipsView, type ClipsView } from '../../lib/clips/reelFeed';
+import { type ClipsView } from '../../lib/clips/reelFeed';
 import { ensureFaceTrack, needsFaceTrack } from '../../lib/clips/autoFrame';
 import { useClipSource, useProjectStyle } from '../../lib/clips/useClipMedia';
 import { downloadLocalFile, exportFileName } from '../../lib/export/clientExport';
@@ -63,7 +73,7 @@ export function ClipSetPage() {
   const [preset, setPreset] = useState<LengthPresetId>('standard');
   const [maxClips, setMaxClips] = useState(8);
   const [starting, setStarting] = useState(false);
-  const [view, setView] = useState<ClipsView>(readClipsView);
+  const [view, setView] = useState<ClipsView>('grid');
   const openEditor = useOpenInEditor();
 
   const project = data?.project;
@@ -187,7 +197,6 @@ export function ClipSetPage() {
 
   function chooseView(next: ClipsView) {
     setView(next);
-    writeClipsView(next);
   }
 
   function toggleSelect(id: string) {
@@ -240,6 +249,7 @@ export function ClipSetPage() {
           <h1 className="clips-title">{project.name}</h1>
         </header>
         <div className="clips-empty">
+          <FilmStrip size={32} className="clips-empty-icon" aria-hidden="true" />
           <p>No clips to show.</p>
         </div>
       </div>
@@ -247,39 +257,40 @@ export function ClipSetPage() {
   }
 
   return (
-    <div className="clips-page">
+    <div className="clips-page clips-results-page">
       <nav className="clips-crumbs" aria-label="Breadcrumb">
-        <Link to="/clips">Viral Clips</Link>
+        <Link to="/clips">Projects</Link>
         <span aria-hidden="true">/</span>
-        <span>{project?.name ?? '…'}</span>
+        <span>Viral Clips</span>
       </nav>
       <header className="clips-head">
-        <div>
-          <h1 className="clips-title">{project?.name ?? 'Loading…'}</h1>
+        <div className="clips-project-heading">
+          <h1 className="clips-title" title={project?.name}>{project?.name ?? 'Loading…'}</h1>
           {runStatus === 'ready' && (
             <p className="clips-sub">
               {clips.length} clips · best first{clips.length > 0 && ` · ${defaultFormat} · ${defaultLook}`}
+              {project && !projectBusy && ` · Captions: ${captionLanguage ?? 'as spoken'}`}
             </p>
           )}
-          {project && !projectBusy && (
+          {project && !projectBusy && runStatus !== 'ready' && (
             <p className="clips-sub clips-lang">Captions: {captionLanguage ?? 'as spoken'}</p>
           )}
         </div>
         <div className="clips-head-actions">
           {project && !imported && (
             <Link to={`/projects/${projectId}/editor`} className="btn ghost clips-head-btn">
-              <Captions size={16} aria-hidden="true" />
+              <ClosedCaptioning size={16} aria-hidden="true" />
               Full video in editor
             </Link>
           )}
           {clips.length > 0 && (
             <div className="clips-view-toggle" role="group" aria-label="Show clips as">
               <button type="button" aria-pressed={view === 'reels'} onClick={() => chooseView('reels')}>
-                <GalleryVerticalEnd size={16} aria-hidden="true" />
+                <Cards size={16} weight={view === 'reels' ? 'fill' : 'duotone'} aria-hidden="true" />
                 Reels
               </button>
               <button type="button" aria-pressed={view === 'grid'} onClick={() => chooseView('grid')}>
-                <LayoutGrid size={16} aria-hidden="true" />
+                <SquaresFour size={16} weight={view === 'grid' ? 'fill' : 'duotone'} aria-hidden="true" />
                 Grid
               </button>
             </div>
@@ -298,11 +309,13 @@ export function ClipSetPage() {
           )}
           {canAnalyze && !working && (
             <button type="button" className="btn ghost" onClick={() => setShowOptions((v) => !v)} aria-expanded={showOptions}>
+              <Sparkle size={16} aria-hidden="true" />
               {clips.length || runStatus === 'ready' ? 'Find more / re-run' : 'Find clips'}
             </button>
           )}
           {unrendered.length > 0 && canRender && (
             <button type="button" className="btn primary" onClick={() => renderJobs(unrendered)} disabled={!projectStyle}>
+              <FilmSlate size={16} aria-hidden="true" />
               Render all ({unrendered.length})
             </button>
           )}
@@ -316,7 +329,7 @@ export function ClipSetPage() {
       )}
       {planError && <UpgradeBanner info={planError} />}
 
-      {project?.sourceUrl && (
+      {project?.sourceUrl && clips.length === 0 && (
         <section className="clips-panel clip-source-panel" aria-label="Source video">
           <LinkedVideo sourceUrl={project.sourceUrl} title={project.name} />
           <p className="clips-sub">
@@ -334,6 +347,7 @@ export function ClipSetPage() {
               <ClipOptionsForm preset={preset} maxClips={maxClips} disabled={starting} onPreset={setPreset} onMaxClips={setMaxClips} />
               <p className="clips-sub">Uses one clip run from your plan. Your existing edits and renders are kept.</p>
               <button type="button" className="btn primary clips-cta" disabled={starting} onClick={() => void findClips()}>
+                <Sparkle size={17} aria-hidden="true" />
                 {starting ? 'Starting…' : 'Find clips'}
               </button>
             </>
@@ -361,8 +375,16 @@ export function ClipSetPage() {
 
       {runStatus === 'ready' && clips.length === 0 && !working && (
         <div className="clips-empty">
+          <MagnifyingGlass size={32} className="clips-empty-icon" aria-hidden="true" />
           <p>No strong moments found in this video.</p>
           <p className="clips-sub">Try a different clip length, or a video with more talking.</p>
+        </div>
+      )}
+
+      {clips.length > 0 && (
+        <div className="clips-results-label">
+          <div><span>GENERATED CLIPS</span><h2>{clips.length} clips <small>· best first</small></h2></div>
+          {working && <span className="clips-results-working">More clips are processing</span>}
         </div>
       )}
 
@@ -400,6 +422,7 @@ export function ClipSetPage() {
           clips={clips}
           project={project}
           showReason
+          workspace
           renders={renders}
           selected={selected ?? undefined}
           onToggleSelect={(c) => toggleSelect(c._id)}
@@ -409,6 +432,23 @@ export function ClipSetPage() {
           onDownload={(c) => void download(c)}
           onDelete={(c) => void remove(c)}
         />
+      )}
+
+      {project?.sourceUrl && clips.length > 0 && (
+        <details className="clips-source-disclosure">
+          <summary>
+            <span className="clips-source-disclosure-copy">
+              <strong>Original video</strong>
+              <span title={project.name}>{project.name}</span>
+              <small>{clips.length} clips · {defaultFormat} · Captions: {captionLanguage ?? 'as spoken'}</small>
+            </span>
+            <span className="clips-source-disclosure-action">View original video</span>
+          </summary>
+          <div className="clip-source-panel">
+            <LinkedVideo sourceUrl={project.sourceUrl} title={project.name} />
+            <p className="clips-sub">Plays from the link — the video isn’t downloaded. Only a clip you render or edit is fetched, just its own part.</p>
+          </div>
+        </details>
       )}
 
       {sheet && (

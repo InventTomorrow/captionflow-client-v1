@@ -43,6 +43,7 @@ import { loadLayoutFonts } from './layout/layoutFonts';
 import { createLayoutPainter } from './layout/painter';
 import { isBehindAt } from './behindWindows';
 import { cropRect, cropXAt, integerCrop } from '../clips/cropTrack';
+import { drawLayout, type LayoutContext } from '../clips/layout';
 // personMatte.ts (MediaPipe) is imported only by exports with text behind person.
 import type { PersonMatter } from './personMatte';
 
@@ -378,6 +379,10 @@ async function run(job: ExportJob): Promise<void> {
     const tuning = job.tuning ?? {};
     const framing = job.framing ?? { mode: 'contain' as const };
     let thumbnail: Promise<Blob | null> | null = null;
+    // A rotated source (phone video with rotation metadata) is first drawn upright at its
+    // display size, so layout regions always address the picture as the viewer sees it.
+    let upright: OffscreenCanvas | null = null;
+    const layoutCtx = ctx as unknown as LayoutContext;
 
     const process = (sample: VideoSample) => {
       const p0 = performance.now();
@@ -385,7 +390,24 @@ async function run(job: ExportJob): Promise<void> {
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
-      if (framing.mode === 'cover') {
+      if (framing.mode === 'layout') {
+        const sw = sample.displayWidth;
+        const sh = sample.displayHeight;
+        if (sample.rotation) {
+          if (!upright || upright.width !== sw || upright.height !== sh) upright = new OffscreenCanvas(sw, sh);
+          const uctx = upright.getContext('2d');
+          if (!uctx) throw new ExportFailure('UNSUPPORTED', '2D canvas unavailable in this worker');
+          sample.drawWithFit(uctx, { fit: 'fill' });
+          const src = upright;
+          drawLayout(layoutCtx, W, H, framing.framing, sw, sh, (c, sx, sy, sW, sH, dx, dy, dW, dH) =>
+            (c as unknown as OffscreenCanvasRenderingContext2D).drawImage(src, sx, sy, sW, sH, dx, dy, dW, dH),
+          );
+        } else {
+          drawLayout(layoutCtx, W, H, framing.framing, sw, sh, (c, sx, sy, sW, sH, dx, dy, dW, dH) =>
+            sample.draw(c as unknown as OffscreenCanvasRenderingContext2D, sx, sy, sW, sH, dx, dy, dW, dH),
+          );
+        }
+      } else if (framing.mode === 'cover') {
         // Vertical reframe: the crop window follows the clip's crop track.
         const sw = sample.displayWidth;
         const sh = sample.displayHeight;

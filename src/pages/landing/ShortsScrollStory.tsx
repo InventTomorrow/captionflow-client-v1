@@ -57,6 +57,8 @@ export function ShortsScrollStory() {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const beforeRef = useRef<HTMLDivElement>(null);
+  const afterRef = useRef<HTMLDivElement>(null);
   const reelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const segRefs = useRef<(HTMLElement | null)[]>([]);
   const stepRefs = useRef<(HTMLLIElement | null)[]>([]);
@@ -66,7 +68,9 @@ export function ShortsScrollStory() {
     const stage = stageRef.current;
     const canvas = canvasRef.current;
     const frame = frameRef.current;
-    if (!wrap || !stage || !canvas || !frame) return;
+    const before = beforeRef.current;
+    const after = afterRef.current;
+    if (!wrap || !stage || !canvas || !frame || !before || !after) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frameId = 0;
     let onScreen = false;
@@ -83,12 +87,12 @@ export function ShortsScrollStory() {
       const fw = Math.min(cw, ((ch * 0.92) * 16) / 9, 980);
       const fh = (fw * 9) / 16;
       const back = ease(range(p, 0.3, 0.72));
-      // How far the long video steps back: little on phones (the reels are narrow there), more on wide screens.
-      const small = cw < 560 ? 0.94 : cw < 900 ? 0.64 : 0.5;
+      // Let the finished clips dominate the screen while keeping the source visible for context.
+      const small = cw < 560 ? 0.78 : cw < 900 ? 0.48 : 0.34;
       const smallH = fh * small;
 
       // End state: the stepped-back video with the row of reels right under it.
-      const gapY = Math.max(14, ch * 0.025);
+      const gapY = Math.max(52, ch * 0.07);
       const reelMaxH = Math.min(ch - smallH - gapY, ch * 0.78);
       const reelW = Math.min((reelMaxH * 9) / 16, (cw * 0.96) / 3.25);
       const realH = (reelW * 16) / 9;
@@ -106,6 +110,13 @@ export function ShortsScrollStory() {
       frame.style.setProperty('--dim', String(lerp(0, 0.5, back)));
       // Its labels and timeline fade once it has stepped back (they'd be too small to read).
       frame.style.setProperty('--chrome', String(1 - range(back, 0.45, 1)));
+      // Keep the source label readable as the video scales down. The result cue
+      // appears in the space opened between the source and the three clips.
+      before.style.left = `${Math.max(8, (cw - fw * frameScale) / 2 + 12)}px`;
+      after.style.top = `${smallH + gapY / 2}px`;
+      const reveal = ease(range(p, 0.5, 0.7));
+      after.style.setProperty('--reveal', String(reveal));
+      after.style.setProperty('--rise', `${lerp(8, 0, reveal)}px`);
 
       // The best moments light up one after another.
       segRefs.current.forEach((seg, i) =>
@@ -196,7 +207,7 @@ export function ShortsScrollStory() {
           <div className="shorts-frame" ref={frameRef}>
             <MediaView media={SHORTS_MEDIA.long} className="shorts-media" />
             <div className="shorts-frame-dim" aria-hidden="true" />
-            <div className="shorts-frame-top"><span><i className="status-dot" /> LONG VIDEO · 16:9</span><span>2:58:49</span></div>
+            <div className="shorts-frame-top"><span>2:58:49</span></div>
             <div className="shorts-timeline" aria-hidden="true">
               {MOMENTS.map((m, i) => (
                 <i
@@ -208,6 +219,14 @@ export function ShortsScrollStory() {
                 />
               ))}
             </div>
+          </div>
+
+          <div className="shorts-before-cue" ref={beforeRef}>
+            <strong>BEFORE</strong><span>1 LONG VIDEO</span>
+          </div>
+          <div className="shorts-after-cue" ref={afterRef}>
+            <span className="shorts-after-arrow" aria-hidden="true">↓</span>
+            <strong>AFTER</strong><span>3 CAPTIONED CLIPS</span>
           </div>
 
           {SHORTS_MEDIA.reels.map((r, i) => (

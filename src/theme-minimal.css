@@ -343,7 +343,7 @@ html .rail-item.active {
   color: var(--cf-text);
 }
 
-/* ---------- App pages (Create, Projects, …): black wave backdrop + see-through header ----------
+/* ---------- App pages (Create, Projects, …): metallic backdrop and glass header ----------
    The image sits on a fixed layer behind the whole shell, so it stays put while the page scrolls.
    The editor keeps its own chrome. */
 html .shell:not(.shell-editor) {
@@ -358,39 +358,21 @@ html .shell:not(.shell-editor)::before {
   z-index: -1;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0.45) 100%),
-    url('/brand/app-bg.webp') center / cover no-repeat;
+    radial-gradient(ellipse 58% 62% at 50% 34%, rgba(0, 0, 0, 0.2), transparent 85%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.06) 45%, rgba(0, 0, 0, 0.2) 100%),
+    url('/brand/create-bg.png') center / cover no-repeat;
 }
 html .shell:not(.shell-editor) .main,
 html .shell:not(.shell-editor) .main.main-creator { background: transparent; }
 html .shell:not(.shell-editor) .main.main-creator::before { display: none; }
 
-/* Header: fully transparent at the top of the page; once the page scrolls it picks up a light
-   frosted tint so content never runs into the nav (scroll-driven, no JS). */
-@keyframes cf-topbar-frost {
-  to {
-    background: rgba(6, 7, 9, 0.62);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(14px);
-  }
-}
+/* A constant, light frosted tint keeps the logo and controls readable over bright ribbons. */
 html .shell:not(.shell-editor) .topbar,
 html body .shell:not(.shell-editor) .topbar {
-  background: transparent;
-  border-bottom: 1px solid transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-@supports (animation-timeline: scroll()) {
-  html body .shell:not(.shell-editor) .topbar {
-    animation: cf-topbar-frost linear both;
-    animation-timeline: scroll(root);
-    animation-range: 0 72px;
-  }
-}
-/* Browsers without scroll-driven animation: the header scrolls away with the page instead. */
-@supports not (animation-timeline: scroll()) {
-  html body .shell:not(.shell-editor) .topbar { position: relative; }
+  background: rgba(6, 7, 9, 0.62);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 /* Page wrappers stay see-through so the backdrop shows. */
 html .shell:not(.shell-editor) .main.main-create,
@@ -398,17 +380,792 @@ html .shell:not(.shell-editor) .creation-page,
 html .shell:not(.shell-editor) .page { background: transparent; }
 /* Cards over the waves read as dark glass. */
 html .shell:not(.shell-editor) :is(.creation-workflow, .creation-uploader, .creation-source-summary, .creation-template-description, .creation-processing, .creation-project-row, .creation-project-empty) {
-  background: color-mix(in srgb, var(--cf-surface) 72%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(12, 14, 17, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
-html .shell:not(.shell-editor) .creation-workflow:hover { background: color-mix(in srgb, var(--cf-card) 80%, transparent); }
-html .shell:not(.shell-editor) .creation-workflow.is-selected { background: color-mix(in srgb, var(--cf-accent) 6%, color-mix(in srgb, var(--cf-surface) 72%, transparent)); }
-html .shell:not(.shell-editor) .creation-uploader.is-dragging { background: color-mix(in srgb, var(--cf-card) 85%, transparent); }
+html .shell:not(.shell-editor) .creation-workflow:hover { background: rgba(20, 23, 27, 0.94); }
+html .shell:not(.shell-editor) .creation-workflow.is-selected { background: color-mix(in srgb, var(--cf-accent) 3%, rgba(15, 18, 21, 0.92)); }
+html .shell:not(.shell-editor) .creation-uploader.is-dragging { background: rgba(21, 24, 28, 0.96); }
+html .shell:not(.shell-editor) .creation-step-panel { background: rgba(10, 12, 15, 0.92); border-color: rgba(255, 255, 255, 0.11); }
+@media (max-width: 700px) {
+  html .shell:not(.shell-editor)::before {
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.5)),
+      url('/brand/create-bg.png') 62% center / cover no-repeat;
+  }
+  html .shell:not(.shell-editor) .topbar,
+  html body .shell:not(.shell-editor) .topbar { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+}
 
 /* Create page on phones: the upload text takes the row beside the icon, the button goes full width below. */
 @media (max-width: 700px) {
   html .creation-uploader { flex-wrap: wrap; align-items: center; }
   html .creation-uploader .creation-upload-copy { flex: 1 1 0; min-width: 0; }
   html .creation-uploader .creation-browse { flex: 1 1 100%; margin-left: 0; justify-content: center; }
+}
+
+/* ---------- Editor workstation ----------
+   Keep the artwork in the shell gaps; editing surfaces stay nearly opaque. */
+html .shell.shell-editor {
+  position: relative;
+  isolation: isolate;
+  background: #050607;
+}
+
+html .shell.shell-editor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(3, 5, 7, 0.80), rgba(3, 5, 7, 0.88)),
+    url('/brand/app-bg.webp') center / cover no-repeat;
+}
+
+html .shell-editor .main.main-editor,
+html .shell-editor .studio,
+html .shell-editor .studio-body { background: transparent; }
+
+html .shell-editor .topbar,
+html body .shell-editor .topbar {
+  background: rgba(9, 11, 14, 0.70);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+html .shell-editor .topbar-editor-actions .btn,
+html .shell-editor .topbar-upload-btn { min-height: 2.4rem; }
+html .shell-editor .topbar-editor-actions .btn.ghost,
+html .shell-editor .topbar-upload-btn {
+  background: rgba(20, 23, 27, 0.75);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: var(--cf-text-secondary);
+}
+html .shell-editor .topbar-editor-actions .btn.ghost:hover,
+html .shell-editor .topbar-upload-btn:hover {
+  background: rgba(29, 33, 38, 0.94);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--cf-text);
+}
+html .shell-editor .topbar-editor-actions .btn.export {
+  box-shadow: none;
+}
+
+html .shell-editor .studio-drawer,
+html .shell-editor .phrases-panel,
+html .shell-editor .studio-stage,
+html .shell-editor .studio-timeline {
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: none;
+}
+html .shell-editor .studio-drawer,
+html .shell-editor .studio-rail { background: rgba(12, 14, 17, 0.97); }
+html .shell-editor .studio-panel { background: rgba(17, 20, 24, 0.97); }
+html .shell-editor .phrases-panel { background: rgba(14, 17, 21, 0.97); }
+html .shell-editor .studio-stage { background: rgba(13, 16, 20, 0.98); }
+html .shell-editor .stage-canvas,
+html .shell-editor .video-wrap,
+html .shell-editor .video-wrap video { background: #000; }
+html .shell-editor .studio-timeline { background: rgba(13, 16, 19, 0.99); }
+
+html .shell-editor .panel-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+html .shell-editor .panel-header h3,
+html .shell-editor .templates-head h4 {
+  color: var(--cf-text);
+  letter-spacing: 0.065em;
+}
+html .shell-editor .panel-count,
+html .shell-editor .caption-row .time,
+html .shell-editor .phrase-count { color: var(--cf-text-muted); }
+
+html .shell-editor .rail-item { color: var(--cf-text-muted); }
+html .shell-editor .rail-item:hover {
+  color: var(--cf-text);
+  background: rgba(255, 255, 255, 0.055);
+}
+html .shell-editor :is(.template-card, .display-card) {
+  background: #171b20;
+  border-color: rgba(255, 255, 255, 0.10);
+}
+html .shell-editor :is(.template-card, .display-card):hover {
+  background: #1c2026;
+  border-color: rgba(255, 255, 255, 0.20);
+  transform: none;
+}
+html .shell-editor :is(.template-card, .display-card).active {
+  border-color: color-mix(in srgb, var(--cf-accent) 62%, #2a2e35);
+  box-shadow: none;
+}
+html .shell-editor .display-badge {
+  color: var(--cf-text-secondary);
+  background: rgba(9, 11, 14, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: none;
+}
+html .shell-editor .display-check { filter: none; }
+html .shell-editor .template-apply {
+  background: #22262c;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--cf-text-secondary);
+}
+html .shell-editor .template-active {
+  background: rgba(137, 233, 0, 0.12);
+  color: var(--cf-accent-hover);
+}
+html .shell-editor .display-desc { color: var(--cf-text-secondary); }
+
+html .shell-editor .caption-row {
+  background: #111418;
+  border-color: rgba(255, 255, 255, 0.09);
+}
+html .shell-editor .caption-row:hover {
+  background: #191d22;
+  border-color: rgba(255, 255, 255, 0.17);
+}
+html .shell-editor .caption-row.active,
+html .shell-editor .caption-row.selected {
+  background: #1a1f22;
+  border-color: color-mix(in srgb, var(--cf-accent) 58%, #2a2e35);
+}
+html .shell-editor .caption-row.active::before {
+  content: '';
+  position: absolute;
+  top: 0.65rem;
+  bottom: 0.65rem;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--cf-accent);
+  pointer-events: none;
+}
+html .shell-editor .caption-row:not(.active) .caption-seq { color: var(--cf-text-muted); }
+html .shell-editor .word-chip {
+  background: #1b1f24;
+  border-color: rgba(255, 255, 255, 0.11);
+  color: var(--cf-text-secondary);
+}
+html .shell-editor .word-chip:hover {
+  background: #252a30;
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--cf-text);
+}
+html .shell-editor .word-chip.role-hero,
+html .shell-editor .word-chip.role-small,
+html .shell-editor .word-chip.role-normal {
+  background: #22272d;
+  border-color: rgba(255, 255, 255, 0.17);
+  color: var(--cf-text);
+}
+html .shell-editor .word-chip.selected {
+  border-color: var(--cf-accent);
+  background: rgba(137, 233, 0, 0.12);
+  outline: 1px solid var(--cf-accent);
+  outline-offset: 1px;
+}
+
+html .shell-editor .player-btn:hover { background: #20242a; }
+html .shell-editor .player-btn.play:hover { box-shadow: none; }
+html .shell-editor .scrubber::-webkit-slider-thumb,
+html .shell-editor .scrubber::-moz-range-thumb { box-shadow: none; }
+
+html .shell-editor .timeline-track {
+  background: #101317;
+  border-color: rgba(255, 255, 255, 0.10);
+}
+html .shell-editor .timeline-block {
+  background: #1a1e23;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--cf-text-secondary);
+}
+html .shell-editor .timeline-block:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  color: var(--cf-text);
+}
+html .shell-editor .timeline-block:is(.active, .dragging, .editing) {
+  border-color: var(--cf-accent);
+  color: var(--cf-text);
+}
+html .shell-editor .playhead { box-shadow: none; }
+html .shell-editor .timeline-add:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.30);
+}
+
+html .shell-editor :is(.panel-scroll, .panel-list, .captions-tools, .studio-rail, .timeline-scroll) {
+  scrollbar-width: thin;
+  scrollbar-color: #454b53 transparent;
+}
+html .shell-editor :is(.panel-scroll, .panel-list, .captions-tools, .studio-rail, .timeline-scroll)::-webkit-scrollbar { width: 6px; height: 6px; }
+html .shell-editor :is(.panel-scroll, .panel-list, .captions-tools, .studio-rail, .timeline-scroll)::-webkit-scrollbar-thumb { background: #454b53; border-radius: 999px; }
+html .shell-editor :is(.panel-scroll, .panel-list, .captions-tools, .studio-rail, .timeline-scroll)::-webkit-scrollbar-thumb:hover { background: #606770; }
+
+html .shell-editor :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html .shell-editor :is(.rail-item, .template-card, .display-card, .caption-row, .word-chip, .timeline-block, .player-btn) {
+    transition-duration: 0.01ms;
+  }
+}
+
+/* ---------- Phosphor icons: layout for icon + label pairs ---------- */
+html .topbar-user-pop a[role="menuitem"],
+html .topbar-user-pop button { display: flex; align-items: center; gap: 0.55rem; }
+html .topbar-user-pop a[role="menuitem"] svg,
+html .topbar-user-pop button svg { flex: none; color: var(--cf-text-secondary); }
+
+html .creation-filters button { display: inline-flex; align-items: center; gap: 7px; }
+html .creation-filters button.is-active svg { color: var(--cf-accent); }
+html .creation-project-actions a,
+html .creation-project-actions button { display: inline-flex; align-items: center; gap: 5px; }
+html .creation-project-actions button:hover { color: #ffabab; }
+html .creation-project-empty > svg { display: block; margin: 0 auto 10px; color: var(--cf-text-secondary); }
+html .creation-browse { display: inline-flex; align-items: center; gap: 7px; }
+html .creation-step-number svg { display: block; }
+
+html .clip-processing-detail { display: flex; align-items: center; gap: 6px; }
+html .clip-processing-detail svg { flex-shrink: 0; color: var(--cf-accent); }
+html .clips-empty-icon { color: var(--cf-accent); }
+html .helper-modal .modal-close { display: inline-grid; place-items: center; }
+
+html .prepare-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+html .prepare-spin { animation: auth-spin 0.8s linear infinite; }
+html .rv-menu button { display: flex; align-items: center; gap: 0.55rem; }
+html .rv-menu button svg { flex-shrink: 0; color: var(--cf-text-muted); }
+html .rv-menu button.danger svg { color: currentColor; }
+html .rv-empty { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+html .rv-empty svg { color: var(--cf-accent); }
+html .admin-nav a { display: flex; align-items: center; gap: 0.6rem; }
+html .admin-nav a svg { flex-shrink: 0; }
+html .admin-nav a.active svg { color: var(--cf-accent); }
+html .modal-close { display: inline-flex; align-items: center; justify-content: center; }
+html .payment-modal-back { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+/* Keep keyboard focus inside the scrollable rail. */
+html .shell-editor .rail-item:focus { outline: none; }
+html .shell-editor .rail-item:focus-visible {
+  outline: none;
+}
+
+/* Consistent dropdown sizing across editor, modal, clip, and admin forms. */
+html .props-field .premium-select-trigger,
+html .panel-controls .premium-select-trigger,
+html .clip-field .premium-select-trigger,
+html .prepare-select-wrap .premium-select-trigger,
+html .lp-payment-select .premium-select-trigger {
+  min-height: 2.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cf-text);
+  background: var(--cf-input);
+}
+html .prepare-select-wrap .premium-select-trigger svg {
+  position: static;
+  transform: none;
+}
+html .prepare-select-wrap .premium-select-trigger.is-open svg {
+  transform: rotate(180deg);
+}
+html .lp-payment-select .premium-select-trigger {
+  min-height: 2.85rem;
+  font-size: 0.875rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+html .clip-field .premium-select-trigger { min-width: 6.5rem; }
+html .player-group .premium-select-trigger.aspect-select {
+  width: auto;
+  min-height: 30px;
+  height: 30px;
+  font-size: 0.72rem;
+}
+html .admin-select .premium-select-trigger { min-height: 2.4rem; font-size: 0.9rem; }
+
+/* A small physical response on press, including icon and menu buttons. */
+html button:not(:disabled):active,
+html a.btn:active,
+html [role='button']:active {
+  scale: 0.97;
+  filter: brightness(0.93);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html button:not(:disabled):active,
+  html a.btn:active,
+  html [role='button']:active {
+    scale: none;
+  }
+}
+
+/* Editor inspector: quiet surfaces, clear groups, and accent only at interaction points. */
+html .shell-editor .studio-rail {
+  flex-basis: 76px;
+  width: 76px;
+  padding-inline: 0.4rem;
+  border-right-color: #2b3034;
+}
+html .shell-editor .studio-drawer { min-width: 76px; }
+html .shell-editor .studio-drawer.is-closed { width: 76px; }
+html .shell-editor .rail-item {
+  position: relative;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: 7px;
+}
+html .shell-editor .rail-item span {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+html .shell-editor .rail-item.active {
+  color: #c9ced1;
+  background: #22262a;
+  border-color: #30353a;
+}
+html .shell-editor .rail-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--cf-accent);
+  transform: translateY(-50%);
+}
+html .shell-editor .rail-item.active svg { color: var(--cf-accent); }
+html .shell-editor .rail-item:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--cf-accent);
+}
+
+html .shell-editor .studio-panel { background: #14171a; }
+html .shell-editor .panel-header {
+  min-height: 53px;
+  padding: 0.75rem 1rem;
+  border-bottom-color: #2b3034;
+}
+html .shell-editor .panel-header h3 {
+  font-size: 0.88rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+html .shell-editor .props-section {
+  gap: 0.7rem;
+  padding: 1rem;
+  border-bottom-color: #292d31;
+}
+html .shell-editor .props-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 0.15rem;
+  color: #a4aaae;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+html .shell-editor .props-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #34383c;
+}
+html .shell-editor .props-heading:not(:first-child) { margin-top: 0.35rem; }
+html .shell-editor .props-field,
+html .shell-editor .panel-controls label {
+  gap: 0.4rem;
+  color: #aeb4b8;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+html .shell-editor .props-field .gold-value {
+  color: #d6dade;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+html .shell-editor .props-section .muted.tiny {
+  margin: 0;
+  color: #818990;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+html .shell-editor .font-preview {
+  padding: 0.7rem;
+  border-color: #30353a;
+  border-radius: 6px;
+  background: #1a1e21;
+  color: #e0e3e5;
+}
+html .shell-editor .props-field input[type='range'] {
+  width: 100%;
+  height: 20px;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+html .shell-editor .props-field input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #3a4044;
+}
+html .shell-editor .props-field input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #3a4044;
+}
+html .shell-editor .props-field input[type='range']::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  appearance: none;
+  border: 2px solid #14171a;
+  border-radius: 50%;
+  background: var(--cf-accent);
+  box-shadow: 0 0 0 1px var(--cf-accent);
+}
+html .shell-editor .props-field input[type='range']::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #14171a;
+  border-radius: 50%;
+  background: var(--cf-accent);
+  box-shadow: 0 0 0 1px var(--cf-accent);
+}
+html .shell-editor .props-field input[type='range']:focus-visible {
+  outline: 1px solid var(--cf-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html .shell-editor .props-field .swatch,
+html .shell-editor .props-field .word-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 1px solid #4a5054;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.13);
+}
+html .shell-editor .props-field .word-swatches { gap: 0.45rem; }
+html .shell-editor .props-field .word-swatch.active {
+  outline: 1px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+html .shell-editor .props-field .word-swatch.custom {
+  background: #252a2e;
+  color: #c2c8cb;
+  font-size: 1rem;
+  font-weight: 400;
+}
+html .shell-editor .props-field :is(.swatch, .word-swatch):focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+html .shell-editor .props-section .btn.ghost {
+  min-height: 36px;
+  padding: 0.5rem 0.7rem;
+  border-color: #3a4044;
+  border-radius: 6px;
+  color: #cbd0d3;
+  font-size: 0.78rem;
+}
+html .shell-editor .props-section .btn.ghost:hover {
+  border-color: #596065;
+  background: #252a2e;
+  transform: none;
+}
+html .shell-editor .props-save-footer {
+  padding: 1rem;
+  border-top: 1px solid #30353a;
+  border-bottom: 0;
+  background: #191d20;
+}
+html .shell-editor .props-save-footer .btn {
+  min-height: 36px;
+  border: 1px solid #434a4e;
+  border-radius: 6px;
+  background: #2a3034;
+  color: #e6e9ea;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+html .shell-editor .props-save-footer .btn:hover {
+  border-color: #596167;
+  background: #343b40;
+  color: #fff;
+  transform: none;
+}
+html .shell-editor .props-save-footer .btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+
+/* Portal menus use a variant class so the editor look follows the menu outside its panel. */
+.premium-select-trigger.is-inspector,
+html .shell-editor .props-field .premium-select-trigger.is-inspector,
+html .shell-editor .panel-controls .premium-select-trigger.is-inspector {
+  min-height: 36px;
+  padding: 0 0.7rem;
+  border: 1px solid #3a4044;
+  border-radius: 6px;
+  background: #1e2225;
+  color: #e0e3e5;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.premium-select-trigger.is-inspector:hover:not(:disabled),
+html .shell-editor .props-field .premium-select-trigger.is-inspector:hover:not(:disabled),
+html .shell-editor .panel-controls .premium-select-trigger.is-inspector:hover:not(:disabled) {
+  border-color: #596065;
+  background: #252a2e;
+}
+.premium-select-trigger.is-inspector:focus-visible,
+.premium-select-trigger.is-inspector.is-open,
+html .shell-editor .props-field .premium-select-trigger.is-inspector:focus-visible,
+html .shell-editor .props-field .premium-select-trigger.is-inspector.is-open,
+html .shell-editor .panel-controls .premium-select-trigger.is-inspector:focus-visible,
+html .shell-editor .panel-controls .premium-select-trigger.is-inspector.is-open {
+  border-color: #738e55;
+  box-shadow: 0 0 0 2px rgba(137, 233, 0, 0.1);
+}
+.premium-select-trigger.is-inspector svg {
+  width: 13px;
+  height: 13px;
+  color: #92999e;
+}
+.premium-select-trigger.is-inspector.is-open svg { color: var(--cf-accent); }
+.premium-select-menu.is-inspector {
+  padding: 0.3rem;
+  border: 1px solid #3a4044;
+  border-radius: 8px;
+  background: #1a1e21;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55);
+  backdrop-filter: none;
+}
+.premium-select-menu.is-inspector .premium-select-menu-scroll {
+  scrollbar-color: #454d51 transparent;
+}
+.premium-select-menu.is-inspector .premium-select-option {
+  min-height: 34px;
+  padding: 0.42rem 0.6rem;
+  border-radius: 5px;
+  color: #c9ced1;
+  font-size: 0.77rem;
+  font-weight: 500;
+}
+.premium-select-menu.is-inspector .premium-select-option.is-active {
+  background: #252b2f;
+  color: #f1f3f3;
+}
+.premium-select-menu.is-inspector .premium-select-option.is-selected,
+.premium-select-menu.is-inspector .premium-select-option.is-active.is-selected {
+  background: #2c3236;
+  color: #f1f3f3;
+}
+.premium-select-menu.is-inspector .premium-select-option svg { color: var(--cf-accent); }
+.premium-select-menu.is-inspector .premium-select-group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.6rem 0.25rem;
+  color: #92999e;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+}
+.premium-select-menu.is-inspector .premium-select-group::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #383e42;
+}
+
+/* The three inspector tabs share the same count, spacing, and quiet actions. */
+html .shell-editor .panel-count {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #9199a0;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+html .shell-editor .panel-controls {
+  gap: 0.8rem;
+  padding: 1rem;
+}
+html .shell-editor .captions-tools .panel-controls > .btn {
+  min-height: 36px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #444b50;
+  border-radius: 6px;
+  background: #292f33;
+  color: #e6e9eb;
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+html .shell-editor .captions-tools .panel-controls > .btn:hover:not(:disabled) {
+  border-color: #626a70;
+  background: #343b40;
+  color: #fff;
+  transform: none;
+}
+html .shell-editor .captions-tools .panel-controls > .btn:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+html .shell-editor .captions-tools .panel-controls > .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+html .shell-editor .captions-tools .panel-controls > .muted.tiny,
+html .shell-editor .captions-tools .clip-project-note {
+  margin: 0;
+  color: #899199;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+html .shell-editor .captions-tools .clip-project-note { padding: 1rem; }
+
+/* Template cards remain one clickable control, including their Apply label. */
+html .shell-editor .templates-head:empty { display: none; }
+html .shell-editor .templates-list {
+  gap: 0.65rem;
+  padding: 1rem;
+}
+html .shell-editor .display-card {
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid #30363b;
+  border-radius: 9px;
+  background: #1a1e22;
+  box-shadow: none;
+}
+html .shell-editor .display-card:hover {
+  border-color: #50585e;
+  background: #20252a;
+  box-shadow: none;
+  transform: none;
+}
+html .shell-editor .display-card.active,
+html .shell-editor .display-card.active:hover {
+  border-color: #71934b;
+  background: #20252a;
+  box-shadow: inset 0 0 0 1px rgba(137, 233, 0, 0.08);
+}
+html .shell-editor .display-card:focus-visible {
+  outline: 2px solid var(--cf-accent);
+  outline-offset: 2px;
+}
+html .shell-editor .display-stage {
+  min-height: 100px;
+  aspect-ratio: 2.5 / 1;
+  border-color: #30363b;
+  border-radius: 6px;
+}
+html .shell-editor .display-meta {
+  gap: 0.55rem;
+  padding: 0 0.1rem;
+}
+html .shell-editor .display-name-block { gap: 0.15rem; }
+html .shell-editor .display-name {
+  color: #eceeef;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+html .shell-editor .display-purpose {
+  color: #a2aab0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+html .shell-editor .display-desc {
+  padding: 0 0.1rem 0.1rem;
+  color: #a2aab0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+html .shell-editor .display-pill,
+html .shell-editor .display-badge {
+  border: 1px solid #4a5156;
+  border-radius: 4px;
+  background: #252b30;
+  color: #c3c9cd;
+  font-size: 0.57rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+html .shell-editor .display-pill { padding: 0.18rem 0.35rem; }
+html .shell-editor .display-badge {
+  padding: 0.2rem 0.4rem;
+  backdrop-filter: none;
+}
+html .shell-editor .template-apply,
+html .shell-editor .template-active {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid #4a5156;
+  border-radius: 5px;
+  background: #292f33;
+  color: #d4d9dc;
+  font-size: 0.67rem;
+  font-weight: 600;
+  line-height: 1;
+}
+html .shell-editor .display-card:hover .template-apply {
+  border-color: #687178;
+  background: #343b40;
+  color: #fff;
+}
+html .shell-editor .template-active {
+  border-color: #577b32;
+  color: var(--cf-accent);
+}
+html .shell-editor .display-check { color: var(--cf-accent); }
+
+@media (max-width: 1100px) {
+  html .shell-editor .studio-rail {
+    flex-basis: auto;
+    width: auto;
+  }
+  html .shell-editor .studio-drawer,
+  html .shell-editor .studio-drawer.is-closed {
+    width: 100%;
+  }
+  html .shell-editor .rail-item { flex: 0 0 68px; }
+  html .shell-editor .rail-item.active::before {
+    left: 50%;
+    top: auto;
+    bottom: -1px;
+    width: 24px;
+    height: 3px;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 640px) {
+  html .shell-editor .panel-header { padding-inline: 0.85rem; }
+  html .shell-editor .panel-controls,
+  html .shell-editor .props-section,
+  html .shell-editor .templates-list { padding-inline: 0.85rem; }
 }

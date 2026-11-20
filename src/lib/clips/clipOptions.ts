@@ -9,7 +9,12 @@ export const LENGTH_PRESETS = [
 
 export type LengthPresetId = (typeof LENGTH_PRESETS)[number]['id'];
 
-export function clipOptionsFrom(preset: LengthPresetId, maxClips: number): ClipOptions {
+/** Longest "What kind of clips do you want?" text (the server enforces the same cap). */
+export const CLIP_INSTRUCTIONS_MAX = 1000;
+
+/** `instructions` is sent only when it has text, so a blank field finds clips exactly as before. */
+export function clipOptionsFrom(preset: LengthPresetId, maxClips: number, instructions?: string): ClipOptions {
   const p = LENGTH_PRESETS.find((x) => x.id === preset) ?? LENGTH_PRESETS[1];
-  return { minSec: p.minSec, maxSec: p.maxSec, maxClips };
+  const text = instructions?.trim().slice(0, CLIP_INSTRUCTIONS_MAX);
+  return { minSec: p.minSec, maxSec: p.maxSec, maxClips, ...(text ? { instructions: text } : {}) };
 }

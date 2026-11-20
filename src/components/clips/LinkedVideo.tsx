@@ -5,7 +5,7 @@
  * With `range` it plays one clip's span; `cropX` fills a vertical frame the
  * way the clip is framed (CSS only — the real crop happens at render).
  */
-import { ExternalLink } from 'lucide-react';
+import { ArrowSquareOut } from '@phosphor-icons/react';
 import { isDirectMedia, youTubeId } from '../../lib/clips/linkSource';
 
 /** Width of a 16:9 picture that fills a 9:16 frame's height, in % of the frame's width. */
@@ -72,7 +72,7 @@ export function LinkedVideo({ sourceUrl, range, cropX, title = 'Source video', c
   return (
     <div className={`linked-video is-link${className ? ` ${className}` : ''}`}>
       <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="btn ghost">
-        <ExternalLink size={16} aria-hidden="true" />
+        <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
         Watch the original
       </a>
     </div>

@@ -6,6 +6,26 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import {
+  ArrowsLeftRight,
+  CaretDoubleLeft,
+  CaretDoubleRight,
+  CaretLeft,
+  CircleHalfTilt,
+  ClosedCaptioning,
+  CornersOut,
+  FilmStrip,
+  MusicNotes,
+  Pause,
+  Play,
+  SignOut,
+  SlidersHorizontal,
+  Sparkle,
+  SpeakerHigh,
+  SpeakerSlash,
+  SquaresFour,
+  TextT,
+} from '@phosphor-icons/react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
@@ -39,6 +59,7 @@ import {
 } from '../lib/captionPosition';
 import { pickerTemplates } from '../lib/templateCatalog';
 import { TemplateCard } from '../components/TemplateCard';
+import { PremiumSelect } from '../components/PremiumSelect';
 import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
 import { TimelineBlocks } from '../components/TimelineBlocks';
 import { applyBlockMoves, findFreeSlot, inTimelineOrder, newCaption } from '../lib/timelineEdit';
@@ -51,6 +72,9 @@ import { clipMedia } from '../lib/clips/clipMedia';
 import { deferredIn } from '../lib/clips/clipMath';
 import type { MediaProbe } from '../lib/media/probe';
 import { coverObjectPosition, cropXAt } from '../lib/clips/cropTrack';
+import { readFraming } from '../lib/clips/framing';
+import { drawLayout } from '../lib/clips/layout';
+import type { ExportFraming } from '../lib/export/protocol';
 import { locateOriginal } from '../lib/media/locateSource';
 import { buildExportStyle, stackedDisplayMode, type EditorStyle } from '../lib/export/styleSnapshot';
 import { uploadVideoToProject } from '../lib/export/serverUpload';
@@ -263,72 +287,24 @@ const RAIL_ITEMS: Array<{ id: PanelId; label: string }> = [
 ];
 
 function RailIcon({ id }: { id: PanelId }) {
-  const common = {
-    width: 20,
-    height: 20,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.7,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  };
+  const common = { size: 20, 'aria-hidden': true } as const;
   switch (id) {
     case 'media':
-      return (
-        <svg {...common}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="m10 9 5 3-5 3V9Z" />
-        </svg>
-      );
+      return <FilmStrip {...common} />;
     case 'text':
-      return (
-        <svg {...common}>
-          <path d="M5 6h14M12 6v13" />
-        </svg>
-      );
+      return <TextT {...common} />;
     case 'captions':
-      return (
-        <svg {...common}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M7 13h4M7 16h7M13 13h4" />
-        </svg>
-      );
+      return <ClosedCaptioning {...common} />;
     case 'templates':
-      return (
-        <svg {...common}>
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M3 9h18M9 9v11" />
-        </svg>
-      );
+      return <SquaresFour {...common} />;
     case 'audio':
-      return (
-        <svg {...common}>
-          <path d="M9 18V6l10-2v12" />
-          <circle cx="6.5" cy="18" r="2.5" />
-          <circle cx="16.5" cy="16" r="2.5" />
-        </svg>
-      );
+      return <MusicNotes {...common} />;
     case 'transitions':
-      return (
-        <svg {...common}>
-          <path d="M4 7h9M4 12h6M4 17h9M17 7l3 5-3 5" />
-        </svg>
-      );
+      return <ArrowsLeftRight {...common} />;
     case 'filters':
-      return (
-        <svg {...common}>
-          <circle cx="9" cy="10" r="5" />
-          <circle cx="15" cy="14" r="5" />
-        </svg>
-      );
+      return <CircleHalfTilt {...common} />;
     case 'settings':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z" />
-        </svg>
-      );
+      return <SlidersHorizontal {...common} />;
   }
 }
 
@@ -568,8 +544,10 @@ export function EditorPage() {
     sourceId: string;
     sourceName: string;
     clipId: string;
-    framing: ReturnType<typeof clipFraming>;
+    /** The crop (cover / contain), or the clip's framing layout drawn on a canvas over the video. */
+    framing: ExportFraming;
   } | null>(null);
+  const layoutCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isClipProjectRef = useRef(false);
   /** A New Clips video (kind 'clips'): its video stays on this device — it is never uploaded for a server render. */
   const isClipsVideoRef = useRef(false);
@@ -620,7 +598,8 @@ export function EditorPage() {
       if (!stop.signal.aborted) setClipPart({ status: 'error', error: errorMessage(err, 'This clip’s part of the video couldn’t be fetched — try again.') });
     }
   }, []);
-  const clipCover = clipProject?.framing.mode === 'cover';
+  // A crop or a layout fills the frame: captions cover the whole frame, as in the export.
+  const clipCover = clipProject?.framing.mode === 'cover' || clipProject?.framing.mode === 'layout';
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateError, setLocateError] = useState('');
   /** Bumped once the original is located, so AuthenticatedVideo re-reads the local copy. */
@@ -994,7 +973,12 @@ export function EditorPage() {
           sourceId,
           sourceName: src.projectName || 'the video',
           clipId: String(src.clipId),
-          framing: clipFraming({ mode: src.crop?.mode ?? 'none', x: src.crop?.x ?? 0.5, track: src.crop?.track ?? [] }),
+          framing: (() => {
+            const layout = readFraming(src.framing);
+            return layout
+              ? { mode: 'layout' as const, framing: layout }
+              : clipFraming({ mode: src.crop?.mode ?? 'none', x: src.crop?.x ?? 0.5, track: src.crop?.track ?? [] });
+          })(),
         });
         if (src.imported) {
           // The original came from a link: play just this clip's part of it.
@@ -1324,7 +1308,30 @@ export function EditorPage() {
       }
       const aspect = parseAspect(styleRef.current.aspectRatio);
       const f = clipProject.framing;
-      if (f.mode === 'cover' && aspect && v.videoWidth > 0) {
+      if (f.mode === 'layout') {
+        // The clip's framing layout, drawn by the same function as the clip page and the export.
+        const canvas = layoutCanvasRef.current;
+        if (v.style.opacity !== '0') v.style.opacity = '0';
+        if (canvas && v.videoWidth > 0 && v.readyState >= 2) {
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const cw = Math.max(2, Math.round(canvas.clientWidth * dpr));
+          const ch = Math.max(2, Math.round(canvas.clientHeight * dpr));
+          const key = `${v.currentTime}|${cw}x${ch}`;
+          if (key !== lastPos) {
+            lastPos = key;
+            if (canvas.width !== cw || canvas.height !== ch) {
+              canvas.width = cw;
+              canvas.height = ch;
+            }
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              drawLayout(ctx, cw, ch, f.framing, v.videoWidth, v.videoHeight, (c, sx, sy, sw, sh, dx, dy, dw, dh) =>
+                (c as CanvasRenderingContext2D).drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh),
+              );
+            }
+          }
+        }
+      } else if (f.mode === 'cover' && aspect && v.videoWidth > 0) {
         const pos = coverObjectPosition(v.videoWidth, v.videoHeight, aspect[0], aspect[1], cropXAt(f.track, v.currentTime - win.start));
         if (v.style.objectFit !== 'cover') v.style.objectFit = 'cover';
         if (pos !== lastPos) {
@@ -1405,7 +1412,12 @@ export function EditorPage() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const activeCaption = activeIndex >= 0 ? captions[activeIndex] : undefined;
+  const selectedCaptionIndex = selectedId
+    ? captions.findIndex((caption) => caption._id === selectedId)
+    : -1;
+  const highlightedCaptionIndex = playing || selectedCaptionIndex < 0
+    ? activeIndex
+    : selectedCaptionIndex;
 
   const virtualizer = useVirtualizer({
     count: captions.length,
@@ -2453,19 +2465,7 @@ export function EditorPage() {
             title={drawerOpen ? 'Hide panel' : 'Show panel'}
             onClick={() => setDrawerOpen((v) => !v)}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ transform: drawerOpen ? 'none' : 'scaleX(-1)' }}
-            >
-              <path d="m14 7-5 5 5 5" />
-            </svg>
+            <CaretLeft size={20} weight="bold" aria-hidden="true" mirrored={!drawerOpen} />
             <span>{drawerOpen ? 'Hide' : 'Show'}</span>
           </button>
 
@@ -2502,18 +2502,7 @@ export function EditorPage() {
                     navigate('/login');
                   }}
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                  </svg>
+                  <SignOut size={18} aria-hidden="true" />
                   Log out
                 </button>
               </div>
@@ -2540,13 +2529,8 @@ export function EditorPage() {
               <div className="panel-controls">
                 <label>
                   Language
-                  <select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
-                    {CAPTION_LANGUAGE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.short}
-                      </option>
-                    ))}
-                  </select>
+                  <PremiumSelect ariaLabel="Caption language" variant="inspector" value={outputLanguage} onChange={setOutputLanguage}
+                    options={CAPTION_LANGUAGE_OPTIONS.map((o) => ({ value: o.value, label: o.short }))} />
                 </label>
                 <button type="button" className="btn primary full" disabled={!!busy} onClick={() => void rebuild()}>
                   {busy === 'rebuild'
@@ -2574,20 +2558,11 @@ export function EditorPage() {
                   <h4 className="props-heading">Text</h4>
                   <label className="props-field">
                     Font
-                    <select
-                      value={style.fontFamily}
-                      onChange={(e) => setStyle({ ...style, fontFamily: e.target.value })}
-                    >
-                      {FONT_GROUPS.map((group) => (
-                        <optgroup key={group.label} label={group.label}>
-                          {group.fonts.map((f) => (
-                            <option key={f} value={f} style={{ fontFamily: f }}>
-                              {f}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                    <PremiumSelect ariaLabel="Font" variant="inspector" value={style.fontFamily}
+                      onChange={(fontFamily) => setStyle({ ...style, fontFamily })}
+                      options={FONT_GROUPS.flatMap((group) => group.fonts.map((font) => ({
+                        value: font, label: font, group: group.label, fontFamily: font,
+                      })))} />
                   </label>
                   <div className="font-preview" style={{ fontFamily: style.fontFamily }}>
                     Zindagi tab badalti hai
@@ -2604,6 +2579,7 @@ export function EditorPage() {
                       onChange={(e) => setStyle({ ...style, fontSize: Number(e.target.value) })}
                     />
                   </label>
+                  <h4 className="props-heading">Appearance</h4>
                   <label className="props-field">
                     Color
                     <button
@@ -2655,13 +2631,13 @@ export function EditorPage() {
                   <h4 className="props-heading">Layout</h4>
                   <label className="props-field">
                     Position
-                    <select
+                    <PremiumSelect ariaLabel="Caption position" variant="inspector"
                       value={
                         matchPositionPreset(resolveCaptionAnchor(style)) ?? 'custom'
                       }
-                      onChange={(e) => {
-                        if (e.target.value === 'custom') return;
-                        const position = e.target.value as CaptionPosition;
+                      onChange={(selected) => {
+                        if (selected === 'custom') return;
+                        const position = selected as CaptionPosition;
                         // Always write concrete X/Y % (CapCut-style). Export
                         // maps these to pixels — never a separate "preset only"
                         // code path that can drift from the preview.
@@ -2670,31 +2646,29 @@ export function EditorPage() {
                           ...POSITION_PRESETS[position],
                         });
                       }}
-                    >
-                      <option value="top">Top</option>
-                      <option value="center">Middle center</option>
-                      <option value="bottom">Bottom</option>
-                      {matchPositionPreset(resolveCaptionAnchor(style)) == null && (
-                        <option value="custom">Custom (dragged)</option>
-                      )}
-                    </select>
+                      options={[
+                        { value: 'top', label: 'Top' },
+                        { value: 'center', label: 'Middle center' },
+                        { value: 'bottom', label: 'Bottom' },
+                        ...(matchPositionPreset(resolveCaptionAnchor(style)) == null
+                          ? [{ value: 'custom', label: 'Custom (dragged)' }] : []),
+                      ]} />
                   </label>
                   <p className="muted tiny">
                     Tip: drag the caption directly on the video to place it anywhere.
                   </p>
                   <label className="props-field">
                     Animation
-                    <select
-                      value={style.animation}
-                      onChange={(e) => applyDisplay({ animation: e.target.value })}
-                    >
-                      <option value="none">None</option>
-                      <option value="fade">Fade</option>
-                      <option value="pop">Pop</option>
-                      <option value="slideUp">Slide up</option>
-                      <option value="typewriter">Typewriter</option>
-                      <option value="bounce">Bounce</option>
-                    </select>
+                    <PremiumSelect ariaLabel="Caption animation" variant="inspector" value={style.animation}
+                      onChange={(animation) => applyDisplay({ animation })}
+                      options={[
+                        { value: 'none', label: 'None' },
+                        { value: 'fade', label: 'Fade' },
+                        { value: 'pop', label: 'Pop' },
+                        { value: 'slideUp', label: 'Slide up' },
+                        { value: 'typewriter', label: 'Typewriter' },
+                        { value: 'bounce', label: 'Bounce' },
+                      ]} />
                   </label>
                 </div>
                 {isKineticTemplate(style.template) && (
@@ -2802,7 +2776,7 @@ export function EditorPage() {
                     )}
                   </div>
                 )}
-                <div className="props-section">
+                <div className="props-section props-save-footer">
                   <button type="button" className="btn primary full" onClick={() => void saveStyle()}>
                     Save Style
                   </button>
@@ -2853,10 +2827,7 @@ export function EditorPage() {
               <div className="panel-controls">
                 <div className="media-card">
                   <div className="media-thumb">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <rect x="3" y="5" width="18" height="14" rx="2" />
-                      <path d="m10 9 5 3-5 3V9Z" />
-                    </svg>
+                    <FilmStrip size={26} aria-hidden="true" />
                   </div>
                   <div>
                     <strong className="media-name">{projectName}</strong>
@@ -2874,9 +2845,7 @@ export function EditorPage() {
                 <h3>{RAIL_ITEMS.find((r) => r.id === panel)?.label}</h3>
               </div>
               <div className="panel-empty">
-                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-                  <path d="m12 3 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 8.7l5.4-.8L12 3Z" />
-                </svg>
+                <Sparkle size={34} aria-hidden="true" />
                 <p>Coming soon</p>
                 <span className="muted tiny">This tool is on the roadmap.</span>
               </div>
@@ -2954,6 +2923,9 @@ export function EditorPage() {
                 }
               }}
             />
+            {clipProject?.framing.mode === 'layout' && (
+              <canvas ref={layoutCanvasRef} className="clip-layout-canvas" aria-hidden="true" />
+            )}
             {mediaProjectId && (
               <AuthenticatedVideo
                 key={`${videoSourceKey}:${mediaProjectId}:${clipPart?.status === 'ready' ? clipPart.offset : 'whole'}`}
@@ -3088,30 +3060,21 @@ export function EditorPage() {
               </span>
               <div className="player-group transport">
                 <button type="button" className="player-btn" title="Back 5s (←)" onClick={() => skip(-5)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 17 6 12l5-5M18 17l-5-5 5-5" />
-                  </svg>
+                  <CaretDoubleLeft size={18} weight="bold" aria-hidden="true" />
                 </button>
                 <button type="button" className="player-btn play" title="Play / Pause (Space)" onClick={togglePlay}>
                   {playing ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="5" width="4" height="14" rx="1" />
-                      <rect x="14" y="5" width="4" height="14" rx="1" />
-                    </svg>
+                    <Pause size={18} weight="fill" aria-hidden="true" />
                   ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5.5v13l11-6.5-11-6.5Z" />
-                    </svg>
+                    <Play size={18} weight="fill" aria-hidden="true" />
                   )}
                 </button>
                 <button type="button" className="player-btn" title="Forward 5s (→)" onClick={() => skip(5)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m13 17 5-5-5-5M6 17l5-5-5-5" />
-                  </svg>
+                  <CaretDoubleRight size={18} weight="bold" aria-hidden="true" />
                 </button>
               </div>
               <div className="player-group">
-                <select
+                <PremiumSelect ariaLabel="Preview aspect ratio"
                   className="aspect-select"
                   title="Aspect ratio of the preview and exported video"
                   value={
@@ -3119,11 +3082,10 @@ export function EditorPage() {
                       ? style.aspectRatio
                       : DEFAULT_ASPECT
                   }
-                  onChange={(e) => {
-                    const aspectRatio = e.target.value;
+                  onChange={(aspectRatio) => {
                     if (clipProject) {
                       // A clip re-crops the original to the new frame; captions keep their proportion.
-                      const cover = clipProject.framing.mode === 'cover';
+                      const cover = clipProject.framing.mode !== 'contain';
                       const k = clipFontFactor(aspectRatio, cover) / clipFontFactor(styleRef.current.aspectRatio, cover);
                       const fontSize = Math.max(12, Math.round(styleRef.current.fontSize * k * 100) / 100);
                       setStyle((s) => ({ ...s, aspectRatio, fontSize }));
@@ -3133,25 +3095,15 @@ export function EditorPage() {
                     setStyle((s) => ({ ...s, aspectRatio }));
                     void api.patch(`/projects/${id}/style`, { aspectRatio });
                   }}
-                >
-                  {ASPECT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  options={ASPECT_OPTIONS} />
                 <button type="button" className="player-btn speed" title="Playback speed" onClick={cycleRate}>
                   {rate}x
                 </button>
                 <button type="button" className="player-btn" title="Mute" onClick={toggleMute}>
                   {muted || volume === 0 ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 5 6 9H3v6h3l5 4V5ZM22 9l-6 6M16 9l6 6" />
-                    </svg>
+                    <SpeakerSlash size={18} aria-hidden="true" />
                   ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M18.4 6a9 9 0 0 1 0 12" />
-                    </svg>
+                    <SpeakerHigh size={18} aria-hidden="true" />
                   )}
                 </button>
                 <input
@@ -3164,9 +3116,7 @@ export function EditorPage() {
                   onChange={(e) => changeVolume(Number(e.target.value))}
                 />
                 <button type="button" className="player-btn" title="Fullscreen" onClick={toggleFullscreen}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-                  </svg>
+                  <CornersOut size={18} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -3192,7 +3142,7 @@ export function EditorPage() {
                     key={c._id || row.index}
                     ref={virtualizer.measureElement}
                     data-index={row.index}
-                    className={`caption-row ${activeCaption?._id === c._id ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
+                    className={`caption-row ${row.index === highlightedCaptionIndex ? (isSelected && !playing ? 'selected' : 'active') : ''}`}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -3533,39 +3483,38 @@ export function EditorPage() {
             <div className="modal-body">
               <label className="props-field">
                 Resolution
-                <select
+                <PremiumSelect ariaLabel="Export resolution"
                   value={exportQuality}
-                  onChange={(e) => setExportQuality(e.target.value as typeof exportQuality)}
+                  onChange={(quality) => setExportQuality(quality as typeof exportQuality)}
                   disabled={exportStatus === 'rendering'}
-                >
-                  <option value="720p">720p - HD</option>
-                  <option value="1080p">1080p - Full HD</option>
-                  <option value="2K">2K - 1440p</option>
-                  {/* Admin toggles this via System > Flags > 4K export enabled */}
-                  {flags.export4kEnabled && <option value="4K">4K - 2160p</option>}
-                </select>
+                  options={[
+                    { value: '720p', label: '720p - HD' },
+                    { value: '1080p', label: '1080p - Full HD' },
+                    { value: '2K', label: '2K - 1440p' },
+                    ...(flags.export4kEnabled ? [{ value: '4K', label: '4K - 2160p' }] : []),
+                  ]} />
               </label>
               <label className="props-field">
                 Format
-                <select
+                <PremiumSelect ariaLabel="Export format"
                   value={exportFormat}
-                  onChange={(e) => setExportFormat(e.target.value as typeof exportFormat)}
+                  onChange={(format) => setExportFormat(format as typeof exportFormat)}
                   disabled={exportStatus === 'rendering'}
-                >
-                  <option value="mp4">MP4 (H.264) - recommended</option>
-                  <option value="webm">WebM (VP9)</option>
-                </select>
+                  options={[
+                    { value: 'mp4', label: 'MP4 (H.264) - recommended' },
+                    { value: 'webm', label: 'WebM (VP9)' },
+                  ]} />
               </label>
               <label className="props-field">
                 Frame rate
-                <select
+                <PremiumSelect ariaLabel="Export frame rate"
                   value={exportFrameRate}
-                  onChange={(e) => setExportFrameRate(e.target.value as typeof exportFrameRate)}
+                  onChange={(frameRate) => setExportFrameRate(frameRate as typeof exportFrameRate)}
                   disabled={exportStatus === 'rendering'}
-                >
-                  <option value="fast">30 FPS - Faster Export</option>
-                  <option value="original">60 FPS - Slower Export</option>
-                </select>
+                  options={[
+                    { value: 'fast', label: '30 FPS - Faster Export' },
+                    { value: 'original', label: '60 FPS - Slower Export' },
+                  ]} />
               </label>
               <p className="muted tiny">
                 Captions are burned into the video with your current template and word styles.

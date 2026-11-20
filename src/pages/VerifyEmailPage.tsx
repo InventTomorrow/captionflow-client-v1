@@ -8,6 +8,14 @@ import {
   type VerifiedEmailState,
 } from '../lib/emailVerification';
 import { AuthBrand } from '../components/AuthParts';
+import {
+  ArrowClockwise,
+  CheckCircle,
+  EnvelopeSimple,
+  PaperPlaneTilt,
+  WarningCircle,
+  XCircle,
+} from '@phosphor-icons/react';
 
 /** Long enough that "Confirming…" is read rather than flashed past. */
 const MIN_CHECK_MS = 700;
@@ -15,17 +23,6 @@ const MIN_CHECK_MS = 700;
 const VERIFIED_HOLD_MS = 1600;
 
 type Phase = 'checking' | 'verified' | 'invalid' | 'error';
-
-const ICON_PROPS = {
-  xmlns: 'http://www.w3.org/2000/svg',
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2.25,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true,
-} as const;
 
 function SpinnerIcon() {
   return (
@@ -37,39 +34,11 @@ function SpinnerIcon() {
 }
 
 function CheckIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
+  return <CheckCircle size={26} aria-hidden="true" />;
 }
 
 function CrossIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v4.5" />
-      <path d="M12 16h.01" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg {...ICON_PROPS} strokeWidth={2}>
-      <path d="m22 7-8.991 5.667a2 2 0 0 1-2.009 0L2 7" />
-      <rect x="2" y="4" width="20" height="16" rx="3" />
-    </svg>
-  );
+  return <XCircle size={26} aria-hidden="true" />;
 }
 
 /**
@@ -101,7 +70,7 @@ function NewLinkForm() {
         <div className="auth-field">
           <label htmlFor="verify-resend-email">Email you signed up with</label>
           <div className="auth-input-wrap">
-            <MailIcon />
+            <EnvelopeSimple size={18} aria-hidden="true" />
             <input
               id="verify-resend-email"
               type="email"
@@ -124,7 +93,10 @@ function NewLinkForm() {
               Sending…
             </>
           ) : (
-            'Send a new link'
+            <>
+              <PaperPlaneTilt size={17} aria-hidden="true" />
+              Send a new link
+            </>
           )}
         </button>
       </form>
@@ -228,7 +200,7 @@ export function VerifyEmailPage() {
             }
           : {
               tone: ' is-bad',
-              icon: <AlertIcon />,
+              icon: <WarningCircle size={26} aria-hidden="true" />,
               title: "We couldn't confirm your email",
               body: message,
             };
@@ -256,6 +228,7 @@ export function VerifyEmailPage() {
               className="btn primary auth-submit auth-status-action"
               onClick={retry}
             >
+              <ArrowClockwise size={17} aria-hidden="true" />
               Try again
             </button>
           ) : null}

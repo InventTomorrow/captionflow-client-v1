@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { X } from '@phosphor-icons/react';
 import { ManualPaymentPanel } from './ManualPaymentPanel';
 import type { ApiPlan } from './PricingCards';
 
@@ -29,7 +30,7 @@ export function ManualPaymentModal({
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card payment-modal-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="modal-close payment-modal-close" onClick={onClose} aria-label="Close">
-          ✕
+          <X size={16} weight="bold" aria-hidden="true" />
         </button>
         <ManualPaymentPanel plans={plans} selectedSlug={slug} onSelectSlug={setSlug} />
       </div>

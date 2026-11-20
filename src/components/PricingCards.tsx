@@ -1,3 +1,6 @@
+import { ArrowClockwise, ArrowRight, Check, Crown, Leaf, Lightning, Star } from '@phosphor-icons/react';
+import { useFlagsStore } from '../stores/flagsStore';
+
 export interface ApiPlan {
   _id: string;
   slug: string;
@@ -11,6 +14,23 @@ export interface ApiPlan {
   durationDays?: number;
   discountPercent?: number;
   discountActive?: boolean;
+  /** Enforced allowances (public /billing/plans returns them). */
+  limits?: { minutesPerMonth?: number; clipRunsPerMonth?: number };
+}
+
+/**
+ * The plan's feature lines plus its Viral Clips allowance, taken from the
+ * enforced limit (Admin → Plans "Clip runs / month") so the card can never
+ * promise a different number than the app allows. Left out when Clips are
+ * switched off, when the plan has no clip runs, or when the admin already
+ * wrote a clips line into the features themselves.
+ */
+export function planFeatures(plan: ApiPlan, clipsEnabled: boolean): string[] {
+  const runs = plan.limits?.clipRunsPerMonth ?? 0;
+  if (!clipsEnabled || runs <= 0 || plan.features.some((f) => /clip/i.test(f))) return plan.features;
+  const line = `Viral Clips from ${runs} video${runs === 1 ? '' : 's'}${plan.isOneTime ? '' : '/month'}`;
+  const [first, ...rest] = plan.features;
+  return first === undefined ? [line] : [first, line, ...rest];
 }
 
 /** Admin-set per-plan discount — returns the discounted price, or null when no discount applies. */
@@ -19,39 +39,11 @@ export function discountedPrice(base: number, plan: ApiPlan): number | null {
   return Math.round(base * (1 - plan.discountPercent / 100));
 }
 
-/** Small per-tier glyph for the pricing cards — play (try it), bolt (speed/creation), star (top tier). */
+/** Small per-tier glyph for the pricing cards — leaf (try it), bolt (speed/creation), crown (top tier). */
 function PlanIcon({ slug }: { slug: string }) {
-  const common = {
-    width: 18,
-    height: 18,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  };
-  if (slug === 'studio') {
-    return (
-      <svg {...common}>
-        <path d="M12 3.5l2.6 5.3 5.9.8-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" />
-      </svg>
-    );
-  }
-  if (slug === 'creator') {
-    return (
-      <svg {...common}>
-        <path d="M13 2 5 13h5.5L10 22l8-11h-5.5z" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <circle cx="12" cy="12" r="8.3" />
-      <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  if (slug === 'studio') return <Crown size={18} aria-hidden="true" />;
+  if (slug === 'creator') return <Lightning size={18} aria-hidden="true" />;
+  return <Leaf size={18} aria-hidden="true" />;
 }
 
 /**
@@ -74,6 +66,7 @@ export function PricingCards({
   onSelectPlan: (plan: ApiPlan) => void;
   ctaLabel?: string;
 }) {
+  const clipsEnabled = useFlagsStore((s) => s.flags.clipsEnabled);
   // The "Most Popular" badge lands on the creator plan when present, else the
   // middle-priced plan, so a newly added plan never breaks the layout.
   const featuredSlug =
@@ -87,6 +80,7 @@ export function PricingCards({
         <p className="muted">We couldn&apos;t load pricing just now.</p>
         {onRetry && (
           <button type="button" className="lp-btn lp-btn-ghost" onClick={onRetry}>
+            <ArrowClockwise size={16} weight="bold" aria-hidden="true" />
             Try again
           </button>
         )}
@@ -116,12 +110,7 @@ export function PricingCards({
             {featured && <div className="lp-price-glow" aria-hidden="true" />}
             {featured && (
               <span className="lp-price-badge">
-                <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
-                  <path
-                    d="M8 1.2l1.85 3.9 4.15.55-3.05 2.95.75 4.3L8 10.9l-3.7 2 .75-4.3-3.05-2.95 4.15-.55z"
-                    fill="currentColor"
-                  />
-                </svg>
+                <Star size={11} weight="fill" aria-hidden="true" />
                 Popular
               </span>
             )}
@@ -143,19 +132,10 @@ export function PricingCards({
               {!monthlyFree && yearly && <span className="lp-price-period">billed yearly</span>}
             </div>
             <ul className="lp-price-features">
-              {p.features.map((f) => (
+              {planFeatures(p, clipsEnabled).map((f) => (
                 <li key={f}>
                   <span className="lp-price-check" aria-hidden="true">
-                    <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
-                      <path
-                        d="M3 8.5l3 3 7-7"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <Check size={10} weight="bold" aria-hidden="true" />
                   </span>
                   <span>{f}</span>
                 </li>
@@ -167,16 +147,7 @@ export function PricingCards({
               onClick={() => onSelectPlan(p)}
             >
               {ctaLabel}
-              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-                <path
-                  d="M3 8h9M8 3l5 5-5 5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ArrowRight size={13} weight="bold" aria-hidden="true" />
             </button>
           </article>
         );

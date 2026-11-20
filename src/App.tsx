@@ -9,7 +9,8 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyResetLinkPage } from './pages/VerifyResetLinkPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
-import { UploadPage } from './pages/UploadPage';
+import { CreatePage } from './pages/CreatePage';
+import { DashboardPage } from './pages/DashboardPage';
 import { LegalPage } from './pages/legal/LegalPage';
 import { AppShell } from './components/AppShell';
 import { PageLoader } from './components/PageLoader';
@@ -31,7 +32,6 @@ const EditorPage = lazy(() =>
 const ClipsGalleryPage = lazy(() =>
   import('./pages/clips/ClipsGalleryPage').then((m) => ({ default: m.ClipsGalleryPage })),
 );
-const NewClipsPage = lazy(() => import('./pages/clips/NewClipsPage').then((m) => ({ default: m.NewClipsPage })));
 const ClipSetPage = lazy(() => import('./pages/clips/ClipSetPage').then((m) => ({ default: m.ClipSetPage })));
 const ClipEditorPage = lazy(() => import('./pages/clips/ClipEditorPage').then((m) => ({ default: m.ClipEditorPage })));
 
@@ -206,8 +206,8 @@ export default function App() {
           </Private>
         }
       >
-        <Route index element={<Navigate to="/projects/upload" replace />} />
-        <Route path="upload" element={<UploadPage />} />
+        <Route index element={<DashboardPage />} />
+        <Route path="upload" element={<Navigate to="/create?workflow=captions" replace />} />
         <Route path=":id/settings" element={<EditorRedirect />} />
         <Route path=":id/progress" element={<EditorRedirect />} />
         <Route
@@ -219,6 +219,9 @@ export default function App() {
           }
         />
       </Route>
+      <Route path="/create" element={<Private><AppShell /></Private>}>
+        <Route index element={<CreatePage />} />
+      </Route>
       <Route
         path="/clips"
         element={
@@ -227,8 +230,8 @@ export default function App() {
           </Private>
         }
       >
-        <Route index element={<ClipsGate><NewClipsPage /></ClipsGate>} />
-        <Route path="new" element={<ClipsGate><NewClipsPage /></ClipsGate>} />
+        <Route index element={<ClipsGate><Navigate to="/create?workflow=clips" replace /></ClipsGate>} />
+        <Route path="new" element={<ClipsGate><Navigate to="/create?workflow=clips" replace /></ClipsGate>} />
         <Route path="library" element={<ClipsGate><ClipsGalleryPage /></ClipsGate>} />
         <Route path=":projectId" element={<ClipsGate><ClipSetPage /></ClipsGate>} />
         <Route path=":projectId/:clipId" element={<ClipsGate><ClipEditorPage /></ClipsGate>} />

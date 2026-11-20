@@ -6,80 +6,32 @@ import { useFlagsStore } from '../stores/flagsStore';
 import { api } from '../lib/api';
 import { PricingModal } from './PricingModal';
 import { subscribeClipsEvents } from '../stores/clipsStore';
+import {
+  CaretDown,
+  ClosedCaptioning,
+  Crown,
+  CrownCross,
+  DownloadSimple,
+  FolderOpen,
+  FolderSimple,
+  Info,
+  ShieldCheck,
+  SignOut,
+  UploadSimple,
+} from '@phosphor-icons/react';
 
 function CrownIcon({ crossedOut }: { crossedOut?: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 18h16l1.4-9.6-5.4 3.8L12 5l-4 7.2-5.4-3.8L4 18z"
-        fill="currentColor"
-      />
-      <rect x="4" y="19" width="16" height="2" rx="1" fill="currentColor" />
-      {crossedOut && (
-        <line x1="2.5" y1="3" x2="21.5" y2="21" stroke="#EF4444" strokeWidth="2.4" strokeLinecap="round" />
-      )}
-    </svg>
-  );
+  const Icon = crossedOut ? CrownCross : Crown;
+  return <Icon size={16} weight="fill" aria-hidden="true" />;
 }
 
-function InfoIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" />
-      <line x1="12" y1="11" x2="12" y2="16.5" />
-      <circle cx="12" cy="7.5" r="0.25" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function NavClipsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="6" cy="6" r="3" />
-      <path d="M8.12 8.12 12 12" />
-      <path d="M20 4 8.12 15.88" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M14.8 14.8 20 20" />
-    </svg>
-  );
-}
-
-function NavCaptionIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="2.5" />
-      <path d="M7 10h4M7 14h6M15 10h2M15 14h2" />
-    </svg>
-  );
-}
-
-function NavUserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4.5" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
-  );
-}
-
-function NavFolderIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
+function NavFolderIcon({ active }: { active?: boolean }) {
+  const Icon = active ? FolderOpen : FolderSimple;
+  return <Icon weight={active ? 'fill' : 'duotone'} aria-hidden="true" />;
 }
 
 /** Avatar + name; opens a small menu with the account email and sign-out. */
-function UserMenu({ name, email, onLogout }: { name?: string; email?: string; onLogout: () => void }) {
+function UserMenu({ name, email, admin, onLogout }: { name?: string; email?: string; admin?: boolean; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -88,8 +40,10 @@ function UserMenu({ name, email, onLogout }: { name?: string; email?: string; on
     const close = (e: MouseEvent) => {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
     };
+    const closeOnEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', closeOnEscape); };
   }, [open]);
 
   return (
@@ -107,13 +61,15 @@ function UserMenu({ name, email, onLogout }: { name?: string; email?: string; on
           <span className="topbar-user-name">{name}</span>
           <span className="topbar-user-meta">Account</span>
         </span>
-        <ChevronDownIcon />
+        <CaretDown weight="bold" aria-hidden="true" />
       </button>
       {open && (
         <div className="topbar-user-pop" role="menu">
           <p className="topbar-user-pop-name">{name}</p>
           {email && <p className="topbar-user-pop-email">{email}</p>}
+          {admin && <Link to="/admin" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={16} aria-hidden="true" />Admin area</Link>}
           <button type="button" role="menuitem" onClick={onLogout}>
+            <SignOut size={16} aria-hidden="true" />
             Log out
           </button>
         </div>
@@ -127,6 +83,8 @@ type UsageInfo = {
   bonusMinutes: number;
   limit: number;
   periodEnd: string;
+  /** Admin account: no usage limit (minutes are still counted). */
+  unlimited?: boolean;
 };
 
 /** "23h 45m" / "2d 6h" / "45m" until the plan's usage period rolls over. */
@@ -200,7 +158,8 @@ export function PlanBadge({
   const used = usage ? usage.minutesUsed : null;
   const limit = usage ? usage.limit + (usage.bonusMinutes || 0) : null;
   const remaining = used != null && limit != null ? Math.max(0, limit - used) : null;
-  const pct = used != null && limit ? Math.min(100, (used / limit) * 100) : 0;
+  const unlimited = !!usage?.unlimited;
+  const pct = used != null && limit && !unlimited ? Math.min(100, (used / limit) * 100) : 0;
 
   if (isFree) {
     const renewsIn = formatRenewsIn(usage?.periodEnd);
@@ -215,17 +174,17 @@ export function PlanBadge({
         <div className="plan-usage-card">
           <div className="plan-usage-card-top">
             <span className="plan-usage-text">
-              {used != null ? used.toFixed(1) : '-'} / {limit ?? '-'} min
+              {used != null ? used.toFixed(1) : '-'} / {unlimited ? 'Unlimited' : `${limit ?? '-'} min`}
             </span>
             <span className="plan-usage-bar">
               <span className="plan-usage-fill" style={{ width: `${pct}%` }} />
             </span>
           </div>
           <div className="plan-usage-card-bottom">
-            <span>{renewsIn ? `Renews in ${renewsIn}` : remaining != null ? `${remaining.toFixed(1)} min left` : '-'}</span>
+            <span>{unlimited ? 'Admin · no usage limit' : renewsIn ? `Renews in ${renewsIn}` : remaining != null ? `${remaining.toFixed(1)} min left` : '-'}</span>
             {renewsTitle && (
               <span title={renewsTitle}>
-                <InfoIcon />
+                <Info size={13} weight="bold" aria-hidden="true" />
               </span>
             )}
           </div>
@@ -257,13 +216,15 @@ export function PlanBadge({
               <div className="plan-badge-pop-head">
                 <span>{label} plan</span>
                 <span>
-                  {used?.toFixed(1)} / {limit} min
+                  {used?.toFixed(1)} / {unlimited ? 'Unlimited' : `${limit} min`}
                 </span>
               </div>
               <div className="plan-badge-pop-bar">
                 <div className="plan-badge-pop-fill" style={{ width: `${pct}%` }} />
               </div>
-              <p className="plan-badge-pop-remaining">{remaining?.toFixed(1)} min remaining this month</p>
+              <p className="plan-badge-pop-remaining">
+                {unlimited ? 'Admin account — no usage limit' : `${remaining?.toFixed(1)} min remaining this month`}
+              </p>
             </>
           )}
         </div>
@@ -290,11 +251,7 @@ export function AppShell() {
   const flags = useFlagsStore((s) => s.flags);
   const loadFlags = useFlagsStore((s) => s.load);
   const [pricingOpen, setPricingOpen] = useState(false);
-  const creatorSurface = location.pathname === '/projects/upload'
-    ? ' main-creator main-creator-caption'
-    : location.pathname === '/clips/new'
-      ? ' main-creator main-creator-clips'
-      : '';
+  const creatorSurface = location.pathname === '/create' ? ' main-create' : '';
 
   // Clips progress arrives in the user's own socket room, on any page.
   useEffect(() => {
@@ -325,34 +282,18 @@ export function AppShell() {
       )}
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/projects/upload" className="brand" aria-label="Asaan Caption home">
+          <Link to="/create" className="brand" aria-label="Asaan Caption home">
             <img src="/logo-mark.png" alt="" className="brand-logo-mark" />
             <img src="/logo-wordmark.png" alt="Asaan Caption" className="brand-logo-wordmark" />
           </Link>
           {editorChrome ? (
             <>
               <span className="topbar-divider" aria-hidden="true" />
-              {flags.clipsEnabled && editorMatch?.params.id && (
-                <Link to={`/clips/${editorMatch.params.id}`} className="btn ghost topbar-upload-btn">
-                  <NavClipsIcon />
-                  Find clips
-                </Link>
-              )}
-              <Link to="/projects/upload" className="btn ghost topbar-upload-btn">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 19V5m0 0-6 6m6-6 6 6" />
-                </svg>
-                New caption
+              <Link to="/create" className="btn ghost topbar-upload-btn">
+                <UploadSimple size={14} weight="bold" aria-hidden="true" />
+                Create
               </Link>
+              <Link to="/projects" className="btn ghost topbar-upload-btn"><NavFolderIcon />Projects</Link>
               <div className="topbar-right">
                 <div className="topbar-editor-actions">
                   <button
@@ -361,6 +302,7 @@ export function AppShell() {
                     disabled={!onDownloadSrt}
                     onClick={() => onDownloadSrt?.()}
                   >
+                    <ClosedCaptioning size={16} aria-hidden="true" />
                     SRT
                   </button>
                   <button
@@ -370,17 +312,7 @@ export function AppShell() {
                     title={!flags.exportsEnabled ? 'Exports are temporarily disabled' : undefined}
                     onClick={() => onExport?.()}
                   >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-                    </svg>
+                    <DownloadSimple size={15} weight="bold" aria-hidden="true" />
                     Export
                   </button>
                 </div>
@@ -389,29 +321,13 @@ export function AppShell() {
           ) : (
             <>
               <nav className="topbar-nav" aria-label="Primary navigation">
-                {/* Admin toggles this via System > Flags > Projects list enabled */}
-                {flags.projectsListEnabled && (
-                  <NavLink to="/projects" end aria-label="Projects">
-                    <NavFolderIcon />
-                    <span>Projects</span>
-                  </NavLink>
-                )}
-                <NavLink to="/projects/upload" aria-label="Caption">
-                  <NavCaptionIcon />
-                  <span>Caption</span>
+                <NavLink to="/create" aria-label="Create">
+                  {({ isActive }) => <>
+                    <ClosedCaptioning weight={isActive ? 'fill' : 'duotone'} aria-hidden="true" />
+                    <span>Create</span>
+                  </>}
                 </NavLink>
-                {flags.clipsEnabled && (
-                  <NavLink to="/clips" aria-label="Viral Clips">
-                    <NavClipsIcon />
-                    <span>Viral Clips</span>
-                  </NavLink>
-                )}
-                {(user?.role === 'admin' || user?.role === 'support') && (
-                  <NavLink to="/admin" aria-label="Admin">
-                    <NavUserIcon />
-                    <span>Admin</span>
-                  </NavLink>
-                )}
+                <NavLink to="/projects" end aria-label="Projects" className={({ isActive }) => isActive || location.pathname.startsWith('/clips/') ? 'active' : ''}>{({ isActive }) => <><NavFolderIcon active={isActive || location.pathname.startsWith('/clips/')} /><span>Projects</span></>}</NavLink>
               </nav>
               <div className="topbar-right">
                 <div className="topbar-account">
@@ -420,7 +336,7 @@ export function AppShell() {
                     planName={user?.planName}
                     onUpgradeClick={() => setPricingOpen(true)}
                   />
-                  <UserMenu name={user?.name} email={user?.email} onLogout={() => void signOut()} />
+                  <UserMenu name={user?.name} email={user?.email} admin={user?.role === 'admin' || user?.role === 'support'} onLogout={() => void signOut()} />
                 </div>
               </div>
             </>

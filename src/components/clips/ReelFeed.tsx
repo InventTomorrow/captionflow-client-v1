@@ -9,7 +9,21 @@
  * the long video, and the same actions as the grid (select, edit, open in the
  * editor, render / download, delete).
  */
-import { Captions, Check, ChevronDown, ChevronUp, Clapperboard, Download, Film, Pause, Play, SquarePen, Trash2, Volume2, VolumeX } from 'lucide-react';
+import {
+  CaretDown,
+  CaretUp,
+  Check,
+  ClosedCaptioning,
+  DownloadSimple,
+  FilmSlate,
+  FilmStrip,
+  Pause,
+  PencilSimpleLine,
+  Play,
+  SpeakerHigh,
+  SpeakerSlash,
+  Trash,
+} from '@phosphor-icons/react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Clip } from '../../lib/clips/api';
 import { localClipMedia } from '../../lib/clips/clipMedia';
@@ -246,7 +260,7 @@ export function ReelFeed({
       <div
         className="reel-feed"
         ref={feedRef}
-        style={feedHeight ? { height: feedHeight } : undefined}
+        style={feedHeight ? { height: Math.min(feedHeight, 680) } : undefined}
         tabIndex={0}
         onKeyDown={onKeyDown}
         role="region"
@@ -297,7 +311,7 @@ export function ReelFeed({
                 )}
                 {link && part === null && mounted.has(i) ? (
                   <button type="button" className="reel-open-link" onClick={() => onOpen(clip)}>
-                    <Play size={18} aria-hidden="true" />
+                    <Play size={18} weight="fill" aria-hidden="true" />
                     Open to play this clip
                   </button>
                 ) : (
@@ -310,11 +324,11 @@ export function ReelFeed({
                 )}
                 {isActive && paused && (
                   <span className="reel-paused" aria-hidden="true">
-                    <Play size={34} fill="currentColor" />
+                    <Play size={34} weight="fill" />
                   </span>
                 )}
-                <span className={`clip-score clip-score-${scoreTone(clip.score)}`} title="How strong the AI rates this moment">
-                  {clip.score}
+                <span className={`clip-score clip-score-${scoreTone(clip.score)}`} title="Clip score">
+                  Score {clip.score}
                 </span>
                 <button
                   type="button"
@@ -323,7 +337,7 @@ export function ReelFeed({
                   aria-label="Mute"
                   aria-pressed={muted}
                 >
-                  {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+                  {muted ? <SpeakerSlash size={18} aria-hidden="true" /> : <SpeakerHigh size={18} aria-hidden="true" />}
                 </button>
                 <span className="reel-progress" aria-hidden="true">
                   {/* Only the playing reel's bar moves; a reel you scroll back to starts from empty. */}
@@ -372,24 +386,24 @@ export function ReelFeed({
                 <div className="reel-actions">
                   {rendered && !rendering ? (
                     <button type="button" className="btn primary reel-btn" onClick={() => onDownload(clip)}>
-                      <Download size={17} aria-hidden="true" />
+                      <DownloadSimple size={17} aria-hidden="true" />
                       Download MP4
                     </button>
                   ) : (
                     onRender && (
                       <button type="button" className="btn primary reel-btn" onClick={() => onRender(clip)} disabled={rendering}>
-                        <Clapperboard size={17} aria-hidden="true" />
+                        <FilmSlate size={17} aria-hidden="true" />
                         {rendering ? `Rendering ${Math.round(render?.percent ?? 0)}%` : 'Render clip'}
                       </button>
                     )
                   )}
                   <button type="button" className="btn ghost reel-btn" onClick={() => onOpen(clip)}>
-                    <SquarePen size={17} aria-hidden="true" />
+                    <PencilSimpleLine size={17} aria-hidden="true" />
                     <span className="reel-btn-label">Edit clip</span>
                   </button>
                   {onEditCaptions && (
                     <button type="button" className="btn ghost reel-btn" onClick={() => onEditCaptions(clip)}>
-                      <Captions size={17} aria-hidden="true" />
+                      <ClosedCaptioning size={17} aria-hidden="true" />
                       <span className="reel-btn-label">Open in editor</span>
                     </button>
                   )}
@@ -399,11 +413,11 @@ export function ReelFeed({
                     onClick={() => onToggleSelect(clip)}
                     aria-pressed={picked}
                   >
-                    <Check size={17} aria-hidden="true" />
+                    <Check size={17} weight="bold" aria-hidden="true" />
                     <span className="reel-btn-label">Select</span>
                   </button>
                   <button type="button" className="reel-delete" onClick={() => onDelete(clip)} aria-label={`Delete ${name}`} title="Delete clip">
-                    <Trash2 size={17} aria-hidden="true" />
+                    <Trash size={17} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -413,16 +427,16 @@ export function ReelFeed({
       </div>
       <div className="reel-nav" role="group" aria-label="Move between clips">
         <button type="button" className="reel-nav-btn" onClick={() => goTo(stepReel(activeIdx, -1, count))} disabled={activeIdx === 0} aria-label="Previous clip">
-          <ChevronUp size={20} aria-hidden="true" />
+          <CaretUp size={20} weight="bold" aria-hidden="true" />
         </button>
         <span className="reel-nav-pos" aria-live="polite">
           {activeIdx + 1}/{count}
         </span>
         <button type="button" className="reel-nav-btn" onClick={() => goTo(stepReel(activeIdx, 1, count))} disabled={activeIdx >= count - 1} aria-label="Next clip">
-          <ChevronDown size={20} aria-hidden="true" />
+          <CaretDown size={20} weight="bold" aria-hidden="true" />
         </button>
         <button type="button" className="reel-nav-btn" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
-          {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
+          {paused ? <Play size={18} weight="fill" aria-hidden="true" /> : <Pause size={18} weight="fill" aria-hidden="true" />}
         </button>
       </div>
     </div>
@@ -462,7 +476,7 @@ function ReelPoster({
   if (thumb === null) {
     return (
       <span className="reel-poster reel-poster-empty" aria-hidden="true">
-        <Film size={28} />
+        <FilmStrip size={28} />
       </span>
     );
   }

@@ -4791,6 +4791,7 @@ legend {
 
 .templates-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.55rem;
   padding: 0.45rem 0.75rem 1rem;
 }
@@ -4877,6 +4878,8 @@ legend {
 .display-stage {
   position: relative;
   display: grid;
+  min-width: 0;
+  width: 100%;
   place-items: center;
   min-height: 88px;
   border-radius: 10px;
@@ -4977,6 +4980,9 @@ legend {
 
 .display-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
   gap: 0.35rem;
   padding: 0.55rem;
   border: 1px solid var(--line);
@@ -5826,7 +5832,9 @@ legend {
    (components/KineticThumb.tsx). Transparent, so the card ground shows. */
 .kinetic-thumb {
   display: block;
+  min-width: 0;
   width: 100%;
+  max-width: 100%;
   aspect-ratio: 16 / 9;
 }
 
@@ -16929,8 +16937,26 @@ legend {
   background: color-mix(in srgb, var(--cf-accent) 18%, var(--cf-input));
 }
 
+.premium-select-group {
+  padding: 0.55rem 0.68rem 0.22rem;
+  color: var(--cf-text-muted);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.premium-select-menu[data-placement='above'] {
+  animation-name: premium-select-in-above;
+}
+
 @keyframes premium-select-in {
   from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes premium-select-in-above {
+  from { opacity: 0; transform: translateY(5px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -17507,4 +17533,14 @@ legend {
   .caption-upload-beats > i::after {
     animation: none;
   }
+}
+
+/* A clip opened in the editor with a framing layout: the composed frame drawn over the (hidden) video. */
+.video-wrap .clip-layout-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }

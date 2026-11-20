@@ -1,16 +1,30 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  ArrowUpRight,
+  ChartLineUp,
+  ClipboardText,
+  CreditCard,
+  Gauge,
+  HardDrives,
+  Package,
+  Queue,
+  SignOut,
+  SquaresFour,
+  Users,
+  type Icon,
+} from '@phosphor-icons/react';
 import { useAuthStore } from '../../stores/authStore';
 
-const LINKS = [
-  { to: '/admin', end: true, label: 'Dashboard' },
-  { to: '/admin/users', label: 'Users' },
-  { to: '/admin/plans', label: 'Packages' },
-  { to: '/admin/subscriptions', label: 'Subscriptions' },
-  { to: '/admin/templates', label: 'Templates' },
-  { to: '/admin/projects', label: 'Jobs' },
-  { to: '/admin/analytics', label: 'Analytics' },
-  { to: '/admin/system', label: 'System' },
-  { to: '/admin/audit', label: 'Audit' },
+const LINKS: { to: string; end?: boolean; label: string; icon: Icon }[] = [
+  { to: '/admin', end: true, label: 'Dashboard', icon: Gauge },
+  { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/plans', label: 'Packages', icon: Package },
+  { to: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
+  { to: '/admin/templates', label: 'Templates', icon: SquaresFour },
+  { to: '/admin/projects', label: 'Jobs', icon: Queue },
+  { to: '/admin/analytics', label: 'Analytics', icon: ChartLineUp },
+  { to: '/admin/system', label: 'System', icon: HardDrives },
+  { to: '/admin/audit', label: 'Audit', icon: ClipboardText },
 ];
 
 export function AdminShell() {
@@ -33,7 +47,12 @@ export function AdminShell() {
               end={l.end}
               className={({ isActive }) => (isActive ? 'active' : undefined)}
             >
-              {l.label}
+              {({ isActive }) => (
+                <>
+                  <l.icon size={18} weight={isActive ? 'fill' : 'duotone'} aria-hidden="true" />
+                  {l.label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -50,6 +69,7 @@ export function AdminShell() {
               navigate('/login');
             }}
           >
+            <SignOut size={16} aria-hidden="true" />
             Log out
           </button>
         </div>
@@ -59,6 +79,7 @@ export function AdminShell() {
           <span className="muted">Control plane</span>
           <a href="/projects/upload" className="btn ghost">
             Creator app
+            <ArrowUpRight size={14} weight="bold" aria-hidden="true" />
           </a>
         </header>
         <div className="admin-content">

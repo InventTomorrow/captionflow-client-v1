@@ -7,6 +7,8 @@ import { templateByKey } from '../templateCatalog';
 import type { Caption } from '../../stores/captionStore';
 import { clipFontFactor } from './clipClock';
 import { cropXAt, type CropTrack } from './cropTrack';
+import { framingKey, readFraming, type ClipFramingV1 } from './framing';
+import type { ExportFraming } from '../export/protocol';
 import { sliceCaptionsToRange } from './sliceCaptions';
 
 export interface ClipTiming {
@@ -18,6 +20,8 @@ export interface ClipFraming {
   crop: { mode: 'auto' | 'manual' | 'none'; x: number; track?: CropTrack };
   /** Output frame; absent on clips from before formats = vertical. */
   aspect?: ClipAspect;
+  /** A framing layout (clips/framing.ts); null/absent = the crop above. */
+  framing?: ClipFramingV1 | null;
 }
 
 /** A clip's output frame: vertical (cropped around the speaker) or the landscape original. */
@@ -32,9 +36,25 @@ export function aspectDims(aspect: ClipAspect): [number, number] {
   return aspect === '16:9' ? [16, 9] : [9, 16];
 }
 
-/** Auto framing of a vertical clip that has no face track yet (landscape keeps the whole frame). */
+/**
+ * The framing layout a clip is drawn with: only vertical clips use layouts,
+ * and a stored value the app can't draw falls back to the crop.
+ */
+export function clipLayout(clip: { aspect?: ClipAspect | null; framing?: unknown }): ClipFramingV1 | null {
+  return clipAspect(clip) === '9:16' ? readFraming(clip.framing) : null;
+}
+
+/** How the export worker frames this clip — the preview draws the same. */
+export function exportFramingFor(clip: ClipFraming): ExportFraming {
+  const layout = clipLayout(clip);
+  if (layout) return { mode: 'layout', framing: layout };
+  const track = cropTrackFor(clip);
+  return track ? { mode: 'cover', track } : { mode: 'contain' };
+}
+
+/** Auto framing of a vertical clip that has no face track yet (landscape keeps the whole frame; a layout is placed by hand). */
 export function needsFaceTrack(clip: ClipFraming): boolean {
-  return clipAspect(clip) === '9:16' && clip.crop.mode === 'auto' && !clip.crop.track?.length;
+  return clipAspect(clip) === '9:16' && !clipLayout(clip) && clip.crop.mode === 'auto' && !clip.crop.track?.length;
 }
 
 /** The poster frame: 1.5 s in (past the cut), or a third of the way through a very short clip. */
@@ -57,7 +77,9 @@ export function cropTrackFor(clip: ClipFraming): CropTrack | null {
 export function thumbKey(clip: ClipTiming & ClipFraming): string {
   const track = cropTrackFor(clip);
   const x = track ? cropXAt(track, clipFrameTime(clip) - clip.start).toFixed(3) : 'fit';
-  return `${clip._id}:${clip.start.toFixed(2)}:${clipAspect(clip)}:${clip.crop.mode}:${x}`;
+  const layout = clipLayout(clip);
+  const base = `${clip._id}:${clip.start.toFixed(2)}:${clipAspect(clip)}`;
+  return layout ? `${base}:L:${framingKey(layout)}` : `${base}:${clip.crop.mode}:${x}`;
 }
 
 /** What a clip says about its captions' look (Clip.templateKey / Clip.style). */
@@ -68,6 +90,8 @@ export interface ClipLook {
   aspect?: ClipAspect | null;
   /** 'none' (Fit) shows the whole frame: captions keep their authored size. */
   crop?: { mode?: 'auto' | 'manual' | 'none' } | null;
+  /** A framing layout fills the vertical frame like a crop does. */
+  framing?: unknown;
 }
 
 /**
@@ -86,7 +110,7 @@ export function clipStyle(projectStyle: Partial<EditorStyle>, look: ClipLook): E
   };
   const style = buildExportStyle(merged, { defaultAspect: clipAspect(look) });
   // A crop fills the clip's frame: size captions so templates fit as in the main editor.
-  const factor = clipFontFactor(style.aspectRatio, look.crop?.mode !== 'none');
+  const factor = clipFontFactor(style.aspectRatio, look.crop?.mode !== 'none' || !!clipLayout(look));
   if (factor !== 1) style.fontSize = Math.max(12, Math.round(style.fontSize * factor * 100) / 100);
   return style;
 }
@@ -134,6 +158,15 @@ export function chunks<T>(list: T[], size: number): T[][] {
 }
 
 export type TimeRange = { start: number; end: number };
+
+/** A caption the ranges reach is written in a non-Latin script (Devanagari, Urdu, Gurmukhi…). */
+export function nonLatinIn(captions: Caption[], ranges: TimeRange[] | 'all'): boolean {
+  return captions.some(
+    (c) =>
+      /[^\p{Script=Latin}\P{L}]/u.test(c.text) &&
+      (ranges === 'all' || ranges.some((r) => c.end > r.start && c.start < r.end)),
+  );
+}
 
 /** A caption the ranges reach still waits for translation and hero words (New Clips; see projectCaptions). */
 export function deferredIn(captions: Caption[], ranges: TimeRange[] | 'all'): boolean {

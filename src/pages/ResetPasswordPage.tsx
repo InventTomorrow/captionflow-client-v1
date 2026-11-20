@@ -1,43 +1,13 @@
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
-import { AuthBrand, PasswordChecklist } from '../components/AuthParts';
+import { CheckCircle, Key, LockSimple } from '@phosphor-icons/react';
+import { ArrowRightIcon, AuthBrand, PasswordChecklist } from '../components/AuthParts';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { verifyResetLinkPath, type VerifiedResetState } from '../lib/resetLink';
 
 function LockIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.25"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
+  return <LockSimple size={18} aria-hidden="true" />;
 }
 
 function SpinnerIcon() {
@@ -118,7 +88,7 @@ export function ResetPasswordPage() {
           <>
             <div className="auth-status" role="status">
               <div className="auth-status-icon is-ok">
-                <CheckIcon />
+                <CheckCircle size={26} aria-hidden="true" />
               </div>
               <div className="auth-heading">
                 <h2>Password updated</h2>
@@ -129,6 +99,7 @@ export function ResetPasswordPage() {
               </div>
               <Link className="btn primary auth-submit auth-status-action" to="/login">
                 Go to sign in
+                <ArrowRightIcon />
               </Link>
             </div>
           </>
@@ -188,7 +159,10 @@ export function ResetPasswordPage() {
                     Updating…
                   </>
                 ) : (
-                  'Update password'
+                  <>
+                    <Key size={17} aria-hidden="true" />
+                    Update password
+                  </>
                 )}
               </button>
             </form>
