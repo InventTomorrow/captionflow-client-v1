@@ -72,6 +72,9 @@
   padding: 5px 2px;
   white-space: nowrap;
 }
+/* Clip length on its own row so Short / Standard / Long / Custom sit side by side; clip count below. */
+.creation-step-panel .clip-options { grid-template-columns: 1fr; }
+.creation-step-panel .clip-length-seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .creation-step-panel .creation-format { margin-top: 26px; }
 .creation-style-step h2 { margin: 0 0 14px; color: var(--cf-text-secondary); font-size: 13px; font-weight: 500; }
 .creation-style-step .clip-tpl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: min(32vh, 290px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--cf-border) transparent; }
@@ -165,6 +168,7 @@
   .creation-step-panel { margin-top: 20px; padding: 18px; }
   .creation-step-panel .creation-fields, .creation-step-panel .clip-options { grid-template-columns: 1fr; gap: 16px; }
   .creation-step-panel .creation-format { margin-top: 18px; }
+  .creation-step-panel .clip-length-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .creation-style-step .clip-tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .creation-source-summary { flex-wrap: wrap; }
   .creation-source-summary > div { flex-basis: calc(100% - 50px); }

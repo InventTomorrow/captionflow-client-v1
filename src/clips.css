@@ -2295,6 +2295,95 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Clip length: Custom minimum / maximum (ClipOptionsForm) */
+.clip-length-custom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.clip-length-input {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--cf-text-secondary);
+}
+
+.clip-length-control {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--cf-border);
+  border-radius: 6px;
+  background: var(--cf-input);
+  transition: border-color 0.15s;
+}
+
+.clip-length-control:focus-within { border-color: var(--cf-accent); }
+.clip-length-control:has([aria-invalid='true']) { border-color: color-mix(in srgb, #ff6b6b 60%, var(--cf-border)); }
+
+.clip-field .clip-length-control input,
+.clip-field .clip-length-control select {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--cf-text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-field .clip-length-control input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 0 0.7rem;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.clip-length-control input::-webkit-inner-spin-button,
+.clip-length-control input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.clip-field .clip-length-control input:focus,
+.clip-field .clip-length-control select:focus { outline: none; }
+
+.clip-field .clip-length-control select {
+  flex: none;
+  padding: 0 0.55rem;
+  border-left: 1px solid var(--cf-border);
+  color: var(--cf-text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.clip-length-control select option { background: var(--cf-card, #111); color: var(--cf-text); }
+
+.clip-length-note {
+  grid-column: 1 / -1;
+  min-height: 1.1em;
+  margin: 0;
+  color: var(--cf-text-muted);
+  font-size: 0.75rem;
+}
+
+.clip-length-note.is-error { color: #ffabab; }
+
+.clip-length-notice {
+  margin: -0.25rem 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--cf-border);
+  border-left: 2px solid var(--cf-accent);
+  border-radius: 6px;
+  color: var(--cf-text-secondary);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 420px) {
+  .clip-length-custom { grid-template-columns: 1fr; }
+}
+
 /* --- grid + cards ---------------------------------------------------------- */
 
 .clip-grid {

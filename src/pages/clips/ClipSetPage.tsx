@@ -32,7 +32,7 @@ import { useOpenInEditor } from '../../lib/clips/useOpenInEditor';
 import { captionLanguageLabel } from '../../lib/languageLabel';
 import { templateByKey } from '../../lib/templateCatalog';
 import { ClipOptionsForm } from '../../components/clips/ClipOptionsForm';
-import { clipOptionsFrom, LENGTH_PRESETS, type LengthPresetId } from '../../lib/clips/clipOptions';
+import { DEFAULT_CUSTOM_LENGTH, clipOptionsFrom, formatLength, lengthChoiceFor, lengthRange, type CustomLength, type LengthChoice } from '../../lib/clips/clipOptions';
 import { ClipProcessing } from '../../components/clips/ClipProcessing';
 import { PageLoader } from '../../components/PageLoader';
 import { UpgradeBanner } from '../../components/UpgradeBanner';
@@ -70,7 +70,8 @@ export function ClipSetPage() {
   const [planError, setPlanError] = useState<PlanErrorInfo | null>(null);
   const [stage, setStage] = useState<{ percent?: number; message?: string }>({});
   const [showOptions, setShowOptions] = useState(false);
-  const [preset, setPreset] = useState<LengthPresetId>('standard');
+  const [preset, setPreset] = useState<LengthChoice>('standard');
+  const [customLength, setCustomLength] = useState<CustomLength>(DEFAULT_CUSTOM_LENGTH);
   const [maxClips, setMaxClips] = useState(8);
   const [starting, setStarting] = useState(false);
   const [view, setView] = useState<ClipsView>('grid');
@@ -110,8 +111,11 @@ export function ClipSetPage() {
   useEffect(() => {
     const o = data?.status.options;
     if (!o) return;
-    const p = LENGTH_PRESETS.find((x) => x.minSec === o.minSec && x.maxSec === o.maxSec);
-    if (p) setPreset(p.id);
+    if (o.minSec && o.maxSec) {
+      const c = lengthChoiceFor(o.minSec, o.maxSec);
+      setPreset(c.choice);
+      if (c.custom) setCustomLength(c.custom);
+    }
     if (o.maxClips) setMaxClips(o.maxClips);
   }, [data?.status.options]);
 
@@ -121,13 +125,30 @@ export function ClipSetPage() {
   const clips = useMemo(() => data?.clips ?? [], [data?.clips]);
   const canAnalyze = !!project && !projectBusy && project.status !== 'error' && (data?.sentences.length ?? 0) > 0;
   const tooShort = (project?.video?.duration ?? 0) > 0 && (project?.video?.duration ?? 0) < 60;
+  const range = lengthRange(preset, customLength);
+  const sourceSec = project?.video?.duration ?? 0;
+  /** The video can't hold one clip of the chosen minimum (the server refuses the same). */
+  const shortForLength = !('error' in range) && sourceSec > 0 && sourceSec < range.minSec;
+  // Clips ending on a sentence (or at the end of the video) can land under the minimum asked for: say so.
+  const runRange = data?.status.options;
+  const offRange =
+    runRange?.minSec && runRange.maxSec
+      ? {
+          under: clips.filter((c) => c.end - c.start < runRange.minSec! - 0.05).length,
+          over: clips.filter((c) => c.end - c.start > runRange.maxSec! + 1).length,
+          minSec: runRange.minSec,
+          maxSec: runRange.maxSec,
+        }
+      : null;
 
   async function findClips() {
     setStarting(true);
     setError('');
     setPlanError(null);
     try {
-      await analyzeClips(projectId, clipOptionsFrom(preset, maxClips));
+      const range = lengthRange(preset, customLength);
+      if ('error' in range) return;
+      await analyzeClips(projectId, clipOptionsFrom(range, maxClips));
       setShowOptions(false);
       useClipsStore.setState((s) => ({ live: { ...s.live, [projectId]: { status: 'queued', percent: 0 } } }));
       await loadProject(projectId);
@@ -344,9 +365,14 @@ export function ClipSetPage() {
             <p>Clips need a video of at least one minute.</p>
           ) : (
             <>
-              <ClipOptionsForm preset={preset} maxClips={maxClips} disabled={starting} onPreset={setPreset} onMaxClips={setMaxClips} />
+              <ClipOptionsForm preset={preset} custom={customLength} maxClips={maxClips} disabled={starting} onPreset={setPreset} onCustom={setCustomLength} onMaxClips={setMaxClips} />
+              {shortForLength && !('error' in range) && (
+                <p className="clip-length-note is-error" role="alert">
+                  This video is {formatLength(sourceSec)} long, shorter than your {formatLength(range.minSec)} minimum. Choose a shorter clip length.
+                </p>
+              )}
               <p className="clips-sub">Uses one clip run from your plan. Your existing edits and renders are kept.</p>
-              <button type="button" className="btn primary clips-cta" disabled={starting} onClick={() => void findClips()}>
+              <button type="button" className="btn primary clips-cta" disabled={starting || 'error' in range || shortForLength} onClick={() => void findClips()}>
                 <Sparkle size={17} aria-hidden="true" />
                 {starting ? 'Starting…' : 'Find clips'}
               </button>
@@ -386,6 +412,15 @@ export function ClipSetPage() {
           <div><span>GENERATED CLIPS</span><h2>{clips.length} clips <small>· best first</small></h2></div>
           {working && <span className="clips-results-working">More clips are processing</span>}
         </div>
+      )}
+      {clips.length > 0 && offRange && (offRange.under > 0 || offRange.over > 0) && (
+        <p className="clip-length-notice" role="status">
+          {offRange.under > 0 &&
+            `${offRange.under} ${offRange.under === 1 ? 'clip is' : 'clips are'} shorter than your ${formatLength(offRange.minSec)} minimum: the moment ends there, or the video runs out. `}
+          {offRange.over > 0 &&
+            `${offRange.over} ${offRange.over === 1 ? 'clip runs' : 'clips run'} past your ${formatLength(offRange.maxSec)} maximum. `}
+          You can trim any clip by sentence.
+        </p>
       )}
 
       {selected && (

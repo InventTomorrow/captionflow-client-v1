@@ -14,7 +14,8 @@ import { UpgradeBanner } from '../components/UpgradeBanner';
 import { ClipsDeviceError, uploadLinkedAudio, uploadProjectMedia, type UploadProgress } from '../lib/uploader';
 import { api, errorMessage } from '../lib/api';
 import { CAPTION_LANGUAGE_OPTIONS, SPOKEN_LANGUAGE_OPTIONS } from '../lib/languageLabel';
-import { clipOptionsFrom, type LengthPresetId } from '../lib/clips/clipOptions';
+import { DEFAULT_CUSTOM_LENGTH, clipOptionsFrom, formatLength, lengthRange, type CustomLength, type LengthChoice } from '../lib/clips/clipOptions';
+import { probeMediaFile } from '../lib/media/probe';
 import type { ClipAspect } from '../lib/clips/clipMath';
 import type { VideoType } from '../lib/clips/framing';
 import { createClipsFromUrl, findLinkedClips, styleAllClips } from '../lib/clips/api';
@@ -64,7 +65,9 @@ export function CreatePage() {
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [outputLanguage, setOutputLanguage] = useState('keep_original');
   const [keyterms, setKeyterms] = useState('');
-  const [preset, setPreset] = useState<LengthPresetId>('standard');
+  const [preset, setPreset] = useState<LengthChoice>('standard');
+  /** Custom clip length fields — kept across steps, like every other setup choice. */
+  const [customLength, setCustomLength] = useState<CustomLength>(DEFAULT_CUSTOM_LENGTH);
   const [maxClips, setMaxClips] = useState(8);
   /** "What kind of clips do you want?" — kept across steps and source changes; sent with the clip options. */
   const [clipInstructions, setClipInstructions] = useState('');
@@ -129,6 +132,16 @@ export function CreatePage() {
 
   async function start() {
     if (busy || (!file && !useUrl) || urlInvalid) return;
+    if (workflow === 'clips' && !lengthOk) return;
+    const clipOptions = 'error' in length ? undefined : clipOptionsFrom(length, maxClips, clipInstructions);
+    // A video shorter than the shortest clip asked for is caught here, before it is uploaded (the server checks too).
+    if (workflow === 'clips' && file && !('error' in length)) {
+      const probe = await probeMediaFile(file).catch(() => null);
+      if (probe?.duration && probe.duration < length.minSec) {
+        setError(`This video is ${formatLength(probe.duration)} long, shorter than your ${formatLength(length.minSec)} minimum clip length. Choose a shorter clip length.`);
+        return;
+      }
+    }
     const link = url.trim();
     if (workflow === 'clips' && youtubeId) {
       const helper = await findHelper();
@@ -148,7 +161,7 @@ export function CreatePage() {
       if (workflow === 'clips' && useUrl && !youtubeId) {
         const { projectId } = await createClipsFromUrl({
           url: link, sourceLanguage, outputLanguage, keyterms: parseKeyterms(keyterms),
-          clipOptions: clipOptionsFrom(preset, maxClips, clipInstructions), templateKey, aspect,
+          clipOptions, templateKey, aspect,
           ...(flags.framingEnabled ? { videoType } : {}),
         });
         navigate(`/clips/${projectId}`);
@@ -172,7 +185,7 @@ export function CreatePage() {
       }
       await api.post(`/projects/${projectId}/transcribe`, {
         ...(workflow === 'clips'
-          ? { purpose: 'clips', clipOptions: clipOptionsFrom(preset, maxClips, clipInstructions), ...(currentFlags.framingEnabled ? { videoType } : {}) }
+          ? { purpose: 'clips', clipOptions, ...(currentFlags.framingEnabled ? { videoType } : {}) }
           : {}),
         sourceLanguage, outputLanguage, keyterms: parseKeyterms(keyterms),
       });
@@ -204,6 +217,8 @@ export function CreatePage() {
 
   if (!flagsLoaded) return <PageLoader inline label="Loading Create" />;
   const sourceReady = useUrl ? !urlInvalid : !!file;
+  const length = lengthRange(preset, customLength);
+  const lengthOk = !('error' in length);
   const stepTitle = stage === 1 ? 'Choose your languages' : stage === 2 ? 'Set up your clips' : 'Choose a caption style';
   const stepDescription = stage === 1 ? 'Tell us how to understand and caption your video.' : stage === 2 ? 'Choose the clip length, number, and format.' : 'Pick a starting look. You can edit each clip later.';
   return <div className={'creation-page' + (stage > 0 ? ' is-setup' : '')}>
@@ -260,7 +275,7 @@ export function CreatePage() {
           <label className="creation-keyterms"><span>Names and special words <small>Optional</small></span><input value={keyterms} onChange={(event) => setKeyterms(event.target.value)} placeholder="e.g. Lahore, Dawood, CaptionFlow" /></label>
         </section>}
         {stage === 2 && workflow === 'clips' && <section className="creation-step-panel" aria-label="Clip setup">
-          <ClipOptionsForm preset={preset} maxClips={maxClips} onPreset={setPreset} onMaxClips={setMaxClips} />
+          <ClipOptionsForm preset={preset} custom={customLength} maxClips={maxClips} onPreset={setPreset} onCustom={setCustomLength} onMaxClips={setMaxClips} />
           <div className="creation-format"><span>Output format</span><ClipFormatToggle value={aspect} onChange={(value) => value && setAspect(value)} /></div>
         </section>}
         {stage === 3 && workflow === 'clips' && <section className="creation-step-panel creation-style-step" aria-label="Caption style">
@@ -269,7 +284,7 @@ export function CreatePage() {
         </section>}
         <div className="creation-actions">
           <button type="button" className="btn ghost" onClick={() => setStage((stage - 1) as 0 | 1 | 2)}><ArrowLeft size={16} weight="bold" aria-hidden="true" /> Back</button>
-          <button type="button" className="btn primary" disabled={!sourceReady} onClick={() => { if (workflow === 'captions' || stage === 3) void start(); else setStage((stage + 1) as 2 | 3); }}>
+          <button type="button" className="btn primary" disabled={!sourceReady || (workflow === 'clips' && stage >= 2 && !lengthOk)} onClick={() => { if (workflow === 'captions' || stage === 3) void start(); else setStage((stage + 1) as 2 | 3); }}>
             {workflow === 'captions' || stage === 3
               ? <><Sparkle size={16} weight="fill" aria-hidden="true" /> {workflow === 'captions' ? 'Generate Captions' : 'Create Short Clips'}</>
               : <>Continue <ArrowRight size={16} weight="bold" aria-hidden="true" /></>}

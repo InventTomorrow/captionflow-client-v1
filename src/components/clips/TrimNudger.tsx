@@ -6,10 +6,12 @@
 import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 import { formatClipLength } from '../../lib/clips/clipMath';
+import { CLIP_LENGTH_MAX_SEC } from '../../lib/clips/clipOptions';
 
 const PAD = 0.25 + 0.35;
 const MIN_SEC = 5;
-const MAX_SEC = 180;
+/** The longest clip a run can ask for, plus its padding (server clips.controller EDIT_MAX_SEC). */
+const MAX_SEC = CLIP_LENGTH_MAX_SEC + 1;
 
 export function TrimNudger({
   startIdx,
