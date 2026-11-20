@@ -2,6 +2,7 @@
  * clips/clipMath.ts — small pure rules the Clips pages, thumbnails and renders
  * share, so a card, its preview and its rendered MP4 always agree.
  */
+import { styleWithTemplate } from '../templateApply';
 import { buildExportStyle, type EditorStyle } from '../export/styleSnapshot';
 import { templateByKey } from '../templateCatalog';
 import type { Caption } from '../../stores/captionStore';
@@ -102,8 +103,8 @@ export interface ClipLook {
 export function clipStyle(projectStyle: Partial<EditorStyle>, look: ClipLook): EditorStyle {
   const card = !look.style && look.templateKey ? templateByKey(look.templateKey) : undefined;
   const merged: Partial<EditorStyle> = {
-    ...projectStyle,
-    ...(card ? { ...card.preset, templateKey: card.key } : {}),
+    // A card replaces the project's whole template look (lib/templateApply.ts), as in the editor.
+    ...(card ? (styleWithTemplate(projectStyle, card) as Partial<EditorStyle>) : projectStyle),
     ...(look.style ?? {}),
     aspectRatio: clipAspect(look),
     behindPerson: false,

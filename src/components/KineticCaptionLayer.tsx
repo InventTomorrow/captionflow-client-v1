@@ -28,7 +28,8 @@
  * override the DOM templates use, so it persists and burns in identically.
  */
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ChunkSizeToolbar, clampChunkScale } from './ChunkSizeToolbar';
 
 import type { DisplayCaption } from '../lib/displayCaptions';
 import type {
@@ -89,6 +90,8 @@ interface Props {
     patch: { sizeScale?: number; offsetX?: number; offsetY?: number },
     scope: 'chunk' | 'all',
   ) => void;
+  /** Delete the selected caption chunk (the Size bar's delete button). */
+  onChunkDelete?: (caption: DisplayCaption) => void;
 }
 
 export default function KineticCaptionLayer({
@@ -101,6 +104,7 @@ export default function KineticCaptionLayer({
   params,
   behindPerson = false,
   onChunkStyleCommit,
+  onChunkDelete,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -197,6 +201,24 @@ export default function KineticCaptionLayer({
     return () => ro.disconnect();
   }, []);
 
+  /* -- Selection: one chunk at a time, edited before it is saved ---------- *
+   * Click a caption to select it (box, corner handles, Size bar). Size and a
+   * drag are PENDING until "Apply to all chunks" / "Apply to this chunk";
+   * Escape, clicking away or the caption ending discards them. */
+  const [sel, setSel] = useState<number | null>(null);
+  const [pendingScale, setPendingScale] = useState<number | null>(null);
+  const [pendingPos, setPendingPos] = useState<{ offsetX: number; offsetY: number } | null>(null);
+  /** Bumped when the selected scene's box moved (drag, rebuild), to re-render the box. */
+  const [, setBoxTick] = useState(0);
+  const selRef = useRef<number | null>(null);
+  selRef.current = sel;
+  const clearSelection = useCallback(() => {
+    setSel(null);
+    setPendingScale(null);
+    setPendingPos(null);
+  }, []);
+  const editKey = sel == null ? '' : `${sel}:${pendingScale ?? ''}:${pendingPos?.offsetX ?? ''}:${pendingPos?.offsetY ?? ''}`;
+
   /* -- 3. Build the composition ------------------------------------------ *
    * Keyed on content, not object identity: a fresh array literal from the
    * parent must not re-run the layout (that is what made the original
@@ -219,16 +241,22 @@ export default function KineticCaptionLayer({
   useEffect(() => {
     // A font set belongs to one template; never lay out with another's faces.
     if (!fonts || fonts.template !== template) return;
-    const input: KineticCaptionInput[] = captions.map((c, i) => ({
-      sequence: c.sequence ?? i,
-      start: c.start,
-      end: c.end,
-      text: c.text,
-      emphasis: c.emphasis,
-      offsetX: c.offsetX,
-      offsetY: c.offsetY,
-      sizeScale: c.sizeScale,
-    }));
+    const input: KineticCaptionInput[] = captions.map((c, i) => {
+      // The selected chunk is laid out with its unsaved size/position, so the
+      // preview is exact while adjusting (the whole layout is rebuilt because
+      // a look can depend on the captions before it).
+      const edit = i === selRef.current;
+      return {
+        sequence: c.sequence ?? i,
+        start: c.start,
+        end: c.end,
+        text: c.text,
+        emphasis: c.emphasis,
+        offsetX: edit && pendingPos ? pendingPos.offsetX : c.offsetX,
+        offsetY: edit && pendingPos ? pendingPos.offsetY : c.offsetY,
+        sizeScale: edit && pendingScale != null ? pendingScale : c.sizeScale,
+      };
+    });
 
     try {
       compRef.current = buildKineticComposition({
@@ -247,6 +275,7 @@ export default function KineticCaptionLayer({
         // equal per-face fingerprints prove both sides measured the same fonts.
         console.debug('[kinetic] fingerprints', template, compRef.current.fingerprints);
       }
+      setBoxTick((n) => n + 1);
     } catch (err) {
       console.error('[kinetic] build failed:', err);
       compRef.current = null;
@@ -254,7 +283,10 @@ export default function KineticCaptionLayer({
     // `captions`, `params` and `frame` are read but intentionally tracked by
     // content / aspect rather than identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fonts, template, captionsKey, paramsKey, color, highlightColor, fontSize, frame.W, frame.H]);
+  }, [fonts, template, captionsKey, paramsKey, color, highlightColor, fontSize, frame.W, frame.H, editKey]);
+
+  const clearSelectionRef = useRef(clearSelection);
+  clearSelectionRef.current = clearSelection;
 
   /* -- 4. Draw loop ------------------------------------------------------ *
    * Reads video.currentTime directly every frame and never sets React state —
@@ -273,6 +305,11 @@ export default function KineticCaptionLayer({
         const video = videoRef.current;
         const t = (video?.currentTime ?? 0) + LEAD;
         renderKineticFrame(ctx, comp, { timeSec: t });
+        // The selected chunk left the screen: drop the selection and its unsaved change.
+        if (selRef.current != null && !activeKineticScenes(comp, t).some((a) => a.scene.index === selRef.current)) {
+          selRef.current = null;
+          clearSelectionRef.current();
+        }
 
         // Text behind person: the footage, kept only where the mask says
         // "person", drawn back on top of the captions. Same compositing the
@@ -328,6 +365,7 @@ export default function KineticCaptionLayer({
     caption: DisplayCaption;
     grabX: number;
     grabY: number;
+    moved?: boolean;
   } | null>(null);
 
   const sceneAt = (timeSec: number) => {
@@ -351,6 +389,17 @@ export default function KineticCaptionLayer({
     if (!scene || !caption) return;
 
     const { nx, ny } = toNorm(e);
+    // Only a press on the caption itself picks it up (with a little slack).
+    const b = sceneBox(scene);
+    if (Math.abs(nx - b.cx) > b.hw + 0.03 || Math.abs(ny - b.cy) > b.hh + 0.03) {
+      clearSelection();
+      return;
+    }
+    if (sel !== scene.index) {
+      setPendingScale(null);
+      setPendingPos(null);
+    }
+    setSel(scene.index);
     // Grab offset from the caption's current centre, so it follows the cursor
     // from where it was picked up rather than snapping its centre under it.
     const curX = scene.anchorX ?? scene.centerX;
@@ -367,6 +416,8 @@ export default function KineticCaptionLayer({
     const { nx, ny } = toNorm(e);
     drag.scene.anchorX = nx - drag.grabX;
     drag.scene.anchorY = ny - drag.grabY;
+    drag.moved = true;
+    setBoxTick((n) => n + 1);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -375,17 +426,69 @@ export default function KineticCaptionLayer({
     if (!drag) return;
     e.currentTarget.releasePointerCapture?.(e.pointerId);
 
-    // Persist the CLAMPED position, so what is stored is what is drawn.
+    if (!drag.moved) return;
+    // Keep the CLAMPED position, so what is saved is what is drawn. Saved only
+    // when the user picks a scope in the Size bar.
     const shift = kineticSceneShift(drag.scene);
     const round = (v: number) => Math.round(v * 1000) / 10; // normalised -> %
-    onChunkStyleCommit?.(
-      drag.caption,
-      {
-        offsetX: round(drag.scene.centerX + shift.dx),
-        offsetY: round(drag.scene.centerY + shift.dy),
-      },
-      'chunk',
-    );
+    setPendingPos({ offsetX: round(drag.scene.centerX + shift.dx), offsetY: round(drag.scene.centerY + shift.dy) });
+  };
+
+  /** A scene's on-screen box (normalised), after its manual-position clamp. */
+  function sceneBox(scene: KineticComposition['scenes'][number]) {
+    const shift = kineticSceneShift(scene);
+    return { cx: scene.centerX + shift.dx, cy: scene.centerY + shift.dy, hw: scene.halfW, hh: scene.halfH };
+  }
+  const selScene = sel != null ? compRef.current?.scenes.find((sc) => sc.index === sel) : undefined;
+  const selCaption = sel != null ? captions[sel] : undefined;
+  const box = selScene ? sceneBox(selScene) : null;
+
+  useEffect(() => {
+    if (sel == null) return;
+    const onDown = (e: PointerEvent) => {
+      if (wrapRef.current && e.target instanceof Node && wrapRef.current.contains(e.target)) return;
+      clearSelection();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearSelection();
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [sel, clearSelection]);
+
+  // Corner handles: the size follows the pointer's distance from the box centre.
+  const scaleRaf = useRef(0);
+  const startResize = (e: React.PointerEvent) => {
+    if (!box || !selCaption || !wrapRef.current) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const r = wrapRef.current.getBoundingClientRect();
+    const cx = r.left + box.cx * r.width;
+    const cy = r.top + box.cy * r.height;
+    const startDist = Math.max(12, Math.hypot(e.clientX - cx, e.clientY - cy));
+    const startScale = pendingScale ?? selCaption.sizeScale ?? 100;
+    let next = startScale;
+    const onMove = (ev: PointerEvent) => {
+      next = clampChunkScale((startScale * Math.hypot(ev.clientX - cx, ev.clientY - cy)) / startDist);
+      // At most one layout rebuild per frame while dragging.
+      if (!scaleRaf.current) {
+        scaleRaf.current = requestAnimationFrame(() => {
+          scaleRaf.current = 0;
+          setPendingScale(next);
+        });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      setPendingScale(next);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   const missing = fonts?.statuses.filter((s) => !s.ok) ?? [];
@@ -400,6 +503,53 @@ export default function KineticCaptionLayer({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       />
+      {box && selCaption && onChunkStyleCommit && (
+        <div
+          className="kinetic-select-box"
+          style={{
+            left: `${(box.cx - box.hw) * 100}%`,
+            top: `${(box.cy - box.hh) * 100}%`,
+            width: `${box.hw * 200}%`,
+            height: `${box.hh * 200}%`,
+          }}
+        >
+          {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
+            <span
+              key={corner}
+              className={`caption-resize caption-resize-${corner}`}
+              title="Drag to resize the caption"
+              onPointerDown={startResize}
+            />
+          ))}
+          <ChunkSizeToolbar
+            className={`kinetic-size-bar${box.cy - box.hh < 0.3 ? ' is-below' : ''}`}
+            scale={pendingScale ?? selCaption.sizeScale ?? 100}
+            pending={pendingScale != null || pendingPos != null}
+            onScale={(v) => setPendingScale(v === (selCaption.sizeScale ?? 100) && !pendingPos ? null : v)}
+            onApply={(scope) => {
+              onChunkStyleCommit(
+                selCaption,
+                { ...(pendingScale != null ? { sizeScale: pendingScale } : {}), ...(pendingPos ?? {}) },
+                scope,
+              );
+              setPendingScale(null);
+              setPendingPos(null);
+            }}
+            onCancel={() => {
+              setPendingScale(null);
+              setPendingPos(null);
+            }}
+            onDelete={
+              onChunkDelete
+                ? () => {
+                    onChunkDelete(selCaption);
+                    clearSelection();
+                  }
+                : undefined
+            }
+          />
+        </div>
+      )}
       {missing.length > 0 && (
         <div className="kinetic-font-warning">
           {missing.map((s) => s.family).join(' and ')} did not load - the preview is drawing in a

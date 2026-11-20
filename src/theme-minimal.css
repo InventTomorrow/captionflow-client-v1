@@ -1169,3 +1169,272 @@ html .shell-editor .display-check { color: var(--cf-accent); }
   html .shell-editor .props-section,
   html .shell-editor .templates-list { padding-inline: 0.85rem; }
 }
+
+/* ------------------------------------------------------------------ *
+ * Caption template gallery (components/TemplateGallery.tsx, TemplateCard.tsx)
+ * Two columns of real-renderer previews; kiwi only marks the applied card.
+ * ------------------------------------------------------------------ */
+/* Templates panel ≈ 290 px (76 px icon rail + panel + borders); narrower windows keep the editor's own 38vw cap. */
+html .shell-editor .studio-drawer.is-open.is-wide { width: min(368px, 38vw); }
+
+html .tpl-gallery { display: grid; gap: 0.65rem; padding: 0.7rem 0.75rem 1rem; }
+
+html .tpl-filters {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -0.15rem;
+  padding: 0 0.15rem 0.1rem;
+}
+html .tpl-filters::-webkit-scrollbar { display: none; }
+html .tpl-filter {
+  flex: none;
+  min-height: 30px;
+  padding: 0 0.7rem;
+  border: 1px solid #2c3136;
+  border-radius: 999px;
+  background: transparent;
+  color: #a2aab0;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+html .tpl-filter:hover { color: #eceeef; border-color: #454c52; }
+html .tpl-filter.is-on { color: #0b0d0f; border-color: #eceeef; background: #eceeef; }
+html .tpl-filter:focus-visible { outline: 2px solid var(--cf-accent); outline-offset: 2px; }
+
+html .tpl-applied {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #2b3034;
+  border-radius: 8px;
+  background: #171a1e;
+}
+html .tpl-applied-label { color: #7f878e; font-size: 0.66rem; font-weight: 600; }
+html .tpl-applied-name { color: #f3f4f5; font-size: 0.86rem; font-weight: 650; }
+html .tpl-applied-desc { color: #a2aab0; font-size: 0.72rem; line-height: 1.45; }
+
+/* One template per row: full-width previews. */
+html .templates-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+html .display-card.tpl-card {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #2c3136;
+  border-radius: 9px;
+  background: #171a1e;
+  box-shadow: none;
+  transform: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+html .display-card.tpl-card:hover { border-color: #4a5257; background: #1c2024; transform: none; box-shadow: none; }
+html .display-card.tpl-card.active,
+html .display-card.tpl-card.active:hover {
+  border-color: color-mix(in srgb, var(--cf-accent) 70%, #2c3136);
+  background: #1a1f1b;
+  box-shadow: none;
+}
+html .display-card.tpl-card:focus-visible { outline: 2px solid var(--cf-accent); outline-offset: 2px; }
+
+html .display-stage.tpl-stage {
+  position: relative;
+  display: block;
+  min-height: 0;
+  aspect-ratio: 2 / 1;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #262b2f;
+  border-radius: 0;
+  background: #0c0e10;
+  overflow: hidden;
+}
+html .display-stage.tpl-stage.has-bg {
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+    var(--stage-img) center / cover no-repeat,
+    #0c0e10;
+}
+
+/* The real renderer lays out in a 270×480 frame scaled to the card, centred. */
+html .tpl-preview { position: absolute; inset: 0; display: block; pointer-events: none; }
+/* The real renderers inside a card must never take the card's click. */
+html .tpl-preview * { pointer-events: none !important; }
+html .tpl-preview-frame { position: absolute; left: 50%; top: 50%; transform-origin: center; }
+html .tpl-preview-frame .caption-resize,
+html .tpl-preview-frame .caption-resize-confirm { display: none; }
+
+html .tpl-check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cf-accent);
+  color: #0b0d0f;
+}
+
+html .tpl-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.45rem 0.6rem 0.5rem;
+}
+html .tpl-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #eceeef;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html .tpl-cat { flex: none; color: #7f878e; font-size: 0.66rem; white-space: nowrap; }
+html .tpl-state { flex: none; color: var(--cf-accent); font-size: 0.66rem; font-weight: 650; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  html .shell-editor .studio-drawer.is-open.is-wide { width: 100%; }
+  html .shell-editor .studio-drawer.is-open.is-wide { max-height: 560px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * On-video caption selection + Size bar (ChunkSizeToolbar)
+ * ------------------------------------------------------------------ */
+html .caption-overlay.draggable { touch-action: none; }
+html .caption-overlay.is-selected {
+  outline: 1px solid rgba(243, 244, 245, 0.75);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html .caption-resize {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #0b0d0f;
+  background: #f3f4f5;
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  html .caption-resize { width: 20px; height: 20px; }
+  html .caption-resize-nw, html .caption-resize-ne { top: -12px; }
+  html .caption-resize-sw, html .caption-resize-se { bottom: -12px; }
+  html .caption-resize-nw, html .caption-resize-sw { left: -12px; }
+  html .caption-resize-ne, html .caption-resize-se { right: -12px; }
+}
+
+html .chunk-size-bar {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  max-width: min(340px, 92vw);
+  padding: 6px;
+  border: 1px solid #2f353a;
+  border-radius: 10px;
+  background: rgba(16, 18, 21, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: default;
+  /* App UI inside a caption: never inherit the template's type or effects. */
+  color: #eceeef;
+  font: 600 12px/1.2 var(--cf-font);
+  letter-spacing: normal;
+  text-transform: none;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  white-space: nowrap;
+  filter: none;
+}
+html .caption-resize-confirm.chunk-size-bar { top: auto; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); border-radius: 10px; }
+html .caption-overlay.is-near-top .caption-resize-confirm.chunk-size-bar { bottom: auto; top: calc(100% + 10px); }
+html .chunk-size-row { display: flex; align-items: center; gap: 6px; }
+html .chunk-size-slider { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+html .chunk-size-label { color: #a2aab0; font-size: 11px; }
+html .chunk-size-slider input[type='range'] { width: 132px; accent-color: var(--cf-accent); cursor: pointer; }
+html .chunk-size-value { min-width: 38px; color: #f3f4f5; font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+html .chunk-size-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #2f353a;
+  border-radius: 6px;
+  background: transparent;
+  color: #c9ced1;
+  cursor: pointer;
+}
+html .chunk-size-icon:hover:not(:disabled) { color: #fff; border-color: #4a5257; }
+html .chunk-size-icon:disabled { opacity: 0.35; cursor: default; }
+html .chunk-size-icon.danger:hover { color: #ffabab; border-color: #6b3a3a; }
+html .chunk-size-apply {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #3a4045;
+  border-radius: 6px;
+  background: transparent;
+  color: #eceeef;
+  font: inherit;
+  cursor: pointer;
+}
+html .chunk-size-apply:hover { border-color: #5a6268; }
+html .chunk-size-apply.primary { border-color: #f3f4f5; background: #f3f4f5; color: #0b0d0f; }
+html :is(.chunk-size-apply, .chunk-size-icon, .chunk-size-slider input):focus-visible { outline: 2px solid var(--cf-accent); outline-offset: 2px; }
+
+
+/* Kinetic captions: the selected chunk's box (drawn over the canvas). */
+html .kinetic-select-box {
+  position: absolute;
+  outline: 1px solid rgba(243, 244, 245, 0.75);
+  outline-offset: 2px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+html .kinetic-select-box .caption-resize,
+html .kinetic-select-box .chunk-size-bar { pointer-events: auto; }
+html .kinetic-size-bar { bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); }
+html .kinetic-size-bar.is-below { bottom: auto; top: calc(100% + 10px); }
+
+/* Editor tool drawer on tablets/phones: icon row on top, the panel full width
+   below it (the row used to stretch across the drawer and push the panel off-screen). */
+@media (max-width: 1100px) {
+  html .shell-editor .studio-drawer,
+  html .shell-editor .studio-drawer.is-open,
+  html .shell-editor .studio-drawer.is-closed {
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+  }
+  html .shell-editor .studio-drawer.is-open { height: min(560px, 72vh); max-height: none; }
+  html .shell-editor .studio-drawer.is-closed { height: auto; }
+  html .shell-editor .studio-rail {
+    flex: 0 0 auto;
+    flex-direction: row;
+    width: 100%;
+    flex-basis: auto;
+    height: auto;
+    padding: 0.35rem;
+    gap: 0.25rem;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid #2b3034;
+  }
+  html .shell-editor .rail-item { flex: 0 0 auto; min-width: 68px; height: auto; }
+  html .shell-editor .rail-item.active::before { left: 50%; top: auto; bottom: 0; width: 24px; height: 3px; transform: translateX(-50%); }
+  html .shell-editor .studio-rail > :is(.rail-spacer, .rail-collapse) { margin-left: auto; }
+  html .shell-editor .studio-drawer .studio-panel { flex: 1 1 auto; min-height: 0; width: 100%; }
+}

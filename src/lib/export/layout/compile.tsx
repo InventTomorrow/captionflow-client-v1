@@ -31,9 +31,13 @@ import {
   type CaptionTemplate,
 } from '../../../components/CaptionOverlay';
 import { resolveCaptionAnchor } from '../../captionPosition';
+import { resolveFontSources } from './fontSources';
+import { fitCaptionToFrame } from '../../captionFit';
+import { loadLayoutFonts } from './layoutFonts';
 import { deriveDisplayCaptions, type DisplayCaption, type DisplayMode } from '../../displayCaptions';
 import {
   colorAlpha,
+  familyNames,
   normalizeColor,
   parseBlurFilter,
   parseDropShadow,
@@ -56,6 +60,12 @@ import {
   type TextItem,
   type VariantValues,
 } from './types';
+
+/** A family list whose first face is a web font (not a generic or a system face we never ship). */
+function needsWebFont(fontFamily: string): boolean {
+  const first = familyNames(fontFamily)[0]?.toLowerCase() ?? '';
+  return !!first && !['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'inherit'].includes(first);
+}
 
 /** The style fields the preview overlay reads (a subset of the editor's StyleState). */
 export interface LayoutStyle {
@@ -351,7 +361,24 @@ export async function compileLayoutTrack(opts: CompileOptions): Promise<LayoutTr
           fresh += ch;
         }
       }
-      if (fresh) pending.push(document.fonts.load(font, fresh).catch(() => null));
+      if (fresh) {
+        const use = { fontStyle: cs.fontStyle, fontWeight: cs.fontWeight, fontFamily: cs.fontFamily, text: fresh };
+        pending.push(
+          document.fonts
+            .load(font, fresh)
+            .then((faces) => {
+              // Nothing matched: the stylesheet declaring this family hasn't
+              // loaded (yet) in this document. Register the exact files the
+              // export worker will draw with (resolveFontSources), so the
+              // layout is measured in the same face it is painted in —
+              // otherwise the worker paints the real glyphs at a fallback
+              // font's positions (gaps / overlaps).
+              if (faces.length || !needsWebFont(cs.fontFamily)) return;
+              return resolveFontSources({ fontUses: [use] }).then((src) => loadLayoutFonts(src, [use]));
+            })
+            .catch(() => null),
+        );
+      }
     }
     if (pending.length) {
       await Promise.all(pending);
@@ -590,6 +617,8 @@ export async function compileLayoutTrack(opts: CompileOptions): Promise<LayoutTr
     const overlay = mount.querySelector('.caption-overlay') as HTMLElement | null;
     if (!overlay) throw new Error('caption layout: overlay did not render');
     await ensureFonts(overlay);
+    // Same safe-area shrink the preview applies (lib/captionFit.ts), once the real fonts are in.
+    fitCaptionToFrame(overlay);
     // Pass A: CSS animations as authored.
     const animSpecs = new Map<Element, CssAnim>();
     for (const el of Array.from(overlay.querySelectorAll('*'))) {

@@ -18,7 +18,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Caption } from '../stores/captionStore';
 import { CaptionOverlay, LEAD, type OverlayStyle } from '../components/CaptionOverlay';
-import { ANTIGRAVITY_UNIFIED_TEMPLATES } from '../lib/captionTemplates';
+import { TEMPLATE_CATALOG } from '../lib/templateCatalog';
+import { styleWithTemplate } from '../lib/templateApply';
 import { deriveDisplayCaptions, type DisplayMode } from '../lib/displayCaptions';
 import { isKineticTemplate } from '../lib/kinetic/engine';
 import { compileLayoutTrack, type LayoutStyle } from '../lib/export/layout/compile';
@@ -51,39 +52,20 @@ const BASE: LayoutStyle & { aspectRatio: string } = {
   aspectRatio: '9:16',
 };
 
-/** The editor's inline cards (EditorPage UNIFIED_TEMPLATES) that captionTemplates.ts doesn't list. */
-const INLINE_CARDS: Array<{ key: string; preset: Partial<LayoutStyle> }> = [
-  { key: 'beat-karaoke', preset: { displayMode: 'karaoke', template: 'classic', fontFamily: 'Poppins', fontWeight: 700, highlightColor: '#FFC43D', animation: 'fade' } },
-  { key: 'hero-punch', preset: { displayMode: 'phrase', template: 'hero', fontFamily: 'Montserrat', fontWeight: 900, highlightColor: '#8FE649', animation: 'pop' } },
-  { key: 'word-blast', preset: { displayMode: 'word', template: 'bigpop', fontFamily: 'Anton', fontWeight: 900, highlightColor: '#FFFFFF', animation: 'bounce' } },
-  { key: 'soft-flicker', preset: { displayMode: 'phrase', template: 'classic', fontFamily: 'Bebas Neue', fontWeight: 700, highlightColor: '#FFFFFF', animation: 'pop', displayWords: 3 } },
-  { key: 'marker-pen', preset: { displayMode: 'phrase', template: 'highlight', fontFamily: 'Poppins', fontWeight: 700, highlightColor: '#FFC43D', animation: 'fade' } },
-  { key: 'stack-verse', preset: { displayMode: 'phrase', template: 'stack', fontFamily: 'Oswald', fontWeight: 700, highlightColor: '#E7C65C', animation: 'slideUp' } },
-  { key: 'full-sentence', preset: { displayMode: 'sentence', template: 'classic', fontFamily: 'Inter', fontWeight: 600, highlightColor: '#FFFFFF', animation: 'fade' } },
-  { key: 'word-reveal', preset: { displayMode: 'paintOn', template: 'classic', fontFamily: 'Poppins', fontWeight: 700, highlightColor: '#8FE649', animation: 'fade' } },
-  { key: 'typewriter', preset: { displayMode: 'typewriter', template: 'classic', fontFamily: 'Rubik', fontWeight: 600, highlightColor: '#FFFFFF', animation: 'none' } },
+/** Legacy looks no card offers any more, still rendered for older projects. */
+const LEGACY_CARDS: Array<{ key: string; preset: Partial<LayoutStyle> }> = [
   { key: 'mixed-styles', preset: { displayMode: 'phrase', template: 'mixed', animation: 'fade' } },
   { key: 'rolling-classic', preset: { displayMode: 'rolling', template: 'classic', fontFamily: 'Poppins', fontWeight: 700, animation: 'fade' } },
 ];
 
-function allCards(): Array<{ key: string; preset: Partial<LayoutStyle> }> {
-  const fromLib = ANTIGRAVITY_UNIFIED_TEMPLATES.map((c) => ({ key: c.key, preset: c.preset as Partial<LayoutStyle> }));
-  return [...fromLib, ...INLINE_CARDS].filter((c) => !isKineticTemplate(c.preset.template));
-}
-
-/** EditorPage.stackedDisplayMode + applyDisplay rules. */
-function styleForCard(preset: Partial<LayoutStyle>): LayoutStyle {
-  const next: LayoutStyle = { ...BASE, activeFill: 'transparent', textTransform: 'none', ...preset };
-  const tpl = next.template;
-  if (tpl === 'heroWord') {
-    next.displayMode = 'paintOn';
-    if (!next.highlightColor || next.highlightColor === '#FFFFFF') next.highlightColor = '#FF2D9A';
-    next.fontWeight = 900;
-    next.fontFamily = 'Montserrat';
-  } else if (['hero', 'stack', 'mixed', 'mixed2'].includes(tpl)) {
-    next.displayMode = 'phrase';
-  }
-  return next;
+/** Every non-kinetic catalog card (shown or hidden), as the editor applies it, plus the legacy looks. */
+function allCards(): Array<{ key: string; style: LayoutStyle }> {
+  const fromCatalog = TEMPLATE_CATALOG.map((c) => ({ key: c.key, style: { ...BASE, ...styleWithTemplate(BASE, c) } as LayoutStyle }));
+  const legacy = LEGACY_CARDS.map((c) => ({
+    key: c.key,
+    style: { ...BASE, ...styleWithTemplate(BASE, { key: c.key, name: c.key, purpose: '', desc: '', preset: c.preset as never }) } as LayoutStyle,
+  }));
+  return [...fromCatalog, ...legacy].filter((c) => !isKineticTemplate(c.style.template));
 }
 
 const LINES = [
@@ -135,8 +117,13 @@ export function CaptionLayoutDevPage() {
   const width = aw >= ah ? REF_LONG_EDGE : (REF_LONG_EDGE * aw) / ah;
   const height = aw >= ah ? (REF_LONG_EDGE * ah) / aw : REF_LONG_EDGE;
 
-  const style = useMemo(() => styleForCard(card.preset), [card]);
-  const captions = useMemo(fixtureCaptions, []);
+  const style = card.style;
+  // ?scale=145 — every caption carries that size override (Caption.sizeScale), as after "Apply to all chunks".
+  const scale = Number(params.get('scale')) || null;
+  const captions = useMemo(
+    () => fixtureCaptions().map((c) => (scale ? { ...c, sizeScale: scale } : c)),
+    [scale],
+  );
   const display = useMemo(
     () => deriveDisplayCaptions(captions, style.displayMode as DisplayMode, style.displayWords),
     [captions, style],
@@ -144,7 +131,18 @@ export function CaptionLayoutDevPage() {
   const target = display[Math.min(display.length - 1, seq - 1)];
   // Nudged off word boundaries so paint/karaoke animations have settled —
   // the DOM preview mounts already-revealed words without animating them.
-  const t = Math.min(target.end - 0.05, target.start + (target.end - target.start) * at + 0.23);
+  // The DOM side is screenshotted after its wall-clock animations settle, so the
+  // export is compared at an instant where no word is mid-entry: at least
+  // SETTLE after the latest word start (entry animations last ≤ 0.3 s).
+  const SETTLE = 0.4;
+  const raw = Math.min(target.end - 0.05, target.start + (target.end - target.start) * at + 0.23);
+  const wordStarts = captions.flatMap((c) => (c.words ?? []).map((w) => w.start)).filter((s) => s <= raw + LEAD);
+  const lastStart = wordStarts.length ? Math.max(...wordStarts) : target.start;
+  // Whole-caption entrances also settle: the editorial templates blur each word
+  // in with a stagger of up to 0.14 s/word (CaptionOverlay `gap`) + ~0.6 s.
+  const blockSettle = target.start + (target.text.split(/\s+/).length - 1) * 0.14 + 0.65;
+  const settled = Math.max(raw + LEAD - lastStart < SETTLE ? lastStart + SETTLE - LEAD : raw, blockSettle - LEAD);
+  const t = Math.min(target.end - 0.05, settled);
 
   const layerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef({ currentTime: t - LEAD } as unknown as HTMLVideoElement);

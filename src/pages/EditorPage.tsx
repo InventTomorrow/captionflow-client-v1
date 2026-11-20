@@ -57,8 +57,9 @@ import {
   resolveCaptionAnchor,
   type CaptionPosition,
 } from '../lib/captionPosition';
-import { pickerTemplates } from '../lib/templateCatalog';
-import { TemplateCard } from '../components/TemplateCard';
+import { pickerTemplates, type UnifiedTemplate } from '../lib/templateCatalog';
+import { appliedTemplateKey, styleWithTemplate } from '../lib/templateApply';
+import { TemplateGallery } from '../components/TemplateGallery';
 import { PremiumSelect } from '../components/PremiumSelect';
 import { getAllForProject, replaceAllForProject, upsertOne } from '../lib/captionDb';
 import { TimelineBlocks } from '../components/TimelineBlocks';
@@ -97,6 +98,24 @@ import {
 } from '../lib/export/clientExport';
 
 type StyleState = EditorStyle;
+
+/** Per-caption fields the on-video size/position editor writes. */
+type ChunkStyleKey = 'sizeScale' | 'offsetX' | 'offsetY' | 'behindPerson';
+/** Values of those fields for some captions (by stable _id): one undo/redo step. */
+type ChunkStyleSnapshot = Array<{ id: string; values: Partial<Record<ChunkStyleKey, number | boolean | null>> }>;
+
+function snapshotChunkStyle(captions: Caption[], ids: string[], keys: ChunkStyleKey[]): ChunkStyleSnapshot {
+  const wanted = new Set(ids);
+  return captions
+    .filter((c) => c._id && wanted.has(c._id))
+    .map((c) => ({
+      id: c._id!,
+      // A field that was never set restores as null (= follow the project style).
+      values: Object.fromEntries(keys.map((k) => [k, (c as unknown as Record<string, unknown>)[k] ?? null])) as Partial<
+        Record<ChunkStyleKey, number | boolean | null>
+      >,
+    }));
+}
 
 /** Server-side state of the project's person matte (Project.masks). */
 interface MasksState {
@@ -623,6 +642,8 @@ export function EditorPage() {
   // Mirror of `style` for pointer-up persistence (avoids stale closure values).
   const styleRef = useRef(style);
   styleRef.current = style;
+  /** Style saves go out one after another (commitDisplayStyle), so the server ends on the last change. */
+  const styleSaves = useRef<Promise<unknown>>(Promise.resolve());
   const showExportRef = useRef(showExport);
   showExportRef.current = showExport;
 
@@ -1071,7 +1092,11 @@ export function EditorPage() {
         stylePatch.displayMode = forcedMode;
       }
       if (Object.keys(stylePatch).length) {
-        void api.patch(`/projects/${id}/style`, stylePatch).catch(() => undefined);
+        // Same ordered queue as template switches, so a quick first click can't be overwritten by this.
+        styleSaves.current = styleSaves.current
+          .catch(() => undefined)
+          .then(() => api.patch(`/projects/${id}/style`, stylePatch))
+          .catch(() => undefined);
       }
       if (settings) {
         setOutputLanguage(settings.outputLanguage || 'keep_original');
@@ -1772,8 +1797,26 @@ export function EditorPage() {
       next.fontWeight = 900;
       next.fontFamily = 'Montserrat';
     }
+    commitDisplayStyle(next);
+  }
+
+  /** Switch to a template card: its whole look replaces the previous template's (lib/templateApply.ts). */
+  function applyTemplate(card: UnifiedTemplate) {
+    commitDisplayStyle(styleWithTemplate(styleRef.current, card) as StyleState);
+  }
+
+  /**
+   * Show a style now and save it. The ref is updated at once so a quick second
+   * change builds on this one, and saves go out one after another so the
+   * server always ends on the last choice (rapid template clicks: last wins).
+   */
+  function commitDisplayStyle(next: StyleState) {
+    styleRef.current = next;
     setStyle(next);
-    void api.patch(`/projects/${id}/style`, next).catch(() => undefined);
+    styleSaves.current = styleSaves.current
+      .catch(() => undefined)
+      .then(() => api.patch(`/projects/${id}/style`, next))
+      .catch(() => undefined);
   }
 
   /**
@@ -1980,20 +2023,62 @@ export function EditorPage() {
     scope: 'chunk' | 'all',
   ) {
     if (!id) return;
+    // "This chunk" = the canonical caption that owns the on-screen chunk
+    // (displayCaptions styleSourceId, a stable _id); "all" = every caption of this video.
+    const current = useCaptionStore.getState().captions;
     const targetIds =
       scope === 'chunk'
-        ? caption.sourceIds?.length
-          ? caption.sourceIds
-          : [caption.sourceId ?? caption._id].filter((v): v is string => !!v)
-        : captions.map((c) => c._id).filter((v): v is string => !!v);
+        ? [caption.styleSourceId ?? caption.sourceId ?? caption._id].filter((v): v is string => !!v)
+        : current.map((c) => c._id).filter((v): v is string => !!v);
     if (!targetIds.length) return;
-    const idSet = new Set(targetIds);
-    const updatedCaptions = captions.map((c) => (c._id && idSet.has(c._id) ? { ...c, ...patch } : c));
-    setCaptions(updatedCaptions);
-    await Promise.all(
-      updatedCaptions.filter((c) => c._id && idSet.has(c._id)).map((c) => upsertOne(id, c)),
-    );
+    const keys = Object.keys(patch) as ChunkStyleKey[];
+    const before = snapshotChunkStyle(current, targetIds, keys);
+    await applyChunkStyle(targetIds.map((cid) => ({ id: cid, values: patch })));
+    chunkHistory.current.undo.push(before);
+    if (chunkHistory.current.undo.length > 50) chunkHistory.current.undo.shift();
+    chunkHistory.current.redo = [];
   }
+
+  /** Write per-caption size/position values to the captions and this device's store. */
+  async function applyChunkStyle(entries: ChunkStyleSnapshot) {
+    if (!id) return;
+    const byId = new Map(entries.map((e) => [e.id, e.values]));
+    const updated = useCaptionStore
+      .getState()
+      .captions.map((c) => (c._id && byId.has(c._id) ? ({ ...c, ...byId.get(c._id) } as Caption) : c));
+    setCaptions(updated);
+    await Promise.all(updated.filter((c) => c._id && byId.has(c._id)).map((c) => upsertOne(id, c)));
+  }
+
+  /** Undo / redo of on-video size and position changes (Ctrl/Cmd+Z, Ctrl+Shift+Z or Ctrl+Y). */
+  const chunkHistory = useRef<{ undo: ChunkStyleSnapshot[]; redo: ChunkStyleSnapshot[] }>({ undo: [], redo: [] });
+  const stepChunkHistory = useCallback(
+    (direction: 'undo' | 'redo') => {
+      const h = chunkHistory.current;
+      const entry = (direction === 'undo' ? h.undo : h.redo).pop();
+      if (!entry) return false;
+      const keys = [...new Set(entry.flatMap((e) => Object.keys(e.values)))] as ChunkStyleKey[];
+      const inverse = snapshotChunkStyle(useCaptionStore.getState().captions, entry.map((e) => e.id), keys);
+      (direction === 'undo' ? h.redo : h.undo).push(inverse);
+      void applyChunkStyleRef.current(entry);
+      return true;
+    },
+    [],
+  );
+  const applyChunkStyleRef = useRef(applyChunkStyle);
+  applyChunkStyleRef.current = applyChunkStyle;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const k = e.key.toLowerCase();
+      const dir = k === 'z' ? (e.shiftKey ? 'redo' : 'undo') : k === 'y' ? 'redo' : null;
+      if (dir && stepChunkHistory(dir)) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stepChunkHistory]);
 
   /**
    * Push one phrase behind the speaker, or pull it back in front.
@@ -2437,7 +2522,7 @@ export function EditorPage() {
       )}
 
       <div className={`studio-body ${drawerOpen ? 'drawer-open' : 'drawer-closed'}`}>
-        <div className={`studio-drawer ${drawerOpen ? 'is-open' : 'is-closed'}`}>
+        <div className={`studio-drawer ${drawerOpen ? 'is-open' : 'is-closed'}${drawerOpen && panel === 'templates' ? ' is-wide' : ''}`}>
         <nav className="studio-rail">
           {RAIL_ITEMS.map((item) => (
             <button
@@ -2789,32 +2874,10 @@ export function EditorPage() {
             <>
               <div className="panel-header">
                 <h3>Templates</h3>
-                <span className="panel-count">{templateCards.length} unique</span>
+                <span className="panel-count">{templateCards.length}</span>
               </div>
               <div className="panel-scroll">
-                <div className="templates-head">
-                  {/* <h4>Caption Templates</h4> */}
-                  {/* <span className="muted tiny">Each style has a clear job · instant</span> */}
-                </div>
-                <div className="templates-list">
-                  {templateCards.map((t) => {
-                    const isActive =
-                      style.displayMode === t.preset.displayMode &&
-                      style.template === t.preset.template &&
-                      style.animation === (t.preset.animation || style.animation) &&
-                      (style.fontFamily || '') === (t.preset.fontFamily || '') &&
-                      (style.highlightColor || '').toUpperCase() ===
-                        (t.preset.highlightColor || '').toUpperCase();
-                    return (
-                      <TemplateCard
-                        key={t.key}
-                        t={t}
-                        isActive={isActive}
-                        onApply={() => applyDisplay({ ...t.preset, templateKey: t.key })}
-                      />
-                    );
-                  })}
-                </div>
+                <TemplateGallery cards={templateCards} appliedKey={appliedTemplateKey(style)} onApply={applyTemplate} />
               </div>
             </>
           )}
@@ -3009,6 +3072,7 @@ export function EditorPage() {
                   params={style.kinetic}
                   behindPerson={!!style.behindPerson}
                   onChunkStyleCommit={handleChunkStyleCommit}
+                  onChunkDelete={deleteDerivedChunk}
                 />
               ) : (
                 <CaptionOverlay

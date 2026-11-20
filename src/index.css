@@ -4855,24 +4855,6 @@ legend {
   color: var(--text);
 }
 
-.template-apply,
-.template-active {
-  font-size: 0.66rem;
-  font-weight: 700;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-}
-
-.template-apply {
-  color: var(--text-secondary);
-  border: 1px solid var(--line);
-}
-
-.template-active {
-  color: var(--gold-ink);
-  background: var(--gold);
-}
-
 /* Display template cards (how captions behave — instant, no credits) */
 
 .display-stage {
@@ -5009,55 +4991,6 @@ legend {
     0 8px 22px color-mix(in srgb, var(--cf-accent) 18%, transparent);
 }
 
-/* Small pills under a template's name ("Kinetic", "Cinematic") — distinct from
-   the single corner badge below. Named `display-pill`, NOT `display-tag`:
-   there is already an (orphaned) `.display-tag` rule further down this file,
-   and being second it would win and paint these gold. */
-.display-tags {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.2rem;
-}
-
-.display-pill {
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1;
-  color: var(--cf-text-secondary);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.18rem 0.42rem;
-}
-
-.display-badge {
-  position: absolute;
-  top: 0.45rem;
-  left: 0.45rem;
-  z-index: 2;
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cf-accent-hover);
-  background: color-mix(in srgb, var(--cf-bg) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cf-accent) 40%, transparent);
-  padding: 0.14rem 0.42rem;
-  border-radius: 999px;
-  backdrop-filter: blur(6px);
-}
-
-.display-check {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  z-index: 2;
-  color: var(--cf-accent);
-  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--cf-accent) 40%, transparent));
-}
-
 .display-meta {
   display: flex;
   align-items: center;
@@ -5066,24 +4999,10 @@ legend {
   padding: 0 0.15rem;
 }
 
-.display-name-block {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
 .display-name {
   font-size: 0.84rem;
   font-weight: 700;
   color: var(--text);
-}
-
-.display-purpose {
-  font-size: 0.66rem;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .display-tag {
@@ -5095,219 +5014,6 @@ legend {
   border: 1px solid var(--line-strong);
   padding: 0.08rem 0.4rem;
   border-radius: 999px;
-}
-
-.display-desc {
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.35;
-  padding: 0 0.15rem 0.1rem;
-}
-
-/* Unique template card previews */
-.uprev {
-  display: inline-flex;
-  align-items: baseline;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.22rem;
-  color: var(--cf-text);
-  font-weight: 700;
-  font-size: 0.78rem;
-  text-align: center;
-  line-height: 1.15;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-}
-
-.uprev-karaoke .uprev-hl {
-  font-weight: 900;
-  animation: uprevPulse 1.6s ease-in-out infinite;
-}
-
-.uprev-dim {
-  opacity: 0.45;
-}
-
-.uprev-hero {
-  display: grid;
-  justify-items: center;
-  gap: 0.08rem;
-}
-
-.uprev-tiny {
-  font-size: 0.58rem;
-  font-weight: 600;
-  opacity: 0.85;
-}
-
-.uprev-hero-word {
-  font-size: 1.28rem;
-  font-weight: 900;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.uprev-blast-word {
-  font-size: 1.45rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transform: rotate(-2deg) scale(1.04);
-  text-shadow:
-    2px 2px 0 rgba(0, 0, 0, 0.9),
-    0 0 18px rgba(255, 255, 255, 0.2);
-  animation: uprevBounce 1.4s ease-in-out infinite;
-}
-
-.uprev-flicker-word {
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-  animation: uprevFlicker 1.5s ease-in-out infinite;
-  text-shadow:
-    0 0 12px rgba(255, 255, 255, 0.85),
-    0 0 28px rgba(255, 255, 255, 0.45);
-}
-
-.uprev-marker {
-  font-size: 0.74rem;
-  font-weight: 600;
-}
-
-.uprev-marker mark {
-  color: #111111;
-  font-weight: 800;
-  padding: 0.05rem 0.28rem;
-  border-radius: 4px;
-}
-
-.uprev-stack {
-  display: grid;
-  justify-items: center;
-  gap: 0.05rem;
-}
-
-.uprev-stack-0 {
-  font-size: 0.58rem;
-  font-weight: 600;
-  opacity: 0.9;
-}
-
-.uprev-stack-1 {
-  font-size: 1.15rem;
-  font-weight: 900;
-  font-family: 'Playfair Display', Georgia, serif;
-  letter-spacing: 0.01em;
-}
-
-.uprev-stack-2 {
-  font-size: 0.5rem;
-  font-weight: 600;
-  opacity: 0.88;
-}
-
-.uprev-stack-3 {
-  font-size: 0.85rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.uprev-clean {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.uprev-sentence {
-  font-size: 0.64rem;
-  font-weight: 600;
-  max-width: 14rem;
-  line-height: 1.35;
-  opacity: 0.95;
-}
-
-.uprev-live {
-  display: grid;
-  gap: 0.18rem;
-  justify-items: center;
-}
-
-.uprev-live-old {
-  font-size: 0.62rem;
-  opacity: 0.4;
-  transform: translateY(-2px);
-}
-
-.uprev-live-new {
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.uprev-reveal span {
-  transition: opacity 0.2s ease;
-}
-
-.uprev-reveal-on {
-  font-weight: 900;
-}
-
-.uprev-reveal-off {
-  opacity: 0.28;
-}
-
-.uprev-type {
-  font-family: 'Consolas', 'Rubik', monospace;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.uprev-caret {
-  display: inline-block;
-  width: 2px;
-  height: 0.9em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  animation: caretBlink 1s steps(2) infinite;
-}
-
-@keyframes uprevPulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.25);
-  }
-}
-
-@keyframes uprevBounce {
-  0%,
-  100% {
-    transform: rotate(-2deg) scale(1.04);
-  }
-  50% {
-    transform: rotate(-2deg) scale(1.1);
-  }
-}
-
-@keyframes uprevFlicker {
-  0%,
-  100% {
-    opacity: 1;
-    filter: brightness(1);
-  }
-  40% {
-    opacity: 0.78;
-    filter: brightness(1.35);
-  }
-  55% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 0.85;
-  }
 }
 
 /* Legacy mini previews (kept for any residual refs) */
@@ -5828,16 +5534,6 @@ legend {
   cursor: grabbing;
 }
 
-/* Template-picker card preview for the canvas templates, drawn by the engine
-   (components/KineticThumb.tsx). Transparent, so the card ground shows. */
-.kinetic-thumb {
-  display: block;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  aspect-ratio: 16 / 9;
-}
-
 /* Quiet status pill over the video while the preview mask model loads. */
 .kinetic-layer-note {
   position: absolute;
@@ -5967,7 +5663,6 @@ legend {
     transform: none;
   }
 }
-
 
 /* Frosted file-name pill overlaid on the video player (top-left). */
 .video-filename-pill {
@@ -7146,115 +6841,18 @@ legend {
   -webkit-box-decoration-break: clone;
 }
 
-.uprev-tiktok {
-  font-family: Bangers, Impact, sans-serif;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.7);
-}
-
-.uprev-pillbox {
-  display: inline-block;
-  background: #fff;
-  color: #111;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.35rem 0.7rem;
-  border-radius: 10px;
-}
-
-.uprev-box {
-  display: inline-block;
-  font-size: 0.72rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 10px;
-  letter-spacing: 0.01em;
-}
-
-.uprev-industrial {
-  font-family: Oswald, 'Arial Narrow', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.uprev-heroword {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.25rem;
-  justify-content: center;
-}
-
-.uprev-hw-n {
-  font-family: Montserrat, sans-serif;
-  font-size: 0.55rem;
-  font-weight: 400;
-  color: #fff;
-}
-
-.uprev-hw-h {
-  font-family: Montserrat, sans-serif;
-  font-size: 1.15rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.uprev-hw-s {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.15rem;
-  font-weight: 400;
-  font-style: italic;
-  color: #fff;
-  line-height: 1;
-}
-
-/* Mixed Styles picker card — three tiny chips hint "a new look every sentence". */
-.uprev-mixed {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.uprev-mx2-0 {
-  font-family: 'Archivo Black', sans-serif;
-  font-size: 0.8rem;
-  color: #fff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
-}
-
-.uprev-mx2-1 {
-  font-family: 'PT Serif', Georgia, serif;
-  font-size: 0.85rem;
-  color: #f3eee3;
-}
-
-.uprev-mx2-2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.05em;
-  color: #c9a24b;
-}
-
 /* Typewriter: untyped characters keep their space so the block never jumps. */
 .capw-ghost {
   visibility: hidden;
 }
 
 /* Rolling: the previous caption sits dimmed above the current one. */
+/* The previous line wraps instead of being cut with an ellipsis: the export
+   replays the measured layout and cannot reproduce a CSS text-overflow cut. */
 .cap-roll-prev {
   font-size: 0.78em;
   line-height: 1.2;
   margin-bottom: 0.3em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
 }
 
@@ -8204,7 +7802,6 @@ legend {
 .lp-body main .lp-card.lp-diff-card {
   text-align: left;
 }
-
 
 .lp-grad {
   background-image: var(--lp-gradient);
@@ -13316,7 +12913,6 @@ legend {
   }
 }
 
-
 .lp-tpl-grid {
   margin-top: 40px;
 }
@@ -14285,7 +13881,6 @@ legend {
     gap: 12px;
   }
 }
-
 
 /* ---------- Admin console ---------- */
 

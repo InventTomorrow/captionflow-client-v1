@@ -2,6 +2,7 @@ import {
   Fragment,
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,7 +10,9 @@ import {
   type RefObject,
 } from 'react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { Check, Trash, X } from '@phosphor-icons/react';
+import { X } from '@phosphor-icons/react';
+import { ChunkSizeToolbar, clampChunkScale } from './ChunkSizeToolbar';
+import { fitCaptionToFrame } from '../lib/captionFit';
 import type { Caption, WordStyle } from '../stores/captionStore';
 import type { DisplayCaption, DisplayMode } from '../lib/displayCaptions';
 import { resolveCaptionAnchor } from '../lib/captionPosition';
@@ -821,10 +824,47 @@ export const CaptionOverlay = memo(function CaptionOverlay({
   // A pending (unconfirmed) resize only ever applies to the caption it was
   // started on — discard it the moment a different caption becomes active.
   const activeIdForPending = active?._id;
+  /** The on-screen chunk is selected: box, handles and the Size bar show. */
+  const [chunkSelected, setChunkSelected] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     setPendingScale(null);
     setPendingPosition(null);
+    setChunkSelected(false);
   }, [activeIdForPending]);
+  // Keep the caption inside the frame's safe area (lib/captionFit.ts — the
+  // export runs the same fit). After every layout, and again when web fonts
+  // finish loading (glyph widths change).
+  useLayoutEffect(() => {
+    fitCaptionToFrame(rootRef.current);
+  });
+  useEffect(() => {
+    const refit = () => fitCaptionToFrame(rootRef.current);
+    document.fonts?.addEventListener?.('loadingdone', refit);
+    return () => document.fonts?.removeEventListener?.('loadingdone', refit);
+  }, []);
+  // Escape or a click anywhere else deselects and drops an unsaved change.
+  useEffect(() => {
+    if (!chunkSelected) return;
+    const dismiss = () => {
+      setPendingScale(null);
+      setPendingPosition(null);
+      setChunkSelected(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (rootRef.current && e.target instanceof Node && rootRef.current.contains(e.target)) return;
+      dismiss();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss();
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [chunkSelected]);
   /** Previous caption, shown dimmed above the current one in Rolling mode. */
   const rollingPrev =
     displayMode === 'rolling' && activeIdx > 0 ? captions[activeIdx - 1] : undefined;
@@ -878,8 +918,9 @@ export const CaptionOverlay = memo(function CaptionOverlay({
         // Framer Motion cannot wipe translate(-50%, -50%) and shift the block.
         <div
           key="caption-overlay"
-          className={`caption-overlay draggable tpl-${style.template} mode-${displayMode}`}
-          title="Drag to move · double-click to edit the text"
+          ref={rootRef}
+          className={`caption-overlay draggable tpl-${style.template} mode-${displayMode}${chunkSelected ? ' is-selected' : ''}${anchor.offsetY < 30 ? ' is-near-top' : ''}`}
+          title="Click to select · drag to move · double-click to edit the text"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => {
             e.stopPropagation();
@@ -890,6 +931,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
             if (editing) return;
             e.stopPropagation();
             e.preventDefault();
+            setChunkSelected(true);
             // Remember where inside the caption the user grabbed, so the box
             // follows the cursor from that point instead of snapping its
             // center under the pointer.
@@ -1052,7 +1094,7 @@ export const CaptionOverlay = memo(function CaptionOverlay({
             </>
           )}
           </motion.div>
-          {!editing &&
+          {!editing && chunkSelected &&
             // CapCut-style handles on all four corners: dragging any corner
             // outward scales the text up, inward scales it down.
             (
@@ -1076,6 +1118,13 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                   const startY = e.clientY;
                   const startScale = pendingScale ?? active.sizeScale ?? 100;
                   resizing.current = { x: startX, y: startY, startScale, sx, sy };
+                  // The whole design scales about its centre: the new size is
+                  // the start size times how much farther the pointer is from
+                  // the centre than where the drag began.
+                  const box = rootRef.current?.getBoundingClientRect();
+                  const cx = box ? box.left + box.width / 2 : startX;
+                  const cy = box ? box.top + box.height / 2 : startY;
+                  const startDist = Math.max(12, Math.hypot(startX - cx, startY - cy));
                   // Window-level listeners instead of setPointerCapture on this
                   // 14px span — capture-based dragging was silently failing to
                   // fire move/up (likely Framer Motion's own pointer handling
@@ -1091,15 +1140,8 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                     // a sizeScale percentage relative to the base
                     // style.fontSize — this chunk resizes, not the whole
                     // project.
-                    const delta = ((ev.clientX - r.x) * r.sx + (ev.clientY - r.y) * r.sy) / 2;
-                    const scaled = (delta * 1080) / Math.max(240, wrapH || 480);
-                    const startPx = (styleLatest.current.fontSize * r.startScale) / 100;
-                    const newPx = Math.min(160, Math.max(16, startPx + scaled));
-                    const scale = Math.min(
-                      400,
-                      Math.max(25, Math.round((newPx / styleLatest.current.fontSize) * 100)),
-                    );
-                    setPendingScale(scale);
+                    const dist = Math.hypot(ev.clientX - cx, ev.clientY - cy);
+                    setPendingScale(clampChunkScale((r.startScale * dist) / startDist));
                   };
                   const onUp = () => {
                     resizing.current = null;
@@ -1116,62 +1158,35 @@ export const CaptionOverlay = memo(function CaptionOverlay({
                 }}
               />
             ))}
-          {(pendingScale != null || pendingPosition != null) && (
-            <div className="caption-resize-confirm" onPointerDown={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="caption-resize-confirm-btn active"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChunkStyleCommit(
-                    active,
-                    {
-                      ...(pendingScale != null ? { sizeScale: pendingScale } : {}),
-                      ...(pendingPosition ?? {}),
-                    },
-                    'chunk',
-                  );
-                  setPendingScale(null);
-                  setPendingPosition(null);
-                }}
-              >
-                <Check size={12} weight="bold" aria-hidden="true" />
-                Current Preset
-              </button>
-              <button
-                type="button"
-                className="caption-resize-confirm-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChunkStyleCommit(
-                    active,
-                    {
-                      ...(pendingScale != null ? { sizeScale: pendingScale } : {}),
-                      ...(pendingPosition ?? {}),
-                    },
-                    'all',
-                  );
-                  setPendingScale(null);
-                  setPendingPosition(null);
-                }}
-              >
-                Apply To All
-              </button>
-              <button
-                type="button"
-                className="caption-resize-confirm-btn danger"
-                title="Delete this whole caption chunk"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChunkDelete(active);
-                  setPendingScale(null);
-                  setPendingPosition(null);
-                }}
-              >
-                <Trash size={12} weight="bold" aria-hidden="true" />
-                Delete
-              </button>
-            </div>
+          {chunkSelected && !editing && (
+            <ChunkSizeToolbar
+              className="caption-resize-confirm"
+              scale={pendingScale ?? active.sizeScale ?? 100}
+              pending={pendingScale != null || pendingPosition != null}
+              onScale={(v) => setPendingScale(v === (active.sizeScale ?? 100) && pendingPosition == null ? null : v)}
+              onApply={(scope) => {
+                onChunkStyleCommit(
+                  active,
+                  {
+                    ...(pendingScale != null ? { sizeScale: pendingScale } : {}),
+                    ...(pendingPosition ?? {}),
+                  },
+                  scope,
+                );
+                setPendingScale(null);
+                setPendingPosition(null);
+              }}
+              onCancel={() => {
+                setPendingScale(null);
+                setPendingPosition(null);
+              }}
+              onDelete={() => {
+                onChunkDelete(active);
+                setPendingScale(null);
+                setPendingPosition(null);
+                setChunkSelected(false);
+              }}
+            />
           )}
           </div>
         </div>

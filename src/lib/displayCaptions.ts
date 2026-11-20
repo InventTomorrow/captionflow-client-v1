@@ -57,6 +57,11 @@ export interface DisplayCaption extends Caption {
    *  caption — used by whole-chunk resize to write sizeScale to all of them,
    *  even when a display caption spans more than one canonical caption. */
   sourceIds?: string[];
+  /** The canonical caption that owns this chunk's size / position / behind-person:
+   *  the one contributing most of its words (the first on a tie). On-video
+   *  "Apply to this chunk" writes to this caption only, so a chunk that starts
+   *  with the previous caption's last word never changes its neighbour. */
+  styleSourceId?: string;
   /**
    * Per-word (aligned with `text.split(whitespace)`) canonical caption id +
    * word index. `sourceId`/`wordOffset` above only cover the common single-
@@ -159,6 +164,11 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
 function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
   const first = words[0];
   const last = words[words.length - 1];
+  // The source with the most words here decides the chunk's size/position.
+  const counts = new Map<string | undefined, number>();
+  for (const w of words) counts.set(w.sourceId, (counts.get(w.sourceId) ?? 0) + 1);
+  let owner = first;
+  for (const w of words) if ((counts.get(w.sourceId) ?? 0) > (counts.get(owner.sourceId) ?? 0)) owner = w;
   const singleSource = first.sourceId != null && words.every((w) => w.sourceId === first.sourceId);
   return {
     _id: `d${sequence}-${first.sourceId ?? 'x'}-${first.sourceIndex}`,
@@ -169,10 +179,11 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
     words: words.map((w) => ({ word: w.text, start: w.start, end: w.end })),
     emphasis: words.map((w) => w.role),
     wordStyles: words.map((w) => w.style ?? {}),
-    sizeScale: first.sizeScale ?? null,
-    offsetX: first.offsetX ?? null,
-    offsetY: first.offsetY ?? null,
-    behindPerson: first.behindPerson ?? null,
+    sizeScale: owner.sizeScale ?? null,
+    offsetX: owner.offsetX ?? null,
+    offsetY: owner.offsetY ?? null,
+    behindPerson: owner.behindPerson ?? null,
+    styleSourceId: owner.sourceId,
     sourceId: singleSource ? first.sourceId : undefined,
     wordOffset: singleSource ? first.sourceIndex : undefined,
     sourceIds: Array.from(new Set(words.map((w) => w.sourceId).filter((id): id is string => !!id))),

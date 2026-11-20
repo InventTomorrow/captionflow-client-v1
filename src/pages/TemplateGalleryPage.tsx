@@ -13,9 +13,11 @@
  * image has decoded and every engine-drawn thumbnail has painted, and lists
  * cards whose backdrop failed to load in window.__templateGalleryMissing.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TemplateCardGallery } from '../components/TemplateCard';
+import { TemplateGallery } from '../components/TemplateGallery';
+import { pickerTemplates } from '../lib/templateCatalog';
 
 declare global {
   interface Window {
@@ -52,8 +54,12 @@ function loadBackdrop(stage: HTMLElement): Promise<string | null> {
 function thumbnailsPainted(): Promise<void> {
   return new Promise((resolve) => {
     const check = () => {
-      const canvases = Array.from(document.querySelectorAll<HTMLCanvasElement>('canvas.kinetic-thumb'));
-      if (canvases.every((c) => Boolean(c.dataset.painted))) resolve();
+      // Every card preview has mounted its renderer (DOM overlay or kinetic canvas).
+      // (Previews mount only near the viewport, so only those are waited for.)
+      const previews = Array.from(document.querySelectorAll('.tpl-preview')).filter(
+        (p) => p.getBoundingClientRect().top < window.innerHeight + 160,
+      );
+      if (previews.every((p) => p.querySelector('.caption-overlay, canvas'))) resolve();
       else window.setTimeout(check, 100);
     };
     check();
@@ -83,6 +89,28 @@ export function TemplateGalleryPage() {
       cancelled = true;
     };
   }, [onlyParam, width]);
+
+  // ?panel=1 — the editor's Templates panel itself (TemplateGallery) in the widened drawer, for UI checks.
+  const [applied, setApplied] = useState<string | undefined>(params.get('applied') ?? 'hero-word');
+  if (params.get('panel') === '1') {
+    const cards = pickerTemplates(null);
+    return (
+      <div className="shell-editor" style={{ display: 'flex', height: '100vh', padding: 12, background: 'var(--cf-bg)' }}>
+        <div className="studio-drawer is-open is-wide">
+          <aside className="studio-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+            <div className="panel-header">
+              <h3>Templates</h3>
+              <span className="panel-count">{cards.length}</span>
+            </div>
+            <div className="panel-scroll">
+              <TemplateGallery cards={cards} appliedKey={applied} onApply={(c) => setApplied(c.key)} />
+            </div>
+          </aside>
+        </div>
+        <div style={{ flex: 1 }} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 24, background: 'var(--cf-bg)', minHeight: '100vh' }}>

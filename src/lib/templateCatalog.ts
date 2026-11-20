@@ -205,6 +205,56 @@ export const TEMPLATE_CATALOG: UnifiedTemplate[] = [
   ...ANTIGRAVITY_UNIFIED_TEMPLATES.filter((t) => t.key !== 'hero-word' && t.key !== 'industrial'),
 ];
 
+/** Picker filter groups. Every card belongs to exactly one (TEMPLATE_CATEGORY). */
+export const TEMPLATE_CATEGORIES = ['Bold', 'Word by word', 'Minimal', 'Editorial', 'Kinetic'] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
+/**
+ * What each card mainly does: Bold = loud display type; Word by word = the
+ * spoken word builds or lights up; Minimal = plain readable subtitles;
+ * Editorial = designed mixed-type layouts; Kinetic = per-letter motion engine.
+ */
+const TEMPLATE_CATEGORY: Record<string, TemplateCategory> = {
+  'hero-word': 'Word by word',
+  industrial: 'Bold',
+  'beat-karaoke': 'Word by word',
+  'hero-punch': 'Bold',
+  'word-blast': 'Bold',
+  'soft-flicker': 'Bold',
+  'marker-pen': 'Bold',
+  'stack-verse': 'Editorial',
+  'full-sentence': 'Minimal',
+  'word-reveal': 'Word by word',
+  typewriter: 'Word by word',
+  'anime-edit': 'Kinetic',
+  blockbuster: 'Kinetic',
+  livingBlue: 'Kinetic',
+  livingTeal: 'Kinetic',
+  livingOrange: 'Kinetic',
+  livingRed: 'Kinetic',
+  livingPurple: 'Kinetic',
+  'mixed-styles-2': 'Editorial',
+  'creator-yellow-box': 'Bold',
+  'cinematic-subtitle': 'Minimal',
+  'bubble-candy': 'Bold',
+  'tiktok-classic': 'Word by word',
+  'roboto-word': 'Bold',
+  'tiktok-pill': 'Minimal',
+  'clean-white': 'Minimal',
+  'poppins-bold': 'Word by word',
+  'editor-masala': 'Editorial',
+  aura: 'Editorial',
+  swiss: 'Editorial',
+  'the-big-red': 'Editorial',
+  scribble: 'Editorial',
+  archives: 'Editorial',
+};
+
+/** A card's filter group (a card added later without one is listed under Bold). */
+export function templateCategory(key: string): TemplateCategory {
+  return TEMPLATE_CATEGORY[key] ?? 'Bold';
+}
+
 /** Cards kept in the code but left out of the picker until an admin shows them. */
 export const DEFAULT_HIDDEN_TEMPLATE_KEYS: readonly string[] = ['mixed-styles-2', 'clean-white', 'editor-masala'];
 

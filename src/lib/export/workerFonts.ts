@@ -46,8 +46,8 @@ export const EXPECTED_KINETIC_FINGERPRINTS: Readonly<Record<KineticFace, number>
   playfairBold: 102190,
   playfairItalic: 97960,
   bungee: 106630,
-  montserratRegular: 0,
-  playfairBoldItalic: 0,
+  montserratRegular: 106700,
+  playfairBoldItalic: 103380,
 };
 
 interface FontFaceSetLike {

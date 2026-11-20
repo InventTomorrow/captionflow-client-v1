@@ -31,6 +31,9 @@ import {
 } from '../lib/export/clientExport';
 import { exportFrameSize, type ExportFormat, type ExportQuality } from '../lib/render/frame';
 import type { ExportResult } from '../lib/export/protocol';
+import { templateByKey } from '../lib/templateCatalog';
+import { styleWithTemplate } from '../lib/templateApply';
+import { createLayoutPainter } from '../lib/export/layout/painter';
 
 /** Preview-layout templates (everything that isn't kinetic). */
 const LAYOUT_TEMPLATES = ['classic', 'heroWord', 'hero', 'stack', 'bigpop', 'highlight', 'mixed', 'mixed2', 'editorMasala', 'aura', 'swiss', 'theBigRed', 'scribble', 'archives'];
@@ -56,6 +59,8 @@ declare global {
       width: number;
       height: number;
       wallMs: number;
+      /** ?ref=1.2,3.4 — the painter's own frame at each time (PNG data URL), for comparing with the video. */
+      reference?: Array<{ t: number; png: string }>;
     };
     __readOpfsBase64?: (path: string) => Promise<string | null>;
   }
@@ -144,7 +149,11 @@ export function ExportDevPage() {
       document.title = 'export-error';
       return;
     }
-    const captions = sampleCaptions(probe.duration);
+    // ?scales=100,145,85 — per-chunk size overrides (Caption.sizeScale), cycling over the captions.
+    const scales = (params.get('scales') ?? '').split(',').filter(Boolean).map(Number);
+    const captions = sampleCaptions(probe.duration).map((c, i) =>
+      scales.length ? { ...c, sizeScale: scales[i % scales.length] } : c,
+    );
     const kinetic = isKineticTemplate(template);
     const style: ExportStyle = {
       template,
@@ -165,6 +174,9 @@ export function ExportDevPage() {
       animation: params.get('anim') ?? 'pop',
       displayMode: (params.get('mode') as ExportStyle['displayMode']) ?? (template === 'heroWord' ? 'paintOn' : 'phrase'),
     };
+    // ?card=<template card key>: the card's look exactly as the editor applies it.
+    const card = templateByKey(params.get('card'));
+    if (card) Object.assign(style, styleWithTemplate({ ...style, offsetY: 50 }, card));
     const { width, height } = exportFrameSize(quality, aspect, probe.width, probe.height);
     const job = await buildDeviceExportJob({
       exportId: `dev-${Date.now().toString(36)}`,
@@ -200,7 +212,24 @@ export function ExportDevPage() {
       const result = await handle.promise;
       const wallMs = Math.round(performance.now() - started);
       const { thumbnail, ...rest } = result;
-      window.__exportDev = { ...base, wallMs, result: { ...rest, thumbnailBytes: thumbnail?.size ?? 0 } };
+      // The painter's own frames (main thread) at the requested times, to compare with the decoded video.
+      const refTimes = (params.get('ref') ?? '').split(',').filter(Boolean).map(Number);
+      const reference: Array<{ t: number; png: string }> = [];
+      if (refTimes.length && job.overlay.kind === 'layout') {
+        await document.fonts.ready;
+        const painter = createLayoutPainter(job.overlay.track, width, height);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        for (const t of refTimes) {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, width, height);
+          painter.draw(ctx as unknown as OffscreenCanvasRenderingContext2D, t);
+          reference.push({ t, png: canvas.toDataURL('image/png') });
+        }
+      }
+      window.__exportDev = { ...base, wallMs, reference, result: { ...rest, thumbnailBytes: thumbnail?.size ?? 0 } };
       const out = await getExportFile(result.outputPath);
       if (out) setResultUrl(URL.createObjectURL(out));
       if (thumbnail) setThumbUrl(URL.createObjectURL(thumbnail));
