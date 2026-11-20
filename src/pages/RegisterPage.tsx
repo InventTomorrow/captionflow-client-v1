@@ -12,6 +12,7 @@ import {
 } from '../components/AuthParts';
 import { passwordPolicyMessage } from '../lib/passwordPolicy';
 import { EnvelopeSimple, PaperPlaneTilt, User } from '@phosphor-icons/react';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 function MailIcon() {
   return <EnvelopeSimple size={18} aria-hidden="true" />;
@@ -260,6 +261,8 @@ export function RegisterPage() {
                 )}
               </button>
             </form>
+
+            <GoogleSignInButton />
 
             <p className="auth-legal">
               By creating an account you agree to our <Link to="/terms">Terms of Service</Link> and{' '}

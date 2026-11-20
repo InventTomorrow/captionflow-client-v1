@@ -377,6 +377,21 @@ a.lp-brand:hover {
   line-height: 1;
 }
 
+.account-avatar {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.account-avatar-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .topbar-user-name {
   max-width: 9rem;
   overflow: hidden;
@@ -397,6 +412,17 @@ a.lp-brand:hover {
   box-shadow: var(--shadow);
 }
 
+.topbar-user-pop-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.topbar-user-pop-profile > div {
+  min-width: 0;
+}
+
 .topbar-user-pop-name {
   margin: 0;
   font-size: 0.9rem;
@@ -412,7 +438,9 @@ a.lp-brand:hover {
 }
 
 .topbar-user-pop button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
   margin-top: 0.65rem;
   padding: 0.5rem 0.6rem;
@@ -1508,6 +1536,61 @@ input[type='checkbox'] {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+.auth-google-group {
+  margin-top: 1.1rem;
+}
+
+.auth-google-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.auth-google-divider::before,
+.auth-google-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--divider);
+}
+
+.auth-google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.85rem;
+  border: 1px solid #d9dee7;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.auth-google-button:hover,
+.auth-google-button:focus-visible {
+  border-color: var(--cf-accent);
+  background: #f5f7fa;
+}
+
+.auth-google-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.auth-google-error {
+  margin: 0.65rem 0 0;
+  color: var(--danger);
+  font-size: 0.8rem;
 }
 
 .auth-submit-arrow {
@@ -4620,6 +4703,31 @@ legend {
   transition: background 0.15s ease;
 }
 
+.rail-account-menu-google {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cf-text);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.rail-account-menu-google:hover {
+  background: var(--cf-surface-2);
+}
+
+.google-photo-error {
+  display: block;
+  color: var(--cf-danger);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .rail-account-menu-logout:hover {
   background: color-mix(in srgb, var(--cf-danger, #ef4444) 12%, transparent);
 }
@@ -5497,6 +5605,12 @@ legend {
   z-index: 6;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* lib/captionFit.ts measures a caption's layout size with its children's
+   transforms (animations, pops) off for that instant. */
+.caption-overlay.cf-fit-measure * {
+  transform: none !important;
 }
 
 .video-caption-layer > * {
@@ -13945,6 +14059,44 @@ legend {
   padding-top: 1rem;
   display: grid;
   gap: 0.35rem;
+}
+
+.admin-account-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  margin-bottom: 0.4rem;
+}
+
+.admin-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--cf-accent);
+  border-radius: 50%;
+  background: var(--cf-card);
+  color: var(--cf-accent);
+  font-weight: 700;
+}
+
+.admin-account-copy {
+  min-width: 0;
+}
+
+.admin-account-copy p,
+.admin-account-copy span {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-account-copy span {
+  color: var(--cf-text-muted);
+  font-size: 0.72rem;
 }
 
 .admin-main {

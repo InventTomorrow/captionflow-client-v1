@@ -32,6 +32,7 @@ import {
 import { exportFrameSize, type ExportFormat, type ExportQuality } from '../lib/render/frame';
 import type { ExportResult } from '../lib/export/protocol';
 import { templateByKey } from '../lib/templateCatalog';
+import { deriveDisplayCaptions } from '../lib/displayCaptions';
 import { styleWithTemplate } from '../lib/templateApply';
 import { createLayoutPainter } from '../lib/export/layout/painter';
 
@@ -61,6 +62,8 @@ declare global {
       wallMs: number;
       /** ?ref=1.2,3.4 — the painter's own frame at each time (PNG data URL), for comparing with the video. */
       reference?: Array<{ t: number; png: string }>;
+      /** The on-screen chunks and the size each one renders at (displayCaptions rules). */
+      chunks?: Array<{ start: number; end: number; sizeScale: number }>;
     };
     __readOpfsBase64?: (path: string) => Promise<string | null>;
   }
@@ -201,7 +204,11 @@ export function ExportDevPage() {
     const started = performance.now();
     const handle = startDeviceExport(job, (p) => setStatus(describeDeviceProgress(p, started)));
     handleRef.current = handle;
+    const chunks = deriveDisplayCaptions(captions, isKineticTemplate(style.template) ? 'phrase' : style.displayMode, style.displayWords).map(
+      (c) => ({ start: c.start, end: c.end, sizeScale: c.sizeScale ?? 100 }),
+    );
     const base = {
+      chunks,
       captions,
       overlayCaptions: job.overlay.kind === 'kinetic' ? job.overlay.captions : job.overlay.track.captions.length,
       style,

@@ -14,6 +14,8 @@ import {
   type Icon,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '../../stores/authStore';
+import { AccountAvatar } from '../AccountAvatar';
+import { ConnectGooglePhotoButton } from '../ConnectGooglePhotoButton';
 
 const LINKS: { to: string; end?: boolean; label: string; icon: Icon }[] = [
   { to: '/admin', end: true, label: 'Dashboard', icon: Gauge },
@@ -57,10 +59,14 @@ export function AdminShell() {
           ))}
         </nav>
         <div className="admin-sidebar-footer">
-          <p className="muted">{user?.name}</p>
-          <p className="muted" style={{ fontSize: '0.75rem' }}>
-            {user?.role}
-          </p>
+          <div className="admin-account-profile">
+            <AccountAvatar name={user?.name} avatarUrl={user?.avatarUrl} className="admin-account-avatar" />
+            <div className="admin-account-copy">
+              <p>{user?.name}</p>
+              <span>{user?.email}</span>
+            </div>
+          </div>
+          <ConnectGooglePhotoButton hasPhoto={Boolean(user?.avatarUrl)} className="btn ghost" />
           <button
             type="button"
             className="btn ghost"

@@ -5,9 +5,11 @@
  * It can still spill past the frame when a single word is wider than that
  * (Swiss / Hero Punch giant uppercase words on a narrow 9:16 frame), when a
  * stacked template grows taller than the frame, or after the user scales a
- * chunk up. Then the whole design is shrunk — its `.cap-block` gets a font-size
- * below 1em, so text, boxes, marks and em-based strokes all scale together —
- * just enough to fit, never enlarged.
+ * chunk up. Then the whole design is shrunk — its `.cap-box` (the wrapper of
+ * the text AND its background box, display: contents when there's no box; font
+ * size still inherits through it) gets a font-size below 1em, so text, box
+ * padding, marks and em-based strokes all scale together — just enough to fit,
+ * never enlarged.
  *
  * Called by the editor preview (CaptionOverlay, after every layout) AND by the
  * export's layout measuring (export/layout/compile.tsx, after fonts load), so
@@ -19,7 +21,7 @@ const SAFE_X = 0.03;
 const SAFE_Y = 0.04;
 
 export function fitCaptionToFrame(overlay: HTMLElement | null): number {
-  const block = overlay?.querySelector<HTMLElement>('.cap-block');
+  const block = overlay?.querySelector<HTMLElement>('.cap-box') ?? overlay?.querySelector<HTMLElement>('.cap-block');
   const frame = overlay?.parentElement;
   if (!overlay || !block || !frame) return 1;
   block.style.fontSize = '';
@@ -33,14 +35,24 @@ export function fitCaptionToFrame(overlay: HTMLElement | null): number {
   const availW = Math.max(fw * 0.3, 2 * Math.min(cx, fw - cx) - 2 * SAFE_X * fw);
   const availH = Math.max(fh * 0.2, 2 * Math.min(cy, fh - cy) - 2 * SAFE_Y * fh);
   let k = 1;
-  // Shrinking can re-wrap lines, so settle in a few passes (layout sizes only — transforms ignored).
-  for (let pass = 0; pass < 3; pass++) {
-    const w = Math.max(overlay.scrollWidth, block.scrollWidth, overlay.offsetWidth);
-    const h = Math.max(overlay.scrollHeight, overlay.offsetHeight);
-    const need = Math.min(availW / Math.max(1, w), availH / Math.max(1, h));
-    if (need >= 0.995) break;
-    k = Math.max(0.3, k * need);
-    block.style.fontSize = `${k.toFixed(4)}em`;
+  // Measure layout only: scroll sizes include transformed children, so a word
+  // caught mid-"pop" would look wider than it is — and the preview and the
+  // export catch words at different animation moments. Transforms are switched
+  // off just for the measurement (.cf-fit-measure, index.css).
+  overlay.classList.add('cf-fit-measure');
+  try {
+    // Shrinking can re-wrap lines, so settle in a few passes.
+    for (let pass = 0; pass < 3; pass++) {
+      const w = Math.max(overlay.scrollWidth, block.scrollWidth, overlay.offsetWidth);
+      const h = Math.max(overlay.scrollHeight, overlay.offsetHeight);
+      const need = Math.min(availW / Math.max(1, w), availH / Math.max(1, h));
+      if (need >= 0.995) break;
+      k = Math.max(0.1, k * need);
+      block.style.fontSize = `${k.toFixed(4)}em`;
+    }
+  } finally {
+    overlay.classList.remove('cf-fit-measure');
   }
+  overlay.dataset.fit = k.toFixed(4);
   return k;
 }

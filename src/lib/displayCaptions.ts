@@ -62,6 +62,9 @@ export interface DisplayCaption extends Caption {
    *  "Apply to this chunk" writes to this caption only, so a chunk that starts
    *  with the previous caption's last word never changes its neighbour. */
   styleSourceId?: string;
+  /** That caption's word indices shown in this chunk (inclusive) — where
+   *  "Apply to this chunk" writes when the chunk is only part of it. */
+  styleWords?: [number, number];
   /**
    * Per-word (aligned with `text.split(whitespace)`) canonical caption id +
    * word index. `sourceId`/`wordOffset` above only cover the common single-
@@ -84,6 +87,8 @@ interface FlatWord {
   offsetX?: number | null;
   offsetY?: number | null;
   behindPerson?: boolean | null;
+  /** The source caption's per-part overrides (Caption.chunkStyles). */
+  chunkStyles?: Caption['chunkStyles'];
   sourceId?: string;
   sourceIndex: number;
   /** Set for every word of an `ownBlock` caption, and the same for all of
@@ -152,6 +157,7 @@ export function flattenToWords(captions: Caption[]): FlatWord[] {
         offsetX: c.offsetX,
         offsetY: c.offsetY,
         behindPerson: c.behindPerson,
+        chunkStyles: c.chunkStyles,
         sourceId: c._id,
         sourceIndex: i,
         ownKey,
@@ -169,6 +175,12 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
   for (const w of words) counts.set(w.sourceId, (counts.get(w.sourceId) ?? 0) + 1);
   let owner = first;
   for (const w of words) if ((counts.get(w.sourceId) ?? 0) > (counts.get(owner.sourceId) ?? 0)) owner = w;
+  // The owner's words in this chunk, and a per-part override covering the first of them.
+  const ownIdx = words.filter((w) => w.sourceId === owner.sourceId).map((w) => w.sourceIndex);
+  const from = Math.min(...ownIdx);
+  const to = Math.max(...ownIdx);
+  const part = owner.chunkStyles?.find((r) => r.from <= from && from <= r.to);
+  const pick = <K extends 'sizeScale' | 'offsetX' | 'offsetY'>(k: K) => (part && part[k] != null ? part[k] : owner[k]) ?? null;
   const singleSource = first.sourceId != null && words.every((w) => w.sourceId === first.sourceId);
   return {
     _id: `d${sequence}-${first.sourceId ?? 'x'}-${first.sourceIndex}`,
@@ -179,11 +191,12 @@ function toCaption(words: FlatWord[], sequence: number): DisplayCaption {
     words: words.map((w) => ({ word: w.text, start: w.start, end: w.end })),
     emphasis: words.map((w) => w.role),
     wordStyles: words.map((w) => w.style ?? {}),
-    sizeScale: owner.sizeScale ?? null,
-    offsetX: owner.offsetX ?? null,
-    offsetY: owner.offsetY ?? null,
+    sizeScale: pick('sizeScale'),
+    offsetX: pick('offsetX'),
+    offsetY: pick('offsetY'),
     behindPerson: owner.behindPerson ?? null,
     styleSourceId: owner.sourceId,
+    styleWords: [from, to],
     sourceId: singleSource ? first.sourceId : undefined,
     wordOffset: singleSource ? first.sourceIndex : undefined,
     sourceIds: Array.from(new Set(words.map((w) => w.sourceId).filter((id): id is string => !!id))),

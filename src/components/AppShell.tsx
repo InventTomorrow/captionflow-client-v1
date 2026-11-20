@@ -5,6 +5,8 @@ import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
 import { api } from '../lib/api';
 import { PricingModal } from './PricingModal';
+import { AccountAvatar } from './AccountAvatar';
+import { ConnectGooglePhotoButton } from './ConnectGooglePhotoButton';
 import { subscribeClipsEvents } from '../stores/clipsStore';
 import {
   CaretDown,
@@ -31,7 +33,7 @@ function NavFolderIcon({ active }: { active?: boolean }) {
 }
 
 /** Avatar + name; opens a small menu with the account email and sign-out. */
-function UserMenu({ name, email, admin, onLogout }: { name?: string; email?: string; admin?: boolean; onLogout: () => void }) {
+function UserMenu({ name, email, avatarUrl, admin, onLogout }: { name?: string; email?: string; avatarUrl?: string; admin?: boolean; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +58,7 @@ function UserMenu({ name, email, admin, onLogout }: { name?: string; email?: str
         aria-label={`Open account menu for ${name || 'your account'}`}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="topbar-avatar">{(name || '?')[0]?.toUpperCase()}</span>
+        <AccountAvatar name={name} avatarUrl={avatarUrl} className="topbar-avatar" />
         <span className="topbar-user-copy">
           <span className="topbar-user-name">{name}</span>
           <span className="topbar-user-meta">Account</span>
@@ -65,8 +67,14 @@ function UserMenu({ name, email, admin, onLogout }: { name?: string; email?: str
       </button>
       {open && (
         <div className="topbar-user-pop" role="menu">
-          <p className="topbar-user-pop-name">{name}</p>
-          {email && <p className="topbar-user-pop-email">{email}</p>}
+          <div className="topbar-user-pop-profile">
+            <AccountAvatar name={name} avatarUrl={avatarUrl} className="topbar-avatar" />
+            <div>
+              <p className="topbar-user-pop-name">{name}</p>
+              {email && <p className="topbar-user-pop-email">{email}</p>}
+            </div>
+          </div>
+          <ConnectGooglePhotoButton hasPhoto={Boolean(avatarUrl)} role="menuitem" />
           {admin && <Link to="/admin" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={16} aria-hidden="true" />Admin area</Link>}
           <button type="button" role="menuitem" onClick={onLogout}>
             <SignOut size={16} aria-hidden="true" />
@@ -336,7 +344,7 @@ export function AppShell() {
                     planName={user?.planName}
                     onUpgradeClick={() => setPricingOpen(true)}
                   />
-                  <UserMenu name={user?.name} email={user?.email} admin={user?.role === 'admin' || user?.role === 'support'} onLogout={() => void signOut()} />
+                  <UserMenu name={user?.name} email={user?.email} avatarUrl={user?.avatarUrl} admin={user?.role === 'admin' || user?.role === 'support'} onLogout={() => void signOut()} />
                 </div>
               </div>
             </>

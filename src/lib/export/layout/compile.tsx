@@ -363,20 +363,19 @@ export async function compileLayoutTrack(opts: CompileOptions): Promise<LayoutTr
       }
       if (fresh) {
         const use = { fontStyle: cs.fontStyle, fontWeight: cs.fontWeight, fontFamily: cs.fontFamily, text: fresh };
+        // The page's own stylesheet faces, AND the exact files the export
+        // worker will draw with (resolveFontSources) registered here too: the
+        // layout must be measured in the face it is painted in. The stylesheet
+        // alone isn't enough — when it hasn't loaded yet, or a Google Fonts
+        // download fails, the browser quietly measures a fallback font and the
+        // worker then paints the real glyphs at those positions (gaps / overlaps).
         pending.push(
-          document.fonts
-            .load(font, fresh)
-            .then((faces) => {
-              // Nothing matched: the stylesheet declaring this family hasn't
-              // loaded (yet) in this document. Register the exact files the
-              // export worker will draw with (resolveFontSources), so the
-              // layout is measured in the same face it is painted in —
-              // otherwise the worker paints the real glyphs at a fallback
-              // font's positions (gaps / overlaps).
-              if (faces.length || !needsWebFont(cs.fontFamily)) return;
-              return resolveFontSources({ fontUses: [use] }).then((src) => loadLayoutFonts(src, [use]));
-            })
-            .catch(() => null),
+          Promise.allSettled([
+            document.fonts.load(font, fresh),
+            needsWebFont(cs.fontFamily)
+              ? resolveFontSources({ fontUses: [use] }).then((src) => loadLayoutFonts(src, [use]))
+              : Promise.resolve(null),
+          ]),
         );
       }
     }

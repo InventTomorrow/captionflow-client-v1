@@ -18,6 +18,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  avatarUrl?: string;
   plan?: string;
   planName?: string;
   planId?: string;
@@ -54,6 +55,7 @@ function mapUser(raw: Record<string, unknown>): User {
     id: String(raw._id || raw.id),
     email: String(raw.email || ''),
     name: String(raw.name || ''),
+    avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : undefined,
     plan: raw.plan as string | undefined,
     planName: raw.planName as string | undefined,
     planId: raw.planId ? String(raw.planId) : undefined,

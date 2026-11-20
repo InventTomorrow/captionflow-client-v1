@@ -52,7 +52,7 @@ export function AuthShowcase({ mode }: { mode: AuthMode }) {
 
 export function AuthSplitShell({ mode, children }: { mode: AuthMode; children: ReactNode }) {
   return (
-    <main className="auth-page auth-split-page">
+    <main className="auth-page auth-split-page" data-auth-mode={mode}>
       <AuthShowcase mode={mode} />
       <section className="auth-entry-pane" aria-label={mode === 'login' ? 'Sign in' : 'Create account'}>
         <section className="auth-card">{children}</section>

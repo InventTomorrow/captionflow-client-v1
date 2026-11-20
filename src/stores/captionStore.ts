@@ -45,6 +45,21 @@ export interface Caption {
    * server export (regroupForDisplay) so the burn-in matches the preview.
    */
   ownBlock?: boolean;
+  /** Size / position for PART of this caption, by its own word indices
+   *  (inclusive), for when it shows as several on-screen chunks: "Apply to
+   *  this chunk" on one of them. The chunk whose first word (from this
+   *  caption) falls in a range uses it; fields left out fall back to the
+   *  caption's own values. Same rule in the server export (export.service.ts). */
+  chunkStyles?: ChunkStyle[] | null;
+}
+
+/** One `Caption.chunkStyles` entry. */
+export interface ChunkStyle {
+  from: number;
+  to: number;
+  sizeScale?: number | null;
+  offsetX?: number | null;
+  offsetY?: number | null;
 }
 
 interface StageState {

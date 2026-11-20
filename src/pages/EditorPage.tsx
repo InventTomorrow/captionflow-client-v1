@@ -30,11 +30,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { HexColorPicker } from 'react-colorful';
 import { api, API_URL, errorMessage } from '../lib/api';
-import { useCaptionStore, type Caption, type WordRole, type WordStyle } from '../stores/captionStore';
+import { useCaptionStore, type Caption, type ChunkStyle, type WordRole, type WordStyle } from '../stores/captionStore';
 import { useEditorChromeStore } from '../stores/editorChromeStore';
 import { useFlagsStore } from '../stores/flagsStore';
 import { useAuthStore } from '../stores/authStore';
 import { PlanBadge } from '../components/AppShell';
+import { AccountAvatar } from '../components/AccountAvatar';
+import { ConnectGooglePhotoButton } from '../components/ConnectGooglePhotoButton';
 import { joinProjectRoom, connectSocket, getSocket } from '../lib/socket';
 import { PricingModal } from '../components/PricingModal';
 import { resolvePlanError, type PlanErrorInfo } from '../lib/planErrors';
@@ -100,9 +102,10 @@ import {
 type StyleState = EditorStyle;
 
 /** Per-caption fields the on-video size/position editor writes. */
-type ChunkStyleKey = 'sizeScale' | 'offsetX' | 'offsetY' | 'behindPerson';
+type ChunkStyleKey = 'sizeScale' | 'offsetX' | 'offsetY' | 'behindPerson' | 'chunkStyles';
+type ChunkStyleValues = Partial<Pick<Caption, ChunkStyleKey>>;
 /** Values of those fields for some captions (by stable _id): one undo/redo step. */
-type ChunkStyleSnapshot = Array<{ id: string; values: Partial<Record<ChunkStyleKey, number | boolean | null>> }>;
+type ChunkStyleSnapshot = Array<{ id: string; values: ChunkStyleValues }>;
 
 function snapshotChunkStyle(captions: Caption[], ids: string[], keys: ChunkStyleKey[]): ChunkStyleSnapshot {
   const wanted = new Set(ids);
@@ -111,10 +114,16 @@ function snapshotChunkStyle(captions: Caption[], ids: string[], keys: ChunkStyle
     .map((c) => ({
       id: c._id!,
       // A field that was never set restores as null (= follow the project style).
-      values: Object.fromEntries(keys.map((k) => [k, (c as unknown as Record<string, unknown>)[k] ?? null])) as Partial<
-        Record<ChunkStyleKey, number | boolean | null>
-      >,
+      values: Object.fromEntries(keys.map((k) => [k, c[k] ?? null])) as ChunkStyleValues,
     }));
+}
+
+/** `chunkStyles` without the given fields (entries left empty are dropped); null when none remain. */
+function withoutPartFields(parts: Caption['chunkStyles'], keys: string[]): ChunkStyle[] | null {
+  const out = (parts ?? [])
+    .map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k))) as unknown as ChunkStyle)
+    .filter((r) => Object.keys(r).some((k) => k !== 'from' && k !== 'to'));
+  return out.length ? out : null;
 }
 
 /** Server-side state of the project's person matte (Project.masks). */
@@ -2026,14 +2035,38 @@ export function EditorPage() {
     // "This chunk" = the canonical caption that owns the on-screen chunk
     // (displayCaptions styleSourceId, a stable _id); "all" = every caption of this video.
     const current = useCaptionStore.getState().captions;
-    const targetIds =
-      scope === 'chunk'
-        ? [caption.styleSourceId ?? caption.sourceId ?? caption._id].filter((v): v is string => !!v)
-        : current.map((c) => c._id).filter((v): v is string => !!v);
-    if (!targetIds.length) return;
-    const keys = Object.keys(patch) as ChunkStyleKey[];
-    const before = snapshotChunkStyle(current, targetIds, keys);
-    await applyChunkStyle(targetIds.map((cid) => ({ id: cid, values: patch })));
+    const keys = Object.keys(patch);
+    const sizePos: string[] = keys.filter((k) => k === 'sizeScale' || k === 'offsetX' || k === 'offsetY');
+    let entries: ChunkStyleSnapshot;
+    if (scope === 'all') {
+      // Every caption gets the value, and per-part overrides of the same
+      // fields are dropped so the size really applies to every chunk.
+      entries = current
+        .filter((c) => c._id)
+        .map((c) => ({ id: c._id!, values: { ...patch, chunkStyles: withoutPartFields(c.chunkStyles, sizePos) } }));
+    } else {
+      const ownerId = caption.styleSourceId ?? caption.sourceId ?? caption._id;
+      const owner = current.find((c) => c._id === ownerId);
+      if (!owner?._id) return;
+      const n = owner.text.split(/\s+/).filter(Boolean).length;
+      const [from, to] = caption.styleWords ?? [0, n - 1];
+      if (!sizePos.length || (from <= 0 && to >= n - 1)) {
+        // The chunk shows the whole caption: a caption-level value.
+        entries = [{ id: owner._id, values: { ...patch, chunkStyles: withoutPartFields(owner.chunkStyles, sizePos) } }];
+      } else {
+        // Only part of the caption is on screen: store it for these words.
+        const parts = (owner.chunkStyles ?? []).filter((r) => r.to < from || r.from > to);
+        const same = owner.chunkStyles?.find((r) => r.from === from && r.to === to);
+        const part: ChunkStyle = { ...(same ?? {}), from, to };
+        for (const k of sizePos) (part as unknown as Record<string, unknown>)[k] = (patch as Record<string, unknown>)[k];
+        const rest = Object.fromEntries(Object.entries(patch).filter(([k]) => !sizePos.includes(k)));
+        entries = [{ id: owner._id, values: { ...rest, chunkStyles: [...parts, part].sort((a, b) => a.from - b.from) } }];
+      }
+    }
+    if (!entries.length) return;
+    const targetIds = entries.map((e) => e.id);
+    const before = snapshotChunkStyle(current, targetIds, [...new Set([...(keys as ChunkStyleKey[]), 'chunkStyles' as const])]);
+    await applyChunkStyle(entries);
     chunkHistory.current.undo.push(before);
     if (chunkHistory.current.undo.length > 50) chunkHistory.current.undo.shift();
     chunkHistory.current.redo = [];
@@ -2352,6 +2385,8 @@ export function EditorPage() {
           behindPerson: c.behindPerson ?? null,
           offsetX: c.offsetX,
           offsetY: c.offsetY,
+          // Sizes/positions set for part of this caption ("Apply to this chunk").
+          ...(c.chunkStyles?.length ? { chunkStyles: c.chunkStyles } : {}),
           // Hand-placed on the timeline: the server must group it on its own too.
           ownBlock: c.ownBlock,
         }));
@@ -2562,7 +2597,7 @@ export function EditorPage() {
               title={user?.name}
               onClick={() => setAccountMenuOpen((v) => !v)}
             >
-              <span className="rail-account-avatar">{(user?.name || '?')[0]?.toUpperCase()}</span>
+              <AccountAvatar name={user?.name} avatarUrl={user?.avatarUrl} className="rail-account-avatar" />
               <span className="rail-account-name">{user?.name}</span>
             </button>
             {accountMenuOpen && accountMenuPos && (
@@ -2579,6 +2614,7 @@ export function EditorPage() {
                     setPricingOpen(true);
                   }}
                 />
+                <ConnectGooglePhotoButton hasPhoto={Boolean(user?.avatarUrl)} className="rail-account-menu-google" />
                 <button
                   type="button"
                   className="rail-account-menu-logout"

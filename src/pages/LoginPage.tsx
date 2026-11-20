@@ -10,6 +10,7 @@ import {
 } from '../lib/emailVerification';
 import { ArrowRightIcon, AuthBrand, AuthSplitShell, PasswordInput } from '../components/AuthParts';
 import { EnvelopeSimple } from '@phosphor-icons/react';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 function SpinnerIcon() {
   return (
@@ -29,6 +30,7 @@ export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
   const location = useLocation();
+  const googleError = new URLSearchParams(location.search).get('google_error');
   // Present when the email-verification page sent the person here: the address
   // it just confirmed ('' if the server did not say which).
   const locationState = location.state as (VerifiedEmailState & { from?: string }) | null;
@@ -75,6 +77,16 @@ export function LoginPage() {
             Email confirmed. Sign in to get started.
           </div>
         )}
+
+        {googleError && <div className="error-banner" role="alert">
+          {googleError === 'account_exists'
+            ? 'This email already has an account. Sign in with your password.'
+            : googleError === 'link_mismatch'
+              ? 'Use the Google account with the same email address as your signed-in account.'
+            : googleError === 'cancelled'
+              ? 'Google sign-in was cancelled.'
+              : 'Google sign-in could not be completed. Please try again.'}
+        </div>}
 
         {unverifiedEmail && resend.state === 'sent' ? (
           <div className="ok-banner" role="status">
@@ -153,6 +165,8 @@ export function LoginPage() {
             )}
           </button>
         </form>
+
+        <GoogleSignInButton />
 
         <p className="auth-footer">
           No account? <Link to="/register">Create one</Link>

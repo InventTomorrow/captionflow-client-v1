@@ -111,6 +111,31 @@ html .auth-showcase-proof {
 }
 html .auth-showcase-proof span:last-child { font: 10px var(--cf-mono); letter-spacing: 0.08em; }
 html .auth-entry-pane { background: var(--cf-bg); }
+/* Sign-in side: a light canvas — off-white, a charcoal dot grid that fades out
+   toward the edges, and two soft kiwi glows (top right, bottom left) that show
+   around the card. */
+html .auth-split-page[data-auth-mode='login'] .auth-entry-pane {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(137, 233, 0, 0.26), transparent 30%),
+    radial-gradient(circle at 6% 94%, rgba(137, 233, 0, 0.18), transparent 28%),
+    #f2f3f0;
+}
+html .auth-split-page[data-auth-mode='login'] .auth-entry-pane::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  background-image: radial-gradient(rgba(11, 13, 15, 0.34) 1.3px, transparent 1.6px);
+  background-size: 24px 24px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 85% 80% at 50% 50%, #000 45%, transparent 100%);
+  pointer-events: none;
+}
+html .auth-split-page[data-auth-mode='login'] .auth-entry-pane .auth-card {
+  box-shadow: 0 24px 60px -24px rgba(11, 13, 15, 0.35);
+}
 html .auth-entry-pane .auth-card {
   border: 1px solid var(--cf-border);
   border-radius: 12px;
@@ -170,6 +195,7 @@ html .auth-split-page .ok-banner { border-color: rgba(137, 233, 0, 0.25); backgr
 html .auth-split-page .error-banner { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); color: #fca5a5; }
 html .auth-split-page .auth-status-icon { color: var(--cf-accent); }
 html .auth-entry-assurance { color: var(--cf-text-muted); font: 10px/1.6 var(--cf-mono); letter-spacing: 0.06em; }
+html .auth-split-page[data-auth-mode='login'] .auth-entry-assurance { color: #5b6472; }
 @media (max-width: 900px) {
   html .auth-page.auth-split-page { grid-template-columns: minmax(0, 1fr); }
   html .auth-showcase { display: none; }
