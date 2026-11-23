@@ -67,9 +67,10 @@ export interface LanguageOption {
 
 export const SPOKEN_LANGUAGE_OPTIONS: LanguageOption[] = [
   { value: 'auto', label: 'Auto (detect language)', short: 'Auto' },
-  { value: 'ur', label: 'Urdu (with English)', short: 'Urdu' },
-  { value: 'pa', label: 'Punjabi (with English)', short: 'Punjabi' },
-  { value: 'en', label: 'English', short: 'English' },
+  { value: 'ur', label: 'Urdu (mixed with English)', short: 'Urdu' },
+  { value: 'pa', label: 'Punjabi (mixed with English)', short: 'Punjabi' },
+  // Forcing English on mixed speech makes the recogniser hear Urdu as English nonsense.
+  { value: 'en', label: 'English (only English spoken)', short: 'English' },
   { value: 'hi', label: 'Hindi', short: 'Hindi' },
   { value: 'ar', label: 'Arabic', short: 'Arabic' },
   { value: 'de', label: 'German', short: 'German' },
