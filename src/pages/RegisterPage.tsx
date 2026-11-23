@@ -2,7 +2,8 @@ import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore, type RegisterResult } from '../stores/authStore';
 import { errorMessage } from '../lib/api';
-import { useResendVerification } from '../lib/emailVerification';
+import { resendVerificationCode, useResendVerification } from '../lib/emailVerification';
+import { EmailCodeEntry } from '../components/EmailCodeEntry';
 import {
   ArrowRightIcon,
   AuthBrand,
@@ -140,6 +141,7 @@ function CheckYourEmail({
 
 export function RegisterPage() {
   const register = useAuthStore((s) => s.register);
+  const verifyEmailCode = useAuthStore((s) => s.verifyEmailCode);
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -182,7 +184,22 @@ export function RegisterPage() {
     <AuthSplitShell mode="register">
         <AuthBrand />
 
-        {pending ? (
+        {pending?.method === 'code' ? (
+          <EmailCodeEntry
+            email={email}
+            title="Confirm your email"
+            emailSent={pending.emailSent}
+            codeLength={pending.codeLength}
+            expiresInMinutes={pending.expiresInMinutes}
+            submitLabel="Verify and continue"
+            onSubmit={async (code) => {
+              await verifyEmailCode(email, code);
+              navigate('/projects/upload', { replace: true });
+            }}
+            onResend={() => resendVerificationCode(email)}
+            onDifferentEmail={() => setPending(null)}
+          />
+        ) : pending ? (
           <CheckYourEmail
             email={email}
             pending={pending}

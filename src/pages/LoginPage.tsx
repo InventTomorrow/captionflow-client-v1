@@ -5,9 +5,13 @@ import { errorMessage } from '../lib/api';
 import {
   EMAIL_NOT_VERIFIED,
   errorCode,
+  pendingCodeFrom,
+  resendVerificationCode,
   useResendVerification,
+  type PendingCode,
   type VerifiedEmailState,
 } from '../lib/emailVerification';
+import { EmailCodeEntry } from '../components/EmailCodeEntry';
 import { ArrowRightIcon, AuthBrand, AuthSplitShell, PasswordInput } from '../components/AuthParts';
 import { EnvelopeSimple } from '@phosphor-icons/react';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
@@ -28,6 +32,10 @@ function SpinnerIcon() {
 
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
+  const verifyEmailCode = useAuthStore((s) => s.verifyEmailCode);
+  // Set when sign-in was refused for an unconfirmed email and the server mailed
+  // a code: the form gives way to "enter the code".
+  const [pendingCode, setPendingCode] = useState<PendingCode | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const googleError = new URLSearchParams(location.search).get('google_error');
@@ -52,15 +60,49 @@ export function LoginPage() {
     resend.reset();
     try {
       await login(email, password);
-      const role = useAuthStore.getState().user?.role;
-      const requestedPath = locationState?.from?.startsWith('/') ? locationState.from : '/projects/upload';
-      navigate(role === 'admin' || role === 'support' ? '/admin' : requestedPath, { replace: true });
+      goToApp();
     } catch (err: unknown) {
+      const code = errorCode(err) === EMAIL_NOT_VERIFIED ? pendingCodeFrom(err, email) : null;
+      if (code) {
+        setPendingCode(code);
+        return;
+      }
       setError(errorMessage(err, 'Login failed'));
       if (errorCode(err) === EMAIL_NOT_VERIFIED) setUnverifiedEmail(email);
     } finally {
       setBusy(false);
     }
+  }
+
+  function goToApp() {
+    const role = useAuthStore.getState().user?.role;
+    const requestedPath = locationState?.from?.startsWith('/') ? locationState.from : '/projects/upload';
+    navigate(role === 'admin' || role === 'support' ? '/admin' : requestedPath, { replace: true });
+  }
+
+  if (pendingCode) {
+    return (
+      <AuthSplitShell mode="login">
+        <AuthBrand />
+        <EmailCodeEntry
+          email={pendingCode.email}
+          title="Confirm your email"
+          emailSent={pendingCode.emailSent}
+          codeLength={pendingCode.codeLength}
+          expiresInMinutes={pendingCode.expiresInMinutes}
+          submitLabel="Verify and sign in"
+          onSubmit={async (code) => {
+            await verifyEmailCode(pendingCode.email, code);
+            goToApp();
+          }}
+          onResend={() => resendVerificationCode(pendingCode.email)}
+          onDifferentEmail={() => {
+            setPendingCode(null);
+            setPassword('');
+          }}
+        />
+      </AuthSplitShell>
+    );
   }
 
   return (

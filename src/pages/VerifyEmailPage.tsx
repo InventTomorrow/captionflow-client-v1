@@ -4,10 +4,13 @@ import { api, errorMessage } from '../lib/api';
 import {
   INVALID_VERIFY_TOKEN,
   errorCode,
+  resendVerificationCode,
   useResendVerification,
   type VerifiedEmailState,
 } from '../lib/emailVerification';
 import { AuthBrand } from '../components/AuthParts';
+import { EmailCodeEntry } from '../components/EmailCodeEntry';
+import { useAuthStore } from '../stores/authStore';
 import {
   ArrowClockwise,
   CheckCircle,
@@ -49,6 +52,8 @@ function CrossIcon() {
 function NewLinkForm() {
   const [email, setEmail] = useState('');
   const resend = useResendVerification();
+  const verifyEmailCode = useAuthStore((s) => s.verifyEmailCode);
+  const navigate = useNavigate();
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,10 +61,20 @@ function NewLinkForm() {
   }
 
   if (resend.state === 'sent') {
+    // The server now mails a 6-digit code: take it right here.
     return (
-      <p className="auth-note" role="status">
-        {resend.message}
-      </p>
+      <EmailCodeEntry
+        email={email}
+        title="Enter your code"
+        submitLabel="Verify and continue"
+        intro={resend.message}
+        onSubmit={async (code) => {
+          await verifyEmailCode(email, code);
+          navigate('/projects/upload', { replace: true });
+        }}
+        onResend={() => resendVerificationCode(email)}
+        onDifferentEmail={resend.reset}
+      />
     );
   }
 
@@ -95,7 +110,7 @@ function NewLinkForm() {
           ) : (
             <>
               <PaperPlaneTilt size={17} aria-hidden="true" />
-              Send a new link
+              Send a code
             </>
           )}
         </button>

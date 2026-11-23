@@ -12,6 +12,36 @@ export const EMAIL_NOT_VERIFIED = 'EMAIL_NOT_VERIFIED';
 /** The emailed link is unknown, replaced by a newer one, or expired. */
 export const INVALID_VERIFY_TOKEN = 'INVALID_VERIFY_TOKEN';
 
+/** An emailed 6-digit code is wrong, used, out of tries or expired. */
+export const INVALID_CODE = 'INVALID_CODE';
+
+/** What a sign-in refused for an unconfirmed email says about the code it sent. */
+export interface PendingCode {
+  email: string;
+  emailSent: boolean;
+  codeLength?: number;
+  expiresInMinutes?: number;
+}
+
+/** The code details from an EMAIL_NOT_VERIFIED reply, or null from a server that mails links. */
+export function pendingCodeFrom(err: unknown, fallbackEmail: string): PendingCode | null {
+  const d = (err as { response?: { data?: { details?: Record<string, unknown> } } })?.response?.data
+    ?.details;
+  if (!d || d.method !== 'code') return null;
+  return {
+    email: typeof d.email === 'string' ? d.email : fallbackEmail,
+    emailSent: d.emailSent !== false,
+    codeLength: typeof d.codeLength === 'number' ? d.codeLength : undefined,
+    expiresInMinutes: typeof d.expiresInMinutes === 'number' ? d.expiresInMinutes : undefined,
+  };
+}
+
+/** Ask for a new sign-up code; resolves with the server's (deliberately vague) wording. */
+export async function resendVerificationCode(email: string): Promise<string> {
+  const { data } = await api.post('/auth/resend-verification', { email });
+  return typeof data?.message === 'string' ? data.message : 'A new code is on its way.';
+}
+
 /** The `code` field of the server's error body, if this was a server error. */
 export function errorCode(err: unknown): string | undefined {
   const code = (err as { response?: { data?: { code?: unknown } } })?.response?.data?.code;

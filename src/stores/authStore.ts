@@ -39,6 +39,10 @@ export interface RegisterResult {
   emailSent: boolean;
   /** How long the emailed link lasts, when the server says. */
   expiresInHours?: number;
+  /** 'code': a 6-digit code was emailed, to be typed in here. Absent: an older server that mails a link. */
+  method?: 'code';
+  codeLength?: number;
+  expiresInMinutes?: number;
 }
 
 interface AuthState {
@@ -46,6 +50,8 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<RegisterResult>;
+  /** Confirm a new account's email with the emailed code; signs in on success. */
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
 }
@@ -82,11 +88,19 @@ export const useAuthStore = create<AuthState>((set) => ({
         verificationRequired: true,
         emailSent: data.emailSent !== false,
         expiresInHours: typeof data.expiresInHours === 'number' ? data.expiresInHours : undefined,
+        method: data.method === 'code' ? 'code' : undefined,
+        codeLength: typeof data.codeLength === 'number' ? data.codeLength : undefined,
+        expiresInMinutes: typeof data.expiresInMinutes === 'number' ? data.expiresInMinutes : undefined,
       };
     }
     set({ user: mapUser(data.user) });
     connectSocket();
     return { verificationRequired: false, emailSent: false };
+  },
+  async verifyEmailCode(email, code) {
+    const { data } = await api.post('/auth/verify-email-code', { email, code });
+    set({ user: mapUser(data.user) });
+    connectSocket();
   },
   async logout() {
     try {

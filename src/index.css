@@ -17291,3 +17291,14 @@ legend {
   display: block;
   pointer-events: none;
 }
+
+/* Emailed 6-digit code: wide, spaced digits that read like the code in the email. */
+.auth-input-wrap input.auth-code-input {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.45em;
+  font-weight: 600;
+}
+.auth-input-wrap input.auth-code-input::placeholder {
+  letter-spacing: 0.45em;
+}
